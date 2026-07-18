@@ -1,0 +1,24 @@
+{
+  "name": "epub-exporter",
+  "version": "0.0.1",
+  "description": "Export Markdown notes as EPUB books from Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": ["obsidian", "epub"],
+  "author": "Johannes Kaindl",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.20.0",
+    "fflate": "^0.8.2",
+    "jsdom": "^24.0.0",
+    "obsidian": "latest",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}
