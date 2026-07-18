@@ -51,11 +51,11 @@ export function parseBookMetadata(
   fm: Record<string, unknown>,
   opts: ParseOptions
 ): BookMetadata {
-  const identifier = (pick(fm, "identifier") as string) || generateUrnUuid(opts.rng);
+  const identifier = asString(pick(fm, "identifier")) || generateUrnUuid(opts.rng);
   return {
-    title: (pick(fm, "title") as string) || opts.fallbackTitle,
+    title: asString(pick(fm, "title")) || opts.fallbackTitle,
     authors: asStringArray(pick(fm, "author")),
-    language: (pick(fm, "language") as string) || opts.defaultLanguage,
+    language: asString(pick(fm, "language")) || opts.defaultLanguage,
     identifier,
     description: asString(pick(fm, "description")),
     publisher: asString(pick(fm, "publisher")),

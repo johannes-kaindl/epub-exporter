@@ -52,6 +52,13 @@ describe("parseBookMetadata", () => {
     const m = parseBookMetadata({ tags: ["a", "b"] }, opts);
     expect(m.subjects).toEqual(["a", "b"]);
   });
+
+  it("coerces a bare-number title/identifier to a string", () => {
+    const m = parseBookMetadata({ title: 2024, identifier: 12345 }, opts);
+    expect(m.title).toBe("2024");
+    expect(typeof m.title).toBe("string");
+    expect(m.identifier).toBe("12345");
+  });
 });
 
 describe("BOOK_FRONTMATTER_TEMPLATE", () => {
