@@ -59,6 +59,12 @@ describe("parseBookMetadata", () => {
     expect(typeof m.title).toBe("string");
     expect(m.identifier).toBe("12345");
   });
+
+  it("does not treat an unrelated `id` field as the identifier", () => {
+    const m = parseBookMetadata({ id: "note-42" }, opts);
+    expect(m.identifier).not.toBe("note-42");
+    expect(m.identifier).toMatch(/^urn:uuid:/);
+  });
 });
 
 describe("BOOK_FRONTMATTER_TEMPLATE", () => {

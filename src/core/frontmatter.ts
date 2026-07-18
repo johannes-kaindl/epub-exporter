@@ -6,7 +6,7 @@ const ALIASES: Record<string, string[]> = {
   title: ["title", "titel"],
   author: ["author", "autor", "authors", "autoren"],
   language: ["language", "sprache", "lang"],
-  identifier: ["identifier", "id", "isbn"],
+  identifier: ["identifier", "isbn"],
   description: ["description", "beschreibung"],
   publisher: ["publisher", "verlag"],
   date: ["date", "datum"],
