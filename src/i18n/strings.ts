@@ -24,6 +24,18 @@ export const EN: Record<string, string> = {
   "settings.language.desc": "Used when a book note has no language field (e.g. en, de).",
   "settings.openSidebar.name": "Open sidebar on startup",
   "settings.openSidebar.desc": "Automatically reveal the EPUB Exporter panel when Obsidian starts.",
+  "cmd.openSidebar": "Open EPUB Exporter sidebar",
+  "view.title": "EPUB Exporter",
+  "view.context.book": "Book note",
+  "view.context.note": "Note",
+  "view.none.title": "No note selected",
+  "view.empty": "Open a note to export it as EPUB.",
+  "view.chaptersLabel": "Chapters",
+  "view.missing": "{0} chapter(s) missing",
+  "view.export": "Export as EPUB",
+  "view.exportNote": "Export note as EPUB",
+  "view.editMetadata": "Edit metadata",
+  "view.makeBook": "Make into a book",
 };
 
 export const DE: Record<string, string> = {
@@ -50,6 +62,18 @@ export const DE: Record<string, string> = {
   "settings.language.desc": "Wird verwendet, wenn eine Buch-Notiz kein Sprachfeld hat (z.B. en, de).",
   "settings.openSidebar.name": "Seitenleiste beim Start öffnen",
   "settings.openSidebar.desc": "Das EPUB-Exporter-Panel beim Start von Obsidian automatisch einblenden.",
+  "cmd.openSidebar": "EPUB-Exporter-Seitenleiste öffnen",
+  "view.title": "EPUB Exporter",
+  "view.context.book": "Buch-Notiz",
+  "view.context.note": "Notiz",
+  "view.none.title": "Keine Notiz ausgewählt",
+  "view.empty": "Öffne eine Notiz, um sie als EPUB zu exportieren.",
+  "view.chaptersLabel": "Kapitel",
+  "view.missing": "{0} Kapitel fehlen",
+  "view.export": "Als EPUB exportieren",
+  "view.exportNote": "Notiz als EPUB exportieren",
+  "view.editMetadata": "Metadaten bearbeiten",
+  "view.makeBook": "Zu Buch machen",
 };
 
 export function registerI18n(): void {
