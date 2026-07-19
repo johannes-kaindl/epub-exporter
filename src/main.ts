@@ -34,7 +34,10 @@ export default class EpubExporterPlugin extends Plugin {
 
     this.addSettingTab(new EpubSettingTab(this.app, this));
 
-    this.addRibbonIcon("book", t("cmd.exportRibbon"), () => { void this.exportActive(); });
+    // Ribbon opens the sidebar (spec §5.1 "per Ribbon erreichbar", matching the
+    // sibling hub plugins). Export lives on the command, the sidebar button, and
+    // the folder context menu — the ribbon is the panel's entry point, not an export.
+    this.addRibbonIcon("book", t("cmd.openSidebar"), () => { void this.openHub(); });
 
     this.addCommand({ id: "export-epub", name: t("cmd.export"), callback: () => { void this.exportActive(); } });
     this.addCommand({ id: "insert-book-frontmatter", name: t("cmd.insertFrontmatter"), callback: () => { void this.insertFrontmatterFor(this.app.workspace.getActiveFile()); } });
