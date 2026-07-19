@@ -26,6 +26,7 @@ export interface ImageSource {
 export class ImageRegistry {
   private assets: ImageAsset[] = [];
   private bySrc = new Map<string, { id: string; href: string }>();
+  private byPath = new Map<string, { id: string; href: string }>();
   private counter = 0;
 
   constructor(private read: (src: string, sourcePath: string) => Promise<ImageSource | null>) {}
@@ -35,6 +36,13 @@ export class ImageRegistry {
     if (seen) return seen;
     const got = await this.read(src, sourcePath);
     if (!got) return null;
+    // Two distinct srcs (bare cover filename vs. inline app:// URL) can resolve to the same
+    // vault file; dedup on the resolved path so the asset is embedded once.
+    const canon = this.byPath.get(got.path);
+    if (canon) {
+      this.bySrc.set(src, canon);
+      return canon;
+    }
     const mediaType = mediaTypeForPath(got.path);
     if (!mediaType) return null;
     this.counter++;
@@ -43,6 +51,7 @@ export class ImageRegistry {
     this.assets.push({ id, href, mediaType, data: got.data });
     const ref = { id, href };
     this.bySrc.set(src, ref);
+    this.byPath.set(got.path, ref);
     return ref;
   }
 

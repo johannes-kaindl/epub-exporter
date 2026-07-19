@@ -52,4 +52,17 @@ describe("ImageRegistry", () => {
     await reg.resolve("a.png", "chapter-3.md");
     expect(calls).toEqual([{ src: "a.png", sourcePath: "chapter-3.md" }]);
   });
+
+  it("dedups two different srcs that resolve to the same vault path", async () => {
+    // "cov.png" (cover) and "app://host/cov.png?9" (inline) → same file "assets/cov.png".
+    const reg = new ImageRegistry(async (src) => ({
+      data: new Uint8Array([1]),
+      path: "assets/cov.png",
+    }));
+    const a = await reg.resolve("cov.png", "Book.md");
+    const b = await reg.resolve("app://host/cov.png?9", "Chapter.md");
+    expect(a).not.toBeNull();
+    expect(b).toEqual(a); // same id + href
+    expect(reg.images()).toHaveLength(1);
+  });
 });
