@@ -71,4 +71,10 @@ describe("buildEpub", () => {
     expect(opf).toContain('properties="cover-image"');
     expect(opf).toContain('name="cover" content="img-01"');
   });
+
+  it("throws when the book has no chapters", () => {
+    const book = fixtureBook();
+    book.chapters = [];
+    expect(() => buildEpub(book)).toThrow(/no chapters/i);
+  });
 });

@@ -140,6 +140,9 @@ function buildNcx(book: Book): string {
 }
 
 export function buildEpub(book: Book): Uint8Array {
+  if (book.chapters.length === 0) {
+    throw new Error("Cannot build an EPUB with no chapters.");
+  }
   const entries: ZipEntry[] = [];
   // mimetype MUST be first and stored (createZip stores everything).
   entries.push({ path: "mimetype", data: enc(MIMETYPE) });
