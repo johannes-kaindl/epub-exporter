@@ -40,7 +40,16 @@ export function extractCodeBlocks(md: string): { markdown: string; codes: Extrac
 
     const body = lines.slice(i + 1, j).map((l) => (l.startsWith(indent) ? l.slice(indent.length) : l));
     codes.push({ lang: lang || undefined, text: body.join("\n") });
+
+    // A fenced code block can interrupt a paragraph in CommonMark/Obsidian, so a placeholder
+    // hugging adjacent text would be rendered as part of the same paragraph (soft break) rather
+    // than as its own lone paragraph — which is what restoreCodeBlocks' regex requires. Pad with
+    // blank lines on both sides (unless already blank) to force the placeholder into its own
+    // block. Extra/duplicate blank lines are harmless in Markdown.
+    if (out.length > 0 && out[out.length - 1] !== "") out.push("");
     out.push(indent + codePlaceholder(codes.length - 1));
+    const nextLine = lines[j + 1];
+    if (nextLine !== undefined && nextLine !== "") out.push("");
     i = j + 1;
   }
 
