@@ -8,20 +8,39 @@ export interface RenderContext {
   onUnsupported(kind: string): void;
 }
 
-const VOID_TAGS = new Set(["br", "hr"]);
-const PASSTHROUGH = new Set([
+// Elements emitted verbatim (as valid XHTML tags).
+const BLOCK = new Set([
   "p", "h1", "h2", "h3", "h4", "h5", "h6",
-  "ul", "ol", "li", "blockquote", "pre", "code",
-  "em", "strong", "del", "s", "b", "i",
-  "table", "thead", "tbody", "tr", "th", "td",
-  "hr", "br", "sup", "sub", "span", "div",
+  "ul", "ol", "li", "blockquote", "pre",
+  "table", "thead", "tbody", "tr", "th", "td", "hr",
 ]);
+const INLINE = new Set(["em", "strong", "del", "s", "b", "i", "code", "sup", "sub", "span", "br"]);
+// Generic containers: unwrap (serialize children, drop the wrapper).
+const UNWRAP = new Set(["div", "section", "article"]);
+const VOID = new Set(["br", "hr"]);
+// Per-tag attribute whitelist — everything else is dropped for safety/validity.
+const ATTR_WHITELIST: Record<string, string[]> = {
+  td: ["colspan", "rowspan"],
+  th: ["colspan", "rowspan"],
+  ol: ["start"],
+};
 
 function escapeText(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function escapeAttr(s: string): string {
   return escapeText(s).replace(/"/g, "&quot;");
+}
+
+function serializeAttrs(el: Element, tag: string): string {
+  const allow = ATTR_WHITELIST[tag];
+  if (!allow) return "";
+  let out = "";
+  for (const name of allow) {
+    const v = el.getAttribute(name);
+    if (v !== null) out += ` ${name}="${escapeAttr(v)}"`;
+  }
+  return out;
 }
 
 export function domToXhtml(root: Node, ctx: RenderContext): string {
@@ -62,12 +81,24 @@ function serializeNode(node: Node, ctx: RenderContext): string {
     return internal ? `<a href="${escapeAttr(internal)}">${inner}</a>` : inner;
   }
 
-  if (PASSTHROUGH.has(tag)) {
-    if (VOID_TAGS.has(tag)) return `<${tag}/>`;
-    return `<${tag}>${serializeChildren(el, ctx)}</${tag}>`;
+  // Math (MathJax container or an element flagged with the math class) -> text.
+  if (tag === "mjx-container" || el.classList.contains("math")) {
+    ctx.onUnsupported("math");
+    return escapeText(el.textContent ?? "");
   }
 
-  // Unknown element (callout, math, embed container, ...) -> degrade to text.
+  // Generic containers -> unwrap. A callout is a div; flag it, then keep its inner content.
+  if (UNWRAP.has(tag)) {
+    if (el.classList.contains("callout")) ctx.onUnsupported("callout");
+    return serializeChildren(el, ctx);
+  }
+
+  if (BLOCK.has(tag) || INLINE.has(tag)) {
+    if (VOID.has(tag)) return `<${tag}/>`;
+    return `<${tag}${serializeAttrs(el, tag)}>${serializeChildren(el, ctx)}</${tag}>`;
+  }
+
+  // Unknown element -> inline-safe escaped text (NO <p> wrapper -> no invalid nesting).
   ctx.onUnsupported(tag);
-  return `<p>${escapeText(el.textContent ?? "")}</p>`;
+  return escapeText(el.textContent ?? "");
 }

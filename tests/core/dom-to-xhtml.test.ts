@@ -60,10 +60,42 @@ describe("domToXhtml", () => {
     expect(dangling).toBe("go");
   });
 
-  it("degrades an unsupported element to a text paragraph and reports it", () => {
+  it("degrades an unknown element to inline-safe text (no <p> wrapper) and reports it", () => {
     const onUnsupported = vi.fn();
-    const out = domToXhtml(frag("<math>E=mc2</math>"), ctx({ onUnsupported }));
-    expect(out).toBe("<p>E=mc2</p>");
+    // unknown element sitting INSIDE a paragraph must NOT produce nested <p>
+    const out = domToXhtml(frag("<p>a <foo>x</foo> b</p>"), ctx({ onUnsupported }));
+    expect(out).toBe("<p>a x b</p>");
+    expect(onUnsupported).toHaveBeenCalledWith("foo");
+  });
+
+  it("unwraps div/section/article without emitting the wrapper", () => {
+    const out = domToXhtml(frag("<div><p>hi</p></div><section><p>yo</p></section>"), ctx());
+    expect(out).toBe("<p>hi</p><p>yo</p>");
+  });
+
+  it("unwraps a callout div and reports it as unsupported", () => {
+    const onUnsupported = vi.fn();
+    const out = domToXhtml(
+      frag('<div class="callout"><div class="callout-title">Note</div><div class="callout-content"><p>body</p></div></div>'),
+      ctx({ onUnsupported })
+    );
+    // callout box unwrapped: title text kept as unwrapped text, content <p> kept
+    expect(out).toBe("Note<p>body</p>");
+    expect(onUnsupported).toHaveBeenCalledWith("callout");
+  });
+
+  it("degrades a math container to text and reports it", () => {
+    const onUnsupported = vi.fn();
+    const out = domToXhtml(frag("<mjx-container>x^2</mjx-container>"), ctx({ onUnsupported }));
+    expect(out).toBe("x^2");
     expect(onUnsupported).toHaveBeenCalledWith("math");
+  });
+
+  it("keeps whitelisted attributes and drops the rest", () => {
+    const out = domToXhtml(
+      frag('<table><tbody><tr><td colspan="2" style="color:red" onclick="x()">c</td></tr></tbody></table>'),
+      ctx()
+    );
+    expect(out).toBe('<table><tbody><tr><td colspan="2">c</td></tr></tbody></table>');
   });
 });
