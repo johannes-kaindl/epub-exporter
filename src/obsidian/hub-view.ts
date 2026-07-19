@@ -23,6 +23,10 @@ export interface SidebarBridge {
 // Thin ItemView shell around the node-tested model + renderer. Re-renders on
 // every active-leaf/file change so the panel always reflects the current note.
 export class EpubHubView extends ItemView {
+  // Key of the model currently on screen — lets rerender() skip a redundant DOM
+  // rebuild (see rerender for why that matters for click handling).
+  private lastModelKey: string | null = null;
+
   constructor(leaf: WorkspaceLeaf, private bridge: SidebarBridge) {
     super(leaf);
   }
@@ -45,15 +49,28 @@ export class EpubHubView extends ItemView {
 
   async onClose(): Promise<void> {
     this.contentEl.empty();
+    this.lastModelKey = null;
   }
 
   private async rerender(): Promise<void> {
+    let snap: SidebarSnapshot | null = null;
+    let failed = false;
     try {
-      const snap = await this.bridge.snapshot();
-      renderSidebar(this.contentEl, buildSidebarModel(snap), this.bridge.handlers);
+      snap = await this.bridge.snapshot();
     } catch (e) {
       console.error("EPUB Exporter: sidebar render failed", e);
-      renderSidebar(this.contentEl, buildSidebarModel(null), this.bridge.handlers);
+      failed = true;
     }
+    const model = buildSidebarModel(failed ? null : snap);
+
+    // active-leaf-change fires when the user focuses the sidebar itself, but
+    // resolveTargetFile reads rootSplit (which excludes sidebars), so the target
+    // note — and thus the model — is unchanged. Rebuilding the DOM here would
+    // destroy the button under the pointer before its click lands, making every
+    // sidebar button need two clicks. Only rebuild when the model actually changed.
+    const key = JSON.stringify(model);
+    if (key === this.lastModelKey) return;
+    this.lastModelKey = key;
+    renderSidebar(this.contentEl, model, this.bridge.handlers);
   }
 }
