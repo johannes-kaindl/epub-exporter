@@ -52,7 +52,15 @@ export default class EpubExporterPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = coerceSettings(await this.loadData());
+    const raw = await this.loadData();
+    this.settings = coerceSettings(raw);
+    // Fresh install (no persisted language yet): default the book language to
+    // Obsidian's UI language (de/en) instead of the static "en" fallback. An
+    // explicit user choice is preserved because its key is present in `raw`.
+    const rawObj = (raw ?? {}) as Record<string, unknown>;
+    if (rawObj.defaultLanguage === undefined) {
+      this.settings.defaultLanguage = pickLang(readObsidianLocale());
+    }
   }
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);

@@ -42,13 +42,19 @@ export class EpubSettingTab extends PluginSettingTab {
         }));
     }
 
+    // Dropdown, not free text: only the languages the plugin actually ships
+    // UI strings for (de/en). Labels are shown in their own language, unlocalised.
     new Setting(containerEl)
       .setName(t("settings.language.name"))
       .setDesc(t("settings.language.desc"))
-      .addText((txt) => txt.setValue(s.defaultLanguage).onChange(async (v) => {
-        s.defaultLanguage = v.trim() || "en";
-        await save();
-      }));
+      .addDropdown((d) => d
+        .addOptions({ en: "English", de: "Deutsch" })
+        // Coerce any legacy free-text value to a valid option for display.
+        .setValue(s.defaultLanguage === "de" ? "de" : "en")
+        .onChange(async (v) => {
+          s.defaultLanguage = v;
+          await save();
+        }));
 
     new Setting(containerEl)
       .setName(t("settings.openSidebar.name"))
