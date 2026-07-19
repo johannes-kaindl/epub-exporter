@@ -17,7 +17,7 @@ export async function buildSnapshot(app: App, defaultLanguage: string): Promise<
     const body = stripFrontmatter(content);
     const chapters = buildBookChapters(body, (target) => {
       const dest = app.metadataCache.getFirstLinkpathDest(target, file.path);
-      if (!(dest instanceof TFile)) return null;
+      if (!(dest instanceof TFile) || dest.extension !== "md") return null;
       const destFm = (app.metadataCache.getFileCache(dest)?.frontmatter ?? {}) as Record<string, unknown>;
       const ct = destFm["chapter_title"];
       return { title: typeof ct === "string" && ct ? ct : dest.basename };

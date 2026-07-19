@@ -48,7 +48,12 @@ export class EpubHubView extends ItemView {
   }
 
   private async rerender(): Promise<void> {
-    const snap = await this.bridge.snapshot();
-    renderSidebar(this.contentEl, buildSidebarModel(snap), this.bridge.handlers);
+    try {
+      const snap = await this.bridge.snapshot();
+      renderSidebar(this.contentEl, buildSidebarModel(snap), this.bridge.handlers);
+    } catch (e) {
+      console.error("EPUB Exporter: sidebar render failed", e);
+      renderSidebar(this.contentEl, buildSidebarModel(null), this.bridge.handlers);
+    }
   }
 }

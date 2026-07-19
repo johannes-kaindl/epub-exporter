@@ -69,7 +69,7 @@ export const DE: Record<string, string> = {
   "view.none.title": "Keine Notiz ausgewählt",
   "view.empty": "Öffne eine Notiz, um sie als EPUB zu exportieren.",
   "view.chaptersLabel": "Kapitel",
-  "view.missing": "{0} Kapitel fehlen",
+  "view.missing": "{0} fehlende Kapitel",
   "view.export": "Als EPUB exportieren",
   "view.exportNote": "Notiz als EPUB exportieren",
   "view.editMetadata": "Metadaten bearbeiten",
