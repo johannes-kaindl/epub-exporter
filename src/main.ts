@@ -4,13 +4,16 @@ import { assembleBook, BookSource } from "./obsidian/book-assembler";
 import { buildEpub } from "./core/epub-builder";
 import { createAssemblerDeps } from "./obsidian/deps";
 import { writeEpub } from "./obsidian/output";
+import { sanitizeBase } from "./core/output-path";
 import { EpubSettingTab } from "./obsidian/settings-tab";
 import { coerceSettings, EpubExporterSettings } from "./obsidian/settings";
 import { BOOK_FRONTMATTER_TEMPLATE } from "./core/frontmatter";
 import { registerI18n } from "./i18n/strings";
 import { pickLang, setLang, t } from "./vendor/kit/i18n";
 
-// Runtime-only Obsidian API not in the public typings.
+// Defensive feature-detect: getAvailablePathForAttachment is in the installed obsidian
+// typings, but this narrow interface guards hosts older than minAppVersion (1.8.7),
+// where the method may not exist at runtime.
 interface FileManagerExt {
   getAvailablePathForAttachment?: (filename: string, sourcePath: string) => Promise<string>;
 }
@@ -105,11 +108,12 @@ export default class EpubExporterPlugin extends Plugin {
   }
 
   private async attachmentPathFor(sourcePath: string, baseName: string): Promise<string> {
+    const safeBaseName = sanitizeBase(baseName);
     const fm = this.app.fileManager as unknown as FileManagerExt;
     if (typeof fm.getAvailablePathForAttachment === "function") {
-      return normalizePath(await fm.getAvailablePathForAttachment(`${baseName}.epub`, sourcePath));
+      return normalizePath(await fm.getAvailablePathForAttachment(`${safeBaseName}.epub`, sourcePath));
     }
-    return normalizePath(`${baseName}.epub`);
+    return normalizePath(`${safeBaseName}.epub`);
   }
 
   private async insertFrontmatter(): Promise<void> {
