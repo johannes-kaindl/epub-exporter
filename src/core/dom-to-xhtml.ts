@@ -15,8 +15,12 @@ const BLOCK = new Set([
   "table", "thead", "tbody", "tr", "th", "td", "hr",
 ]);
 const INLINE = new Set(["em", "strong", "del", "s", "b", "i", "code", "sup", "sub", "span", "br"]);
-// Generic containers: unwrap (serialize children, drop the wrapper).
-const UNWRAP = new Set(["div", "section", "article"]);
+// Generic containers: unwrap (serialize children, drop the wrapper). Includes the common
+// HTML5 sectioning/figure wrappers so a wrapped <img>/<a> is not lost to textContent.
+const UNWRAP = new Set([
+  "div", "section", "article",
+  "figure", "figcaption", "aside", "details", "summary", "header", "footer", "main", "nav",
+]);
 const VOID = new Set(["br", "hr"]);
 // Per-tag attribute whitelist — everything else is dropped for safety/validity.
 const ATTR_WHITELIST: Record<string, string[]> = {

@@ -98,4 +98,13 @@ describe("domToXhtml", () => {
     );
     expect(out).toBe('<table><tbody><tr><td colspan="2">c</td></tr></tbody></table>');
   });
+
+  it("unwraps a <figure> and keeps its inner image", () => {
+    const out = domToXhtml(
+      frag('<figure><img src="a.png" alt="cap"><figcaption>cap</figcaption></figure>'),
+      ctx()
+    );
+    expect(out).toContain('<img src="images/x.png" alt="cap"/>');
+    expect(out).toContain("cap"); // figcaption text preserved as loose inline text
+  });
 });
