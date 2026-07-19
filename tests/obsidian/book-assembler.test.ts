@@ -8,12 +8,16 @@ import { assembleBook, AssemblerDeps, NoteData } from "../../src/obsidian/book-a
 // DOM. vitest's jsdom env gives us document.
 // @vitest-environment jsdom
 
-function makeDeps(notes: Record<string, NoteData>, images: Record<string, { path: string; n: number }>): AssemblerDeps {
+function makeDeps(
+  notes: Record<string, NoteData>,
+  images: Record<string, { path: string; n: number }>,
+  codes: Record<string, { lang?: string; text: string }[]> = {}
+): AssemblerDeps {
   return {
-    async renderMarkdown(markdown, _sourcePath) {
+    async renderMarkdown(markdown, sourcePath) {
       const root = document.createElement("div");
       root.innerHTML = markdown; // test notes provide HTML bodies directly
-      return { root, dispose: () => {} };
+      return { root, dispose: () => {}, codes: codes[sourcePath] ?? [] };
     },
     async readNote(path) {
       return notes[path] ?? null;
@@ -191,5 +195,18 @@ describe("assembleBook — per-chapter and cover sourcePath", () => {
     expect(introCall?.sourcePath).toBe("Intro.md");
     expect(bodyCall?.sourcePath).toBe("Body.md");
     expect(coverCall?.sourcePath).toBe("Book.md");
+  });
+});
+
+describe("assembleBook — code-block restore", () => {
+  it("re-injects extracted fenced code as <pre><code> in the chapter XHTML", async () => {
+    // The book-note body already carries the post-render placeholder paragraph;
+    // codes[sourcePath] supplies the captured fence, as the real renderMarkdown would.
+    const notes = {
+      "N.md": note("N.md", "<p>EPUBEXPORTERCODE0</p>", { epub: true, title: "T" }),
+    };
+    const deps = makeDeps(notes, {}, { "N.md": [{ lang: "js", text: "a<b" }] });
+    const { book } = await assembleBook(deps, { kind: "note", path: "N.md" }, opts);
+    expect(book.chapters[0].xhtml).toContain('<pre><code class="language-js">a&lt;b</code></pre>');
   });
 });

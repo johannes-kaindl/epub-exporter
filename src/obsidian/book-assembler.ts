@@ -5,6 +5,7 @@ import { sortFolderChapters } from "../core/spine-parser";
 import { domToXhtml, RenderContext } from "../core/dom-to-xhtml";
 import { ImageRegistry, ImageSource } from "../core/image-registry";
 import { DEFAULT_BOOK_CSS } from "../core/epub-builder";
+import { restoreCodeBlocks, ExtractedCode } from "../core/code-blocks";
 
 export interface NoteData {
   path: string;
@@ -16,6 +17,7 @@ export interface NoteData {
 export interface RenderedNote {
   root: HTMLElement;
   dispose: () => void;
+  codes: ExtractedCode[]; // fenced code pulled out before render, re-injected after dom-to-xhtml
 }
 
 // Injected Obsidian port bundle — real impl (app.*) is built in Plan 3.
@@ -164,7 +166,8 @@ export async function assembleBook(
           simplifiedCount++;
         },
       };
-      chapters.push({ title: plan.title, xhtml: domToXhtml(rendered.root, ctx), sourcePath: plan.sourcePath });
+      const xhtml = restoreCodeBlocks(domToXhtml(rendered.root, ctx), rendered.codes);
+      chapters.push({ title: plan.title, xhtml, sourcePath: plan.sourcePath });
     } finally {
       rendered.dispose();
     }
