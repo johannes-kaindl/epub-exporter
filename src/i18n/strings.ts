@@ -1,8 +1,7 @@
 import { defineStrings } from "../vendor/kit/i18n";
 
 export const EN: Record<string, string> = {
-  "cmd.exportBook": "Export book as EPUB",
-  "cmd.exportNote": "Export note as EPUB",
+  "cmd.export": "Export as EPUB",
   "cmd.exportFolder": "Export folder as EPUB",
   "cmd.insertFrontmatter": "Insert book frontmatter into note",
   "cmd.exportRibbon": "Export as EPUB",
@@ -15,11 +14,20 @@ export const EN: Record<string, string> = {
   "notice.fmAdded": "Book frontmatter added.",
   "notice.fmFailed": "Could not add book frontmatter.",
   "notice.exportFailed": "EPUB export failed — see console for details.",
+  "settings.output.name": "Output destination",
+  "settings.output.besideNote": "Beside the note",
+  "settings.output.attachmentFolder": "Attachment folder",
+  "settings.output.customFolder": "Custom folder",
+  "settings.output.share": "Share / open in another app",
+  "settings.customFolder.name": "Custom folder",
+  "settings.language.name": "Default book language",
+  "settings.language.desc": "Used when a book note has no language field (e.g. en, de).",
+  "settings.openSidebar.name": "Open sidebar on startup",
+  "settings.openSidebar.desc": "Automatically reveal the EPUB Exporter panel when Obsidian starts.",
 };
 
 export const DE: Record<string, string> = {
-  "cmd.exportBook": "Buch als EPUB exportieren",
-  "cmd.exportNote": "Notiz als EPUB exportieren",
+  "cmd.export": "Als EPUB exportieren",
   "cmd.exportFolder": "Ordner als EPUB exportieren",
   "cmd.insertFrontmatter": "Buch-Frontmatter in Notiz einfügen",
   "cmd.exportRibbon": "Als EPUB exportieren",
@@ -32,6 +40,16 @@ export const DE: Record<string, string> = {
   "notice.fmAdded": "Buch-Frontmatter ergänzt.",
   "notice.fmFailed": "Buch-Frontmatter konnte nicht ergänzt werden.",
   "notice.exportFailed": "EPUB-Export fehlgeschlagen — Details in der Konsole.",
+  "settings.output.name": "Ausgabeziel",
+  "settings.output.besideNote": "Neben der Notiz",
+  "settings.output.attachmentFolder": "Anhang-Ordner",
+  "settings.output.customFolder": "Eigener Ordner",
+  "settings.output.share": "Teilen / in anderer App öffnen",
+  "settings.customFolder.name": "Eigener Ordner",
+  "settings.language.name": "Standard-Buchsprache",
+  "settings.language.desc": "Wird verwendet, wenn eine Buch-Notiz kein Sprachfeld hat (z.B. en, de).",
+  "settings.openSidebar.name": "Seitenleiste beim Start öffnen",
+  "settings.openSidebar.desc": "Das EPUB-Exporter-Panel beim Start von Obsidian automatisch einblenden.",
 };
 
 export function registerI18n(): void {
