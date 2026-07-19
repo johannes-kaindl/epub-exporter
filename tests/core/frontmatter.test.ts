@@ -4,6 +4,7 @@ import {
   isBookNote,
   BOOK_FRONTMATTER_TEMPLATE,
 } from "../../src/core/frontmatter";
+import { stripFrontmatter } from "../../src/core/frontmatter";
 
 const opts = { fallbackTitle: "Untitled", defaultLanguage: "en", rng: () => 0.5 };
 
@@ -64,6 +65,16 @@ describe("parseBookMetadata", () => {
     const m = parseBookMetadata({ id: "note-42" }, opts);
     expect(m.identifier).not.toBe("note-42");
     expect(m.identifier).toMatch(/^urn:uuid:/);
+  });
+});
+
+describe("stripFrontmatter", () => {
+  it("removes a leading YAML block, keeps body", () => {
+    const md = ["---", "epub: true", "title: X", "---", "", "# Body", "text"].join("\n");
+    expect(stripFrontmatter(md)).toBe(["", "# Body", "text"].join("\n"));
+  });
+  it("returns content unchanged when there is no frontmatter", () => {
+    expect(stripFrontmatter("# Body only")).toBe("# Body only");
   });
 });
 

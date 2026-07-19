@@ -3,15 +3,7 @@ import { App, Component, MarkdownRenderer, TFile, TFolder, normalizePath } from 
 import { AssemblerDeps, NoteData } from "./book-assembler";
 import { ImageSource } from "../core/image-registry";
 import { extractCodeBlocks } from "../core/code-blocks";
-
-// Strip a leading YAML frontmatter block so the body handed to the renderer has no raw YAML.
-function stripFrontmatter(content: string): string {
-  if (content.startsWith("---")) {
-    const m = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-    if (m) return content.slice(m[0].length);
-  }
-  return content;
-}
+import { stripFrontmatter } from "../core/frontmatter";
 
 export function createAssemblerDeps(app: App): AssemblerDeps {
   return {

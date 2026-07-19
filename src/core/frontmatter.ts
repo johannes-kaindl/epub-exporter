@@ -68,6 +68,16 @@ export function parseBookMetadata(
   };
 }
 
+// Strip a leading YAML frontmatter block so the body handed to a renderer/parser
+// has no raw YAML. Shared by deps.ts (render) and sidebar-bridge.ts (spine read).
+export function stripFrontmatter(content: string): string {
+  if (content.startsWith("---")) {
+    const m = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+    if (m) return content.slice(m[0].length);
+  }
+  return content;
+}
+
 // Fields scaffolded by the "Insert book frontmatter" command (Plan 2).
 // Canonical English keys; the user may rename to German aliases.
 export const BOOK_FRONTMATTER_TEMPLATE: Record<string, unknown> = {
