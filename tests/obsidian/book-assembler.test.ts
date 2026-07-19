@@ -113,3 +113,83 @@ describe("assembleBook — folder", () => {
     expect(book.metadata.title).toBe("Bk");
   });
 });
+
+describe("assembleBook — epub_exclude", () => {
+  it("skips an embedded chapter marked epub_exclude in book-note mode", async () => {
+    const notes = {
+      "Book.md": note("Book.md", "![[Intro]]\n![[Body]]", { epub: true, title: "B" }),
+      "Intro.md": note("Intro.md", "<p>intro</p>"),
+      "Body.md": note("Body.md", "<p>body</p>", { epub_exclude: true }),
+    };
+    const { book } = await assembleBook(makeDeps(notes, {}), { kind: "note", path: "Book.md" }, opts);
+    expect(book.chapters.map((c) => c.title)).toEqual(["Intro"]);
+  });
+
+  it("skips a folder note marked epub_exclude", async () => {
+    const notes = {
+      "Bk/01 One.md": note("Bk/01 One.md", "<p>one</p>"),
+      "Bk/02 Two.md": note("Bk/02 Two.md", "<p>two</p>", { epub_exclude: true }),
+    };
+    const { book } = await assembleBook(makeDeps(notes, {}), { kind: "folder", path: "Bk" }, opts);
+    expect(book.chapters.map((c) => c.title)).toEqual(["01 One"]);
+  });
+});
+
+describe("assembleBook — failed image resolution", () => {
+  it("counts a missing image as simplified and adds nothing to book.images", async () => {
+    const notes = {
+      "Book.md": note("Book.md", "![[Intro]]", { epub: true, title: "B" }),
+      "Intro.md": note("Intro.md", '<p><img src="missing.png" alt=""></p>'),
+    };
+    const { book, simplifiedCount } = await assembleBook(makeDeps(notes, {}), { kind: "note", path: "Book.md" }, opts);
+    expect(simplifiedCount).toBe(1);
+    expect(book.images).toEqual([]);
+  });
+});
+
+describe("assembleBook — per-chapter and cover sourcePath", () => {
+  function makeDepsWithSourceTracking(
+    notes: Record<string, NoteData>,
+    images: Record<string, { path: string; n: number }>,
+    calls: Array<{ target: string; sourcePath: string }>
+  ): AssemblerDeps {
+    const base = makeDeps(notes, images);
+    return {
+      ...base,
+      async readImage(target, sourcePath) {
+        calls.push({ target, sourcePath });
+        return base.readImage(target, sourcePath);
+      },
+    };
+  }
+
+  it("resolves each chapter's images against that chapter's own note path, and the cover against the book note's path", async () => {
+    const calls: Array<{ target: string; sourcePath: string }> = [];
+    const notes = {
+      "Book.md": note("Book.md", "![[Intro]]\n![[Body]]", { epub: true, title: "B", cover: "cover.png" }),
+      "Intro.md": note("Intro.md", '<p><img src="intro-pic.png" alt=""></p>'),
+      "Body.md": note("Body.md", '<p><img src="body-pic.png" alt=""></p>'),
+    };
+    const images = {
+      "intro-pic.png": { path: "intro-pic.png", n: 1 },
+      "body-pic.png": { path: "body-pic.png", n: 2 },
+      "cover.png": { path: "cover.png", n: 3 },
+    };
+    const { book } = await assembleBook(
+      makeDepsWithSourceTracking(notes, images, calls),
+      { kind: "note", path: "Book.md" },
+      opts
+    );
+
+    expect(book.coverImageId).toBeDefined();
+    expect(book.images).toHaveLength(3);
+
+    const introCall = calls.find((c) => c.target === "intro-pic.png");
+    const bodyCall = calls.find((c) => c.target === "body-pic.png");
+    const coverCall = calls.find((c) => c.target === "cover.png");
+
+    expect(introCall?.sourcePath).toBe("Intro.md");
+    expect(bodyCall?.sourcePath).toBe("Body.md");
+    expect(coverCall?.sourcePath).toBe("Book.md");
+  });
+});

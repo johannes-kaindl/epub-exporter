@@ -28,12 +28,12 @@ export class ImageRegistry {
   private bySrc = new Map<string, { id: string; href: string }>();
   private counter = 0;
 
-  constructor(private read: (src: string) => Promise<ImageSource | null>) {}
+  constructor(private read: (src: string, sourcePath: string) => Promise<ImageSource | null>) {}
 
-  async resolve(src: string): Promise<{ id: string; href: string } | null> {
+  async resolve(src: string, sourcePath: string): Promise<{ id: string; href: string } | null> {
     const seen = this.bySrc.get(src);
     if (seen) return seen;
-    const got = await this.read(src);
+    const got = await this.read(src, sourcePath);
     if (!got) return null;
     const mediaType = mediaTypeForPath(got.path);
     if (!mediaType) return null;

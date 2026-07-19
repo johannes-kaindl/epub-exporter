@@ -83,6 +83,7 @@ export async function assembleBook(
   let frontmatter: Record<string, unknown> = {};
   let fallbackTitle = "Untitled";
   const plans: ChapterPlan[] = [];
+  let metadataSourcePath = source.path;
 
   if (source.kind === "folder") {
     fallbackTitle = source.path.split("/").pop() || source.path;
@@ -104,6 +105,7 @@ export async function assembleBook(
     if (isBookNote(root.frontmatter)) {
       frontmatter = root.frontmatter;
       fallbackTitle = root.basename;
+      metadataSourcePath = root.path;
       const spine = parseEmbedSpine(root.body);
       // leading prose = book-note body with the embed lines removed
       const prose = root.body
@@ -128,6 +130,7 @@ export async function assembleBook(
       // single note
       frontmatter = root.frontmatter;
       fallbackTitle = root.basename;
+      metadataSourcePath = root.path;
       plans.push({ title: chapterTitle(root), body: root.body, sourcePath: root.path });
     }
   }
@@ -138,9 +141,7 @@ export async function assembleBook(
     for (const key of linkKeysFor(plan.sourcePath)) linkMap.set(key, chapterFileName(i));
   });
 
-  const registry = new ImageRegistry((src) =>
-    deps.readImage(src, plans[0]?.sourcePath ?? source.path)
-  );
+  const registry = new ImageRegistry((src, sourcePath) => deps.readImage(src, sourcePath));
   let simplifiedCount = 0;
   const chapters: Chapter[] = [];
 
@@ -153,7 +154,7 @@ export async function assembleBook(
       for (let i = 0; i < imgs.length; i++) {
         const src = imgs[i].getAttribute("src") ?? "";
         if (srcToHref.has(src)) continue;
-        const resolved = await registry.resolve(src);
+        const resolved = await registry.resolve(src, plan.sourcePath);
         srcToHref.set(src, resolved ? resolved.href : null);
       }
       const ctx: RenderContext = {
@@ -179,7 +180,7 @@ export async function assembleBook(
   let coverImageId: string | undefined;
   if (metadata.coverImagePath) {
     const coverSrc = unwrapLink(metadata.coverImagePath);
-    const resolved = await registry.resolve(coverSrc);
+    const resolved = await registry.resolve(coverSrc, metadataSourcePath);
     if (resolved) coverImageId = resolved.id;
   }
 
