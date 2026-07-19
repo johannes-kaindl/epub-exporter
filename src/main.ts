@@ -1,5 +1,5 @@
 // src/main.ts
-import { Plugin, Notice, TFile, TFolder, Menu, getLanguage, normalizePath } from "obsidian";
+import { Plugin, Notice, TFile, TFolder, Menu, getLanguage, normalizePath, WorkspaceLeaf } from "obsidian";
 import { assembleBook, BookSource } from "./obsidian/book-assembler";
 import { buildEpub } from "./core/epub-builder";
 import { createAssemblerDeps } from "./obsidian/deps";
@@ -10,6 +10,8 @@ import { coerceSettings, EpubExporterSettings } from "./obsidian/settings";
 import { BOOK_FRONTMATTER_TEMPLATE } from "./core/frontmatter";
 import { registerI18n } from "./i18n/strings";
 import { pickLang, setLang, t } from "./vendor/kit/i18n";
+import { EpubHubView, VIEW_TYPE_EPUB_HUB, resolveTargetFile, SidebarBridge } from "./obsidian/hub-view";
+import { buildSnapshot } from "./obsidian/sidebar-bridge";
 
 // Defensive feature-detect: getAvailablePathForAttachment is in the installed obsidian
 // typings, but this narrow interface guards hosts older than minAppVersion (1.8.7),
@@ -35,7 +37,10 @@ export default class EpubExporterPlugin extends Plugin {
     this.addRibbonIcon("book", t("cmd.exportRibbon"), () => { void this.exportActive(); });
 
     this.addCommand({ id: "export-epub", name: t("cmd.export"), callback: () => { void this.exportActive(); } });
-    this.addCommand({ id: "insert-book-frontmatter", name: t("cmd.insertFrontmatter"), callback: () => { void this.insertFrontmatter(); } });
+    this.addCommand({ id: "insert-book-frontmatter", name: t("cmd.insertFrontmatter"), callback: () => { void this.insertFrontmatterFor(this.app.workspace.getActiveFile()); } });
+
+    this.registerView(VIEW_TYPE_EPUB_HUB, (leaf: WorkspaceLeaf) => new EpubHubView(leaf, this.makeBridge()));
+    this.addCommand({ id: "open-sidebar", name: t("cmd.openSidebar"), callback: () => { void this.openHub(); } });
 
     // Right-click a folder → export it as a book (filename-sorted spine).
     this.registerEvent(
@@ -49,6 +54,11 @@ export default class EpubExporterPlugin extends Plugin {
         }
       })
     );
+
+    // Gotcha Z.37: never auto-open unconditionally — gated on the setting and onLayoutReady.
+    this.app.workspace.onLayoutReady(() => {
+      if (this.settings.openSidebarOnStartup) void this.openHub();
+    });
   }
 
   async loadSettings(): Promise<void> {
@@ -124,8 +134,7 @@ export default class EpubExporterPlugin extends Plugin {
     return normalizePath(`${safeBaseName}.epub`);
   }
 
-  private async insertFrontmatter(): Promise<void> {
-    const file = this.app.workspace.getActiveFile();
+  private async insertFrontmatterFor(file: TFile | null): Promise<void> {
     if (!file || file.extension !== "md") { new Notice(t("notice.noActiveNote")); return; }
     try {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
@@ -139,5 +148,28 @@ export default class EpubExporterPlugin extends Plugin {
       console.error("EPUB Exporter: frontmatter insert failed", e);
       new Notice(t("notice.fmFailed"));
     }
+  }
+
+  private makeBridge(): SidebarBridge {
+    return {
+      snapshot: () => buildSnapshot(this.app, this.settings.defaultLanguage),
+      handlers: {
+        onExport: () => {
+          const file = resolveTargetFile(this.app);
+          if (file) void this.exportSource({ kind: "note", path: file.path });
+          else new Notice(t("notice.noActiveNote"));
+        },
+        onInsertFrontmatter: () => { void this.insertFrontmatterFor(resolveTargetFile(this.app)); },
+      },
+    };
+  }
+
+  async openHub(): Promise<void> {
+    const { workspace } = this.app;
+    const existing = workspace.getLeavesOfType(VIEW_TYPE_EPUB_HUB);
+    const leaf = existing[0] ?? workspace.getRightLeaf(false);
+    if (!leaf) return;
+    if (existing.length === 0) await leaf.setViewState({ type: VIEW_TYPE_EPUB_HUB, active: true });
+    void workspace.revealLeaf(leaf);
   }
 }
