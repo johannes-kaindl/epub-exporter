@@ -1,0 +1,17 @@
+# Changelog
+
+Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
+Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
+Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
+
+## [Unreleased]
+
+### Hinzugefügt
+
+- Export einer Notiz als EPUB3 — mit Buch-Note als Single Source of Truth:
+  Frontmatter trägt die Metadaten, geordnete `![[embeds]]` bilden den Kapitel-Spine.
+- Sidebar als Hub-View: Buch-Übersicht, Kapitelliste, Export per Klick.
+- Vier Ausgabeziele, Cover-Bild, interne Links, Bilder, Code-Blöcke.
+- `chapter_title`-Override und `epub_exclude` pro Kapitel.
+- Buchsprache Deutsch/Englisch, folgt der Obsidian-UI-Sprache.
+- Abhängigkeitsfreie Engine: eigener store-only ZIP-Writer, eigene DOM→XHTML-Konvertierung.

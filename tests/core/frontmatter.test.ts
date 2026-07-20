@@ -66,6 +66,51 @@ describe("parseBookMetadata", () => {
     expect(m.identifier).not.toBe("note-42");
     expect(m.identifier).toMatch(/^urn:uuid:/);
   });
+
+  // Regression test for the scalarToString() fix: a nested frontmatter object
+  // (e.g. `description: { note: "..." }` from malformed YAML) must be dropped,
+  // not stringified via Object.prototype.toString() into the literal
+  // "[object Object]" that would otherwise land in the exported EPUB metadata.
+  // `description` has no string fallback in parseBookMetadata, so this asserts
+  // the raw asString() outcome directly.
+  it("drops a nested object value instead of writing '[object Object]'", () => {
+    const m = parseBookMetadata({ description: { note: "nested" } }, opts);
+    expect(m.description).toBeUndefined();
+    expect(m.description).not.toBe("[object Object]");
+  });
+
+  it("still coerces string/number/boolean scalars to a string", () => {
+    const m = parseBookMetadata({ title: "Plain String", rights: true }, opts);
+    expect(m.title).toBe("Plain String");
+    expect(m.rights).toBe("true");
+
+    const numeric = parseBookMetadata({ title: 2024 }, opts);
+    expect(numeric.title).toBe("2024");
+  });
+
+  // Obsidian's YAML parser turns an unquoted `date: 2024-01-15` into a real
+  // Date instance. Date overrides toString(), so it must still come through
+  // as a string (this is the one type besides string/number/boolean that
+  // scalarToString() deliberately keeps).
+  it("stringifies a Date value for a date field (unquoted YAML date)", () => {
+    const d = new Date("2024-01-15T00:00:00.000Z");
+    const m = parseBookMetadata({ date: d }, opts);
+    expect(m.date).toBe(String(d));
+    expect(typeof m.date).toBe("string");
+  });
+
+  it("drops non-scalar entries (null/undefined/object) from a mixed author array", () => {
+    const m = parseBookMetadata(
+      { author: ["A", null, { name: "nested" }, "B", undefined] },
+      opts
+    );
+    expect(m.authors).toEqual(["A", "B"]);
+  });
+
+  it("keeps a pure string array unchanged", () => {
+    const m = parseBookMetadata({ subject: ["fiction", "adventure"] }, opts);
+    expect(m.subjects).toEqual(["fiction", "adventure"]);
+  });
 });
 
 describe("stripFrontmatter", () => {

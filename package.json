@@ -7,18 +7,30 @@
     "build": "node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:pure": "sh -c '! grep -rlE \"from [\\\"'\\'']obsidian[\\\"'\\'']\" src/core src/vendor 2>/dev/null'",
+    "lint": "node scripts/check-no-inline-disables.mjs && eslint src",
+    "gate": "npm run typecheck && npm test && npm run check:pure && npm run lint && npm run build",
+    "version-bump": "test -f ../tools/release/version-bump.mjs || { echo \"FEHLER: ../tools/release/ fehlt. Dieses Repo muss im Dach-Verzeichnis obsidian-plugins/ neben tools/ liegen — das Release-Tooling liegt dort zentral, nicht im Plugin. Ein Clone ohne Dach ist nicht release-faehig.\" >&2; exit 1; }; node ../tools/release/version-bump.mjs",
+    "preflight": "test -f ../tools/release/preflight.mjs || { echo \"FEHLER: ../tools/release/ fehlt. Dieses Repo muss im Dach-Verzeichnis obsidian-plugins/ neben tools/ liegen — das Release-Tooling liegt dort zentral, nicht im Plugin. Ein Clone ohne Dach ist nicht release-faehig.\" >&2; exit 1; }; node ../tools/release/preflight.mjs",
+    "release": "test -f ../tools/release/release.mjs || { echo \"FEHLER: ../tools/release/ fehlt. Dieses Repo muss im Dach-Verzeichnis obsidian-plugins/ neben tools/ liegen — das Release-Tooling liegt dort zentral, nicht im Plugin. Ein Clone ohne Dach ist nicht release-faehig.\" >&2; exit 1; }; node ../tools/release/release.mjs"
   },
-  "keywords": ["obsidian", "epub"],
+  "keywords": [
+    "obsidian",
+    "epub"
+  ],
   "author": "Johannes Kaindl",
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
     "@types/node": "^20.11.0",
     "esbuild": "^0.20.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.4.1",
     "fflate": "^0.8.2",
     "jsdom": "^24.0.0",
     "obsidian": "latest",
     "typescript": "^5.4.0",
+    "typescript-eslint": "^8.64.0",
     "vitest": "^1.4.0"
   }
 }
