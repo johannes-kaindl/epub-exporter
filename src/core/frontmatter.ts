@@ -25,14 +25,36 @@ function pick(fm: Record<string, unknown>, canonical: string): unknown {
   return undefined;
 }
 
+// Coerce a scalar frontmatter value to a string. Deliberately narrow: only
+// types with a meaningful (non-default) toString() are converted. Plain
+// objects/arrays are rejected (-> undefined) instead of falling through to
+// Object.prototype.toString(), which would silently write the literal
+// "[object Object]" into the book's metadata for malformed frontmatter
+// (e.g. a nested `author: { name: ... }` block instead of a plain string).
+function scalarToString(v: unknown): string | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  // Some YAML parsers (incl. Obsidian's) turn an unquoted `date: 2024-01-15`
+  // into a real Date instance. Date overrides toString() (unlike a plain
+  // object), so String(v) here is safe and matches the prior behaviour.
+  if (v instanceof Date) return String(v);
+  return undefined;
+}
+
 function asStringArray(v: unknown): string[] {
   if (v === undefined) return [];
-  if (Array.isArray(v)) return v.map((x) => String(x)).filter((s) => s.length > 0);
-  return [String(v)].filter((s) => s.length > 0);
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => scalarToString(x))
+      .filter((s): s is string => s !== undefined && s.length > 0);
+  }
+  const s = scalarToString(v);
+  return s !== undefined && s.length > 0 ? [s] : [];
 }
 
 function asString(v: unknown): string | undefined {
-  return v === undefined ? undefined : String(v);
+  return scalarToString(v);
 }
 
 export interface ParseOptions {

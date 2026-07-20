@@ -65,7 +65,7 @@ export default class EpubExporterPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const raw = await this.loadData();
+    const raw: unknown = await this.loadData();
     this.settings = coerceSettings(raw);
     // Fresh install (no persisted language yet): default the book language to
     // Obsidian's UI language (de/en) instead of the static "en" fallback. An
@@ -143,7 +143,10 @@ export default class EpubExporterPlugin extends Plugin {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
         // Add each template field only if absent — never overwrite user values.
         for (const [key, value] of Object.entries(BOOK_FRONTMATTER_TEMPLATE)) {
-          if (fm[key] === undefined) fm[key] = Array.isArray(value) ? [...value] : value;
+          // Array.isArray narrows via `arg is any[]` (lib.es5), which reintroduces
+          // `any` into the spread; the explicit cast keeps the copy but restores
+          // `unknown` so the assignment stays type-safe.
+          if (fm[key] === undefined) fm[key] = Array.isArray(value) ? [...(value as unknown[])] : value;
         }
       });
       new Notice(t("notice.fmAdded"));
