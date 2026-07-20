@@ -6,6 +6,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-07-20
+
 ### Hinzugefügt
 
 - Export einer Notiz als EPUB3 — mit Buch-Note als Single Source of Truth:
