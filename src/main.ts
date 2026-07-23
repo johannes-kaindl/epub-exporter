@@ -12,6 +12,12 @@ import { registerI18n } from "./i18n/strings";
 import { pickLang, setLang, t } from "./vendor/kit/i18n";
 import { EpubHubView, VIEW_TYPE_EPUB_HUB, resolveTargetFile, SidebarBridge } from "./obsidian/hub-view";
 import { buildSnapshot } from "./obsidian/sidebar-bridge";
+import { buildConsolidatePlan } from "./core/consolidate-plan";
+import { createConsolidatePort, gatherConsolidateInput, executeConsolidatePlan, ConsolidatePort } from "./obsidian/consolidate";
+import { createImportPort, folderMdBasenames, executeImport } from "./obsidian/import";
+import { buildImportPlan } from "./core/import-plan";
+import { ConsolidateModal } from "./obsidian/consolidate-modal";
+import { isBookNote } from "./core/frontmatter";
 
 // Defensive feature-detect: getAvailablePathForAttachment is in the installed obsidian
 // typings, but this narrow interface guards hosts older than minAppVersion (1.8.7),
@@ -45,13 +51,39 @@ export default class EpubExporterPlugin extends Plugin {
     this.registerView(VIEW_TYPE_EPUB_HUB, (leaf: WorkspaceLeaf) => new EpubHubView(leaf, this.makeBridge()));
     this.addCommand({ id: "open-sidebar", name: t("cmd.openSidebar"), callback: () => { void this.openHub(); } });
 
-    // Right-click a folder → export it as a book (filename-sorted spine).
+    this.addCommand({
+      id: "consolidate-book",
+      name: t("cmd.consolidate"),
+      checkCallback: (checking: boolean) => {
+        const f = this.app.workspace.getActiveFile();
+        const ok = !!f && f.extension === "md" &&
+          isBookNote(this.app.metadataCache.getFileCache(f)?.frontmatter ?? {});
+        if (ok && !checking) void this.consolidateBook(f);
+        return ok;
+      },
+    });
+
+    // Right-click a folder → export it as a book (filename-sorted spine) or import it
+    // as one; right-click a book note → consolidate it into a folder.
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu: Menu, file) => {
         if (file instanceof TFolder) {
           menu.addItem((item) =>
             item.setTitle(t("cmd.exportFolder")).setIcon("book").onClick(() => {
               void this.exportSource({ kind: "folder", path: file.path });
+            })
+          );
+          menu.addItem((item) =>
+            item.setTitle(t("cmd.importFolder")).setIcon("book-plus").onClick(() => {
+              void this.importFolder(file);
+            })
+          );
+        }
+        if (file instanceof TFile && file.extension === "md" &&
+            isBookNote(this.app.metadataCache.getFileCache(file)?.frontmatter ?? {})) {
+          menu.addItem((item) =>
+            item.setTitle(t("cmd.consolidate")).setIcon("folder-input").onClick(() => {
+              void this.consolidateBook(file);
             })
           );
         }
@@ -156,6 +188,93 @@ export default class EpubExporterPlugin extends Plugin {
     }
   }
 
+  // Prefix every port path with the parent dir, so the pure planner's `folderName`
+  // stays parent-free. Source paths (copy/move source, copyBinary source) are already
+  // absolute vault paths and must NOT be prefixed.
+  private rootedPort(base: ConsolidatePort, parentDir: string): ConsolidatePort {
+    const at = (p: string) => (parentDir ? `${parentDir}/${p}` : p);
+    return {
+      createFolder: (p) => base.createFolder(at(p)),
+      readBody: (p) => base.readBody(at(p)),
+      copyFile: (s, t2) => base.copyFile(s, at(t2)),
+      moveFile: (s, t2) => base.moveFile(s, at(t2)),
+      writeFile: (p, c) => base.writeFile(at(p), c),
+      copyBinary: (s, t2) => base.copyBinary(s, at(t2)),
+    };
+  }
+
+  // Gather for preview only, then open the modal. The chosen asset mode from the
+  // modal changes what needs gathering (image refs are only collected in full mode),
+  // so runConsolidate re-gathers with the confirmed choice.
+  private async consolidateBook(file: TFile): Promise<void> {
+    const fm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<string, unknown>;
+    if (!isBookNote(fm)) { new Notice(t("notice.notBookNote")); return; }
+
+    const assetMode = this.settings.consolidateAssetMode;
+    let gathered: Awaited<ReturnType<typeof gatherConsolidateInput>>;
+    try {
+      gathered = await gatherConsolidateInput(this.app, file, assetMode, this.settings.defaultLanguage);
+    } catch (e) {
+      console.error("EPUB Exporter: consolidate gather failed", e);
+      new Notice(t("notice.notBookNote"));
+      return;
+    }
+    const { input } = gathered;
+    const plan = buildConsolidatePlan(input);
+
+    const preview = {
+      folderName: plan.folderName,
+      chapterCount: plan.chapters.length,
+      assetCount: plan.assets.length,
+      // The planner suffixes on collision, so a changed folder name means a sibling existed.
+      collision: plan.folderName !== sanitizeBase(input.bookTitle),
+      defaultChapterMode: this.settings.consolidateChapterMode,
+      defaultAssetMode: assetMode,
+    };
+
+    new ConsolidateModal(this.app, preview, (mode, assets) => {
+      void this.runConsolidate(file, mode, assets);
+    }).open();
+  }
+
+  private async runConsolidate(
+    file: TFile,
+    mode: "copy" | "move",
+    assets: "full" | "cover" | "none"
+  ): Promise<void> {
+    try {
+      const { input, parentDir, frontmatterBlock, bookNoteSourcePath } =
+        await gatherConsolidateInput(this.app, file, assets, this.settings.defaultLanguage);
+      const plan = buildConsolidatePlan(input);
+      const port = this.rootedPort(createConsolidatePort(this.app), parentDir);
+      const res = await executeConsolidatePlan(port, plan, {
+        mode, bookNoteSourcePath, bookNoteFrontmatter: frontmatterBlock,
+      });
+      const full = parentDir ? `${parentDir}/${plan.folderName}` : plan.folderName;
+      if (res.errors.length) {
+        console.error("EPUB Exporter: consolidate problems", res.errors);
+        new Notice(t("notice.consolidateErrors", res.errors.length));
+      } else {
+        new Notice(t("notice.consolidated", full));
+      }
+      if (plan.skipped > 0) new Notice(t("notice.brokenEmbed", plan.skipped));
+    } catch (e) {
+      console.error("EPUB Exporter: consolidate failed", e);
+      new Notice(t("notice.exportFailed"));
+    }
+  }
+
+  private async importFolder(folder: TFolder): Promise<void> {
+    const basenames = folderMdBasenames(this.app, folder.path);
+    if (basenames.length === 0) { new Notice(t("notice.importEmpty")); return; }
+    const plan = buildImportPlan(folder.name, basenames, this.settings.defaultLanguage);
+    const res = await executeImport(createImportPort(this.app), folder.path, plan);
+    if (!res.created) { new Notice(t("notice.importExists")); return; }
+    new Notice(t("notice.imported", res.notePath));
+    const created = this.app.vault.getAbstractFileByPath(res.notePath);
+    if (created instanceof TFile) void this.app.workspace.getLeaf(false).openFile(created);
+  }
+
   private makeBridge(): SidebarBridge {
     return {
       snapshot: () => buildSnapshot(this.app, this.settings.defaultLanguage),
@@ -166,7 +285,11 @@ export default class EpubExporterPlugin extends Plugin {
           else new Notice(t("notice.noActiveNote"));
         },
         onInsertFrontmatter: () => { void this.insertFrontmatterFor(resolveTargetFile(this.app)); },
-        onConsolidate: () => { new Notice("Consolidate: not yet implemented"); },
+        onConsolidate: () => {
+          const f = resolveTargetFile(this.app);
+          if (f) void this.consolidateBook(f);
+          else new Notice(t("notice.noActiveNote"));
+        },
       },
     };
   }

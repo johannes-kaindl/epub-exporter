@@ -66,3 +66,5 @@
 .epub-sb-btn {
   margin-top: 0.2rem;
 }
+.epub-consolidate-modal .epub-consolidate-summary { color: var(--text-muted); }
+.epub-consolidate-modal .epub-consolidate-warning { color: var(--text-warning); }
