@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { makeFakeEl } from "../mocks/obsidian";
+import { makeFakeEl, Platform } from "../mocks/obsidian";
 import { renderSidebar } from "../../src/obsidian/sidebar-render";
 import type { SidebarModel } from "../../src/core/sidebar-model";
 import { t } from "../../src/vendor/kit/i18n";
@@ -142,6 +142,22 @@ describe("renderSidebar · Kapitel umsortieren", () => {
 
     const row = r.find("epub-sb-chapter")!;
     expect(row.getAttribute("title")).toBe(t("view.dragHint"));
+  });
+
+  it("omits the grip and drag hint on mobile even though the note itself is reorderable", () => {
+    Platform.isMobile = true;
+    try {
+      const root = makeFakeEl() as unknown as HTMLElement;
+      renderSidebar(root, twoChapterModel, noop);
+      const r = root as unknown as ReturnType<typeof makeFakeEl>;
+
+      expect(r.find("epub-sb-chapter-grip")).toBeNull();
+      const row = r.find("epub-sb-chapter")!;
+      expect(row.draggable).toBe(false);
+      expect(row.getAttribute("title")).toBeNull();
+    } finally {
+      Platform.isMobile = false;
+    }
   });
 
   it("omits handles when there is nothing to reorder", () => {

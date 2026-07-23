@@ -132,6 +132,12 @@ export class Notice {
   constructor(public message?: string) {}
 }
 
+// Settable stand-in for Obsidian's `Platform`. Real usage only ever reads
+// `isMobile`; tests mutate it directly to exercise both states. Defaults to
+// desktop so every pre-existing test (written before mobile suppression
+// existed) is unaffected.
+export const Platform: { isMobile: boolean } = { isMobile: false };
+
 // Minimal YAML-object serializer, just enough for import.ts's frontmatter
 // block (flat + string-array values). NOT a general YAML implementation.
 export function stringifyYaml(obj: Record<string, unknown>): string {

@@ -1,4 +1,4 @@
-import { setIcon } from "obsidian";
+import { setIcon, Platform } from "obsidian";
 import { SidebarModel } from "../core/sidebar-model";
 import { t } from "../vendor/kit/i18n";
 
@@ -60,12 +60,20 @@ export function renderSidebar(
       }
     };
 
+    // Neither half of the reorder gesture exists on mobile: HTML5 drag-and-drop
+    // never fires from touch input in either mobile WebView, and Alt+↑/↓ needs a
+    // hardware keyboard. Showing the grip/hint there advertises a gesture the
+    // user cannot perform, so the whole affordance — grip, hint, draggable,
+    // and the drag/keyboard listeners — is suppressed on mobile even when the
+    // model says the note itself is reorderable.
+    const reorderable = model.canReorder && !Platform.isMobile;
+
     model.chapters.forEach((ch, index) => {
       const li = list.createEl("li", { cls: "epub-sb-chapter" });
       rows.push(li);
       if (ch.status === "missing") li.addClass("is-missing");
 
-      if (model.canReorder) {
+      if (reorderable) {
         li.draggable = true;
         li.setAttribute("tabindex", "0");
         // The grip is a decorative icon (aria-hidden), so its title would be
@@ -83,7 +91,7 @@ export function renderSidebar(
       setIcon(status, ch.status === "ok" ? "check" : "alert-triangle");
       li.createSpan({ cls: "epub-sb-chapter-title", text: ch.title });
 
-      if (!model.canReorder) return;
+      if (!reorderable) return;
 
       li.addEventListener("dragstart", (e) => {
         dragFrom = index;
