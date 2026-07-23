@@ -175,6 +175,13 @@ Anzeige und Datei auseinanderlaufen — auch nicht, wenn ein Schreibvorgang sche
 - **Embeds in Code-Blöcken.** `parseEmbedSpine` erkennt sie heute als Kapitel — das ist
   bestehendes Verhalten, das Anzeige *und* Export gleichermaßen betrifft. Es hier einseitig zu
   ändern, würde Sortierung und Export auseinanderlaufen lassen. Bleibt als bekannte Grenze.
+  **Wichtig:** Diese Ausnahme betraf ursprünglich nur die *Identifikation* eines Kapitels —
+  seit Kapitel per Ziehen/Alt+Pfeil verschoben werden können, deckt sie auch die *Mutation* des
+  Code-Blocks ab. Ein `![[A]]` innerhalb eines Fences ist ein Slot wie jeder andere und kann
+  aus dem Fence heraus- und ein anderes Embed hineingezogen werden — der Inhalt des Code-Blocks
+  ändert sich dadurch. Das bewusst NICHT zu verhindern (z. B. indem `matchEmbedLine` Fences
+  überspringt) ist richtig: Sortierung würde sonst mit Export/Anzeige uneins darüber, was ein
+  Kapitel ist — genau die Ein-Regel-Invariante, auf der dieses Design beruht, ginge verloren.
 - **Tabs / Mehr-Panel-Hub.** Siehe Abschnitt 2.
 
 ## 8. Teststrategie
