@@ -166,6 +166,7 @@ export default class EpubExporterPlugin extends Plugin {
           else new Notice(t("notice.noActiveNote"));
         },
         onInsertFrontmatter: () => { void this.insertFrontmatterFor(resolveTargetFile(this.app)); },
+        onConsolidate: () => { new Notice("Consolidate: not yet implemented"); },
       },
     };
   }

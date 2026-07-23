@@ -5,6 +5,7 @@ import { t } from "../vendor/kit/i18n";
 export interface SidebarHandlers {
   onExport(): void;
   onInsertFrontmatter(): void;
+  onConsolidate(): void;
 }
 
 function headerTitle(context: SidebarModel["context"]): string {
@@ -55,6 +56,11 @@ export function renderSidebar(root: HTMLElement, model: SidebarModel, handlers: 
       text: t("view.editMetadata"),
     });
     metaBtn.addEventListener("click", () => handlers.onInsertFrontmatter());
+    const consolidateBtn = root.createEl("button", {
+      cls: "epub-sb-btn epub-sb-action-consolidate",
+      text: t("view.consolidate"),
+    });
+    consolidateBtn.addEventListener("click", () => handlers.onConsolidate());
     return;
   }
 

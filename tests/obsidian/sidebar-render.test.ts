@@ -3,7 +3,7 @@ import { makeFakeEl } from "../mocks/obsidian";
 import { renderSidebar } from "../../src/obsidian/sidebar-render";
 import type { SidebarModel } from "../../src/core/sidebar-model";
 
-const noop = { onExport: () => {}, onInsertFrontmatter: () => {} };
+const noop = { onExport: () => {}, onInsertFrontmatter: () => {}, onConsolidate: () => {} };
 
 describe("renderSidebar", () => {
   it("book context: renders one row per chapter, flags missing, shows a warning", () => {
@@ -34,7 +34,7 @@ describe("renderSidebar", () => {
     renderSidebar(
       root,
       { context: "book", title: "B", chapters: [], missingCount: 0 },
-      { onExport: () => exported++, onInsertFrontmatter: () => meta++ }
+      { onExport: () => exported++, onInsertFrontmatter: () => meta++, onConsolidate: () => {} }
     );
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
 
@@ -51,7 +51,7 @@ describe("renderSidebar", () => {
     renderSidebar(
       root,
       { context: "note", title: "Solo", chapters: [], missingCount: 0 },
-      { onExport: () => exported++, onInsertFrontmatter: () => {} }
+      { onExport: () => exported++, onInsertFrontmatter: () => {}, onConsolidate: () => {} }
     );
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
 
@@ -77,5 +77,23 @@ describe("renderSidebar", () => {
     renderSidebar(root, { context: "book", title: "B", chapters: [{ title: "A", status: "ok" }], missingCount: 0 }, noop);
     renderSidebar(root, { context: "none", title: "", chapters: [], missingCount: 0 }, noop);
     expect(r.findAll("epub-sb-chapter")).toHaveLength(0);
+  });
+
+  it("renders a consolidate button in the book context and wires the handler", () => {
+    const root = makeFakeEl() as unknown as HTMLElement;
+    let consolidated = 0;
+    const model = { context: "book" as const, title: "B", chapters: [], missingCount: 0 };
+    renderSidebar(root as unknown as HTMLElement, model, {
+      onExport() {},
+      onInsertFrontmatter() {},
+      onConsolidate() {
+        consolidated++;
+      },
+    });
+    const r = root as unknown as ReturnType<typeof makeFakeEl>;
+    const btn = r.find("epub-sb-action-consolidate");
+    expect(btn).not.toBeNull();
+    btn!.click();
+    expect(consolidated).toBe(1);
   });
 });

@@ -56,6 +56,7 @@ export const EN: Record<string, string> = {
   "view.export": "Export as EPUB",
   "view.exportNote": "Export note as EPUB",
   "view.editMetadata": "Edit metadata",
+  "view.consolidate": "Consolidate to folder",
   "view.makeBook": "Make into a book",
 };
 
@@ -115,6 +116,7 @@ export const DE: Record<string, string> = {
   "view.export": "Als EPUB exportieren",
   "view.exportNote": "Notiz als EPUB exportieren",
   "view.editMetadata": "Metadaten bearbeiten",
+  "view.consolidate": "In Ordner konsolidieren",
   "view.makeBook": "Zu Buch machen",
 };
 
