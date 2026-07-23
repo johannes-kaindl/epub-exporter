@@ -1,4 +1,5 @@
 import { mergeSettings } from "../vendor/kit/settings";
+import { ChapterMode, AssetMode } from "../core/consolidate-plan";
 
 export type OutputDestination =
   | "besideNote"
@@ -11,6 +12,8 @@ export interface EpubExporterSettings {
   customFolder: string;
   openSidebarOnStartup: boolean;
   defaultLanguage: string;
+  consolidateChapterMode: ChapterMode;
+  consolidateAssetMode: AssetMode;
 }
 
 export const DEFAULT_SETTINGS: EpubExporterSettings = {
@@ -18,6 +21,8 @@ export const DEFAULT_SETTINGS: EpubExporterSettings = {
   customFolder: "",
   openSidebarOnStartup: false,
   defaultLanguage: "en",
+  consolidateChapterMode: "copy",
+  consolidateAssetMode: "full",
 };
 
 // Merge persisted data (from Plugin.loadData()) onto the defaults without

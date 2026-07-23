@@ -38,6 +38,8 @@ describe("EpubSettingTab.getSettingDefinitions", () => {
       "customFolder",
       "defaultLanguage",
       "openSidebarOnStartup",
+      "consolidateChapterMode",
+      "consolidateAssetMode",
     ]);
   });
 
@@ -47,6 +49,8 @@ describe("EpubSettingTab.getSettingDefinitions", () => {
     expect(byKey(tab, "customFolder").control?.type).toBe("text");
     expect(byKey(tab, "defaultLanguage").control?.type).toBe("dropdown");
     expect(byKey(tab, "openSidebarOnStartup").control?.type).toBe("toggle");
+    expect(byKey(tab, "consolidateChapterMode").control?.type).toBe("dropdown");
+    expect(byKey(tab, "consolidateAssetMode").control?.type).toBe("dropdown");
   });
 
   test("offers all four output destinations", () => {

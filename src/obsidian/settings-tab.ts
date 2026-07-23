@@ -1,6 +1,7 @@
 // src/obsidian/settings-tab.ts
 import { App, Plugin, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
 import { EpubExporterSettings, OutputDestination } from "./settings";
+import { ChapterMode, AssetMode } from "../core/consolidate-plan";
 import { t } from "../vendor/kit/i18n";
 
 export class EpubSettingTab extends PluginSettingTab {
@@ -52,6 +53,31 @@ export class EpubSettingTab extends PluginSettingTab {
         name: t("settings.openSidebar.name"),
         desc: t("settings.openSidebar.desc"),
         control: { type: "toggle", key: "openSidebarOnStartup" },
+      },
+      {
+        name: t("settings.consolidateChapter.name"),
+        desc: t("settings.consolidateChapter.desc"),
+        control: {
+          type: "dropdown",
+          key: "consolidateChapterMode",
+          options: {
+            copy: t("settings.consolidateChapter.copy"),
+            move: t("settings.consolidateChapter.move"),
+          },
+        },
+      },
+      {
+        name: t("settings.consolidateAsset.name"),
+        desc: t("settings.consolidateAsset.desc"),
+        control: {
+          type: "dropdown",
+          key: "consolidateAssetMode",
+          options: {
+            full: t("settings.consolidateAsset.full"),
+            cover: t("settings.consolidateAsset.cover"),
+            none: t("settings.consolidateAsset.none"),
+          },
+        },
       },
     ];
   }
@@ -124,5 +150,28 @@ export class EpubSettingTab extends PluginSettingTab {
         s.openSidebarOnStartup = v;
         await save();
       }));
+
+    new Setting(containerEl)
+      .setName(t("settings.consolidateChapter.name"))
+      .setDesc(t("settings.consolidateChapter.desc"))
+      .addDropdown((d) => d
+        .addOptions({
+          copy: t("settings.consolidateChapter.copy"),
+          move: t("settings.consolidateChapter.move"),
+        })
+        .setValue(s.consolidateChapterMode)
+        .onChange(async (v) => { s.consolidateChapterMode = v as ChapterMode; await save(); }));
+
+    new Setting(containerEl)
+      .setName(t("settings.consolidateAsset.name"))
+      .setDesc(t("settings.consolidateAsset.desc"))
+      .addDropdown((d) => d
+        .addOptions({
+          full: t("settings.consolidateAsset.full"),
+          cover: t("settings.consolidateAsset.cover"),
+          none: t("settings.consolidateAsset.none"),
+        })
+        .setValue(s.consolidateAssetMode)
+        .onChange(async (v) => { s.consolidateAssetMode = v as AssetMode; await save(); }));
   }
 }
