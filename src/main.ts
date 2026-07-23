@@ -16,7 +16,8 @@ import { createConsolidatePort, gatherConsolidateInput, executeConsolidatePlan, 
 import { createImportPort, folderMdBasenames, executeImport } from "./obsidian/import";
 import { buildImportPlan } from "./core/import-plan";
 import { ConsolidateModal } from "./obsidian/consolidate-modal";
-import { BOOK_FRONTMATTER_TEMPLATE, isBookNote } from "./core/frontmatter";
+import { reorderSpine } from "./core/spine-reorder";
+import { BOOK_FRONTMATTER_TEMPLATE, isBookNote, splitFrontmatter } from "./core/frontmatter";
 
 // Defensive feature-detect: getAvailablePathForAttachment is in the installed obsidian
 // typings, but this narrow interface guards hosts older than minAppVersion (1.8.7),
@@ -290,8 +291,35 @@ export default class EpubExporterPlugin extends Plugin {
           if (f) void this.consolidateBook(f);
           else new Notice(t("notice.noActiveNote"));
         },
+        onReorder: (from, to, expectedCount) => { void this.reorderChapters(from, to, expectedCount); },
       },
     };
+  }
+
+  // Write the new chapter order straight into the book note's embed spine.
+  // Atomic via vault.process: the note is typically open in the editor while the
+  // user drags, so read-then-write would risk clobbering an edit made in between.
+  private async reorderChapters(from: number, to: number, expectedCount: number): Promise<void> {
+    const file = resolveTargetFile(this.app);
+    if (!file) { new Notice(t("notice.noActiveNote")); return; }
+
+    let conflict = false;
+    try {
+      await this.app.vault.process(file, (data) => {
+        // Indices count chapters in the body only — a YAML block value could
+        // otherwise contribute a line that looks exactly like an embed.
+        const { head, body } = splitFrontmatter(data);
+        const res = reorderSpine(body, from, to, expectedCount);
+        if (res.ok) return head + res.body;
+        if (res.reason === "conflict") conflict = true;
+        return data; // noop and out-of-range leave the file untouched
+      });
+    } catch (e) {
+      console.error("EPUB Exporter: chapter reorder failed", e);
+      new Notice(t("notice.reorderFailed"));
+      return;
+    }
+    if (conflict) new Notice(t("notice.reorderConflict"));
   }
 
   async openHub(): Promise<void> {

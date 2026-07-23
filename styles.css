@@ -68,3 +68,27 @@
 }
 .epub-consolidate-modal .epub-consolidate-summary { color: var(--text-muted); }
 .epub-consolidate-modal .epub-consolidate-warning { color: var(--text-warning); }
+
+.epub-sb-chapter-grip {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  cursor: grab;
+}
+
+.epub-sb-chapter[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.epub-sb-chapter.is-dragging {
+  opacity: 0.5;
+}
+
+.epub-sb-chapter.is-drop-target {
+  border-top: 2px solid var(--interactive-accent);
+}
+
+.epub-sb-chapter:focus-visible {
+  outline: 1px solid var(--interactive-accent);
+  outline-offset: -1px;
+}

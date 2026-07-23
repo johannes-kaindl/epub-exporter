@@ -70,3 +70,39 @@ describe("EpubHubView re-render dedup (two-click guard)", () => {
     expect((view.contentEl as unknown as { children: unknown[] }).children).not.toBe(firstChildren);
   });
 });
+
+describe("EpubHubView · Neuaufbau waehrend einer Geste", () => {
+  function viewWith(snaps: SidebarSnapshot[]) {
+    let i = 0;
+    const bridge = {
+      snapshot: async () => snaps[Math.min(i++, snaps.length - 1)],
+      handlers: {
+        onExport: () => {},
+        onInsertFrontmatter: () => {},
+        onConsolidate: () => {},
+        onReorder: () => {},
+      },
+    };
+    return new EpubHubView(new WorkspaceLeaf() as never, bridge);
+  }
+  const priv = (v: EpubHubView) =>
+    v as unknown as { rerender: () => Promise<void>; setDragging: (a: boolean) => void };
+
+  it("defers a rebuild while a drag is in flight and runs it once afterwards", async () => {
+    const view = viewWith([
+      { kind: "book", title: "B", chapters: [{ title: "A", status: "ok" }] },
+      { kind: "book", title: "B", chapters: [{ title: "Z", status: "ok" }] },
+    ]);
+    await priv(view).rerender();
+    const before = (view.contentEl as unknown as { children: unknown[] }).children;
+
+    priv(view).setDragging(true);
+    await priv(view).rerender(); // must not touch the DOM under the pointer
+    expect((view.contentEl as unknown as { children: unknown[] }).children).toBe(before);
+
+    priv(view).setDragging(false);
+    await Promise.resolve(); // the deferred rerender is scheduled, not awaited
+    await Promise.resolve();
+    expect((view.contentEl as unknown as { children: unknown[] }).children).not.toBe(before);
+  });
+});

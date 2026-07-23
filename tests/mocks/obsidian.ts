@@ -4,13 +4,26 @@
 // (obsidian-plugin-test-pattern skill), trimmed to exactly what the sidebar
 // code imports. NEVER import this from src/.
 
+// Minimal stand-in for the DOM events the sidebar listens to. Only the members
+// the renderer actually touches — enough to drive drag and keyboard handlers.
+export interface FakeEvent {
+  defaultPrevented: boolean;
+  preventDefault(): void;
+  stopPropagation(): void;
+  altKey?: boolean;
+  key?: string;
+  dataTransfer?: { effectAllowed: string; setData(format: string, data: string): void };
+}
+
 export class FakeEl {
   tag: string;
   children: FakeEl[] = [];
   classes = new Set<string>();
   attrs: Record<string, string> = {};
   text = "";
-  private listeners: Record<string, Array<() => void>> = {};
+  private listeners: Record<string, Array<(ev: FakeEvent) => void>> = {};
+  draggable = false;
+  focusCount = 0;
 
   constructor(tag = "div") {
     this.tag = tag;
@@ -62,14 +75,31 @@ export class FakeEl {
     return this.attrs[k] ?? null;
   }
 
-  addEventListener(ev: string, fn: () => void): void {
+  addEventListener(ev: string, fn: (ev: FakeEvent) => void): void {
     (this.listeners[ev] ??= []).push(fn);
   }
-  set onclick(fn: () => void) {
+  set onclick(fn: (ev: FakeEvent) => void) {
     this.listeners["click"] = [fn];
   }
+
+  // ── test-only event plumbing (not part of Obsidian's API) ────────────────
+  dispatch(ev: string, payload: Partial<FakeEvent> = {}): FakeEvent {
+    const e: FakeEvent = {
+      defaultPrevented: false,
+      preventDefault() {
+        this.defaultPrevented = true;
+      },
+      stopPropagation() {},
+      ...payload,
+    };
+    for (const fn of this.listeners[ev] ?? []) fn(e);
+    return e;
+  }
   click(): void {
-    for (const fn of this.listeners["click"] ?? []) fn();
+    this.dispatch("click");
+  }
+  focus(): void {
+    this.focusCount++;
   }
 
   // ── test-only introspection (not part of Obsidian's API) ────────────────

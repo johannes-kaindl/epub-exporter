@@ -17,7 +17,9 @@ export function resolveTargetFile(app: App): TFile | null {
 
 export interface SidebarBridge {
   snapshot(): Promise<SidebarSnapshot | null>;
-  handlers: SidebarHandlers;
+  // The gesture handlers are supplied by the view, not by the plugin: the drag
+  // lock is view state, so main.ts has no business knowing about it.
+  handlers: Omit<SidebarHandlers, "onDragStart" | "onDragEnd">;
 }
 
 // Thin ItemView shell around the node-tested model + renderer. Re-renders on
@@ -26,6 +28,12 @@ export class EpubHubView extends ItemView {
   // Key of the model currently on screen — lets rerender() skip a redundant DOM
   // rebuild (see rerender for why that matters for click handling).
   private lastModelKey: string | null = null;
+
+  // A rebuild during an in-flight drag would destroy the element under the
+  // pointer mid-gesture — the same failure mode that made buttons need two
+  // clicks in Plan 4. Requests arriving while locked are deferred, not dropped.
+  private dragging = false;
+  private pendingRerender = false;
 
   constructor(leaf: WorkspaceLeaf, private bridge: SidebarBridge) {
     super(leaf);
@@ -52,7 +60,19 @@ export class EpubHubView extends ItemView {
     this.lastModelKey = null;
   }
 
+  private setDragging(active: boolean): void {
+    this.dragging = active;
+    if (!active && this.pendingRerender) {
+      this.pendingRerender = false;
+      void this.rerender();
+    }
+  }
+
   private async rerender(): Promise<void> {
+    if (this.dragging) {
+      this.pendingRerender = true;
+      return;
+    }
     let snap: SidebarSnapshot | null = null;
     let failed = false;
     try {
@@ -71,6 +91,11 @@ export class EpubHubView extends ItemView {
     const key = JSON.stringify(model);
     if (key === this.lastModelKey) return;
     this.lastModelKey = key;
-    renderSidebar(this.contentEl, model, this.bridge.handlers);
+    const handlers: SidebarHandlers = {
+      ...this.bridge.handlers,
+      onDragStart: () => this.setDragging(true),
+      onDragEnd: () => this.setDragging(false),
+    };
+    renderSidebar(this.contentEl, model, handlers);
   }
 }

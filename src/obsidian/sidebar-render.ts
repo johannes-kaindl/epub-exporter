@@ -6,6 +6,11 @@ export interface SidebarHandlers {
   onExport(): void;
   onInsertFrontmatter(): void;
   onConsolidate(): void;
+  // `expectedCount` travels with the request so the writer can detect that the
+  // note changed behind the panel's back without re-reading it first.
+  onReorder(from: number, to: number, expectedCount: number): void;
+  onDragStart(): void;
+  onDragEnd(): void;
 }
 
 function headerTitle(context: SidebarModel["context"]): string {
@@ -35,13 +40,70 @@ export function renderSidebar(root: HTMLElement, model: SidebarModel, handlers: 
   if (model.context === "book") {
     root.createDiv({ cls: "epub-sb-chapters-label", text: t("view.chaptersLabel") });
     const list = root.createEl("ul", { cls: "epub-sb-chapters" });
-    for (const ch of model.chapters) {
+
+    // Source index of the row currently being dragged. Kept in this closure
+    // rather than in dataTransfer: it survives without any DOM round-trip and
+    // keeps the handlers node-testable.
+    let dragFrom: number | null = null;
+    const rows: HTMLElement[] = [];
+    const clearMarks = (): void => {
+      for (const el of rows) {
+        el.removeClass("is-dragging");
+        el.removeClass("is-drop-target");
+      }
+    };
+
+    model.chapters.forEach((ch, index) => {
       const li = list.createEl("li", { cls: "epub-sb-chapter" });
+      rows.push(li);
       if (ch.status === "missing") li.addClass("is-missing");
+
+      if (model.canReorder) {
+        li.draggable = true;
+        li.setAttribute("tabindex", "0");
+        const grip = li.createSpan({
+          cls: "epub-sb-chapter-grip",
+          attr: { "aria-hidden": "true", title: t("view.dragHint") },
+        });
+        setIcon(grip, "grip-vertical");
+      }
+
       const status = li.createSpan({ cls: "epub-sb-chapter-status" });
       setIcon(status, ch.status === "ok" ? "check" : "alert-triangle");
       li.createSpan({ cls: "epub-sb-chapter-title", text: ch.title });
-    }
+
+      if (!model.canReorder) return;
+
+      li.addEventListener("dragstart", (e) => {
+        dragFrom = index;
+        li.addClass("is-dragging");
+        // Firefox refuses to start a drag unless some data is set.
+        const dt = e.dataTransfer;
+        if (dt) {
+          dt.effectAllowed = "move";
+          dt.setData("text/plain", String(index));
+        }
+        handlers.onDragStart();
+      });
+      li.addEventListener("dragover", (e) => {
+        e.preventDefault(); // without this the drop event never fires
+        if (dragFrom !== null && dragFrom !== index) li.addClass("is-drop-target");
+      });
+      li.addEventListener("dragleave", () => li.removeClass("is-drop-target"));
+      li.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const from = dragFrom;
+        dragFrom = null;
+        clearMarks();
+        if (from !== null && from !== index) handlers.onReorder(from, index, model.chapters.length);
+      });
+      li.addEventListener("dragend", () => {
+        dragFrom = null;
+        clearMarks();
+        handlers.onDragEnd();
+      });
+    });
+
     if (model.missingCount > 0) {
       root.createDiv({ cls: "epub-sb-warning", text: t("view.missing", model.missingCount) });
     }
