@@ -6,6 +6,13 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- Kapitel lassen sich in der Sidebar per Ziehen oder `Alt+↑/↓` umsortieren; die neue
+  Reihenfolge wird sofort in den Embed-Spine der Buch-Notiz geschrieben.
+- Die Kapitelliste aktualisiert sich jetzt auch, wenn Embeds direkt in der offenen
+  Buch-Notiz geändert werden.
+
 ## [0.2.0] — 2026-07-23
 
 ### Hinzugefügt
