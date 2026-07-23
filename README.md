@@ -3,7 +3,7 @@
 Exportiert Notizen als EPUB3 — eine einzelne Notiz oder ein ganzes Buch aus eingebetteten Kapiteln.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://codeberg.org/jkaindl/epub-exporter/src/branch/main/LICENSE)
-[![Release](https://img.shields.io/badge/Release-0.1.0-green.svg)](https://codeberg.org/jkaindl/epub-exporter/releases)
+[![Release](https://img.shields.io/badge/Release-0.2.0-green.svg)](https://codeberg.org/jkaindl/epub-exporter/releases)
 [![Platform: Desktop + Mobile](https://img.shields.io/badge/Platform-Desktop%20%2B%20Mobile-blue.svg)](https://codeberg.org/jkaindl/epub-exporter/src/branch/main/manifest.json)
 
 ## Das Buch-Modell
@@ -29,9 +29,13 @@ es gibt keine separate Projektdatei, die mit der Notiz aus dem Tritt geraten kö
 
 ## Benutzung
 
-- **Seitenleiste** — öffnet die Buchübersicht mit Kapitelliste und Export-Schaltfläche.
+- **Seitenleiste** — öffnet die Buchübersicht mit Kapitelliste, Export- und Konsolidieren-Schaltfläche.
 - **Befehl** „Export as EPUB" — exportiert die aktive Notiz.
-- **Kontextmenü eines Ordners** — exportiert den Ordner als Buch.
+- **Kontextmenü eines Ordners** — exportiert den Ordner als Buch **oder** importiert ihn als Buch-Notiz
+  (Embed-Spine aus der Dateinamen-Reihenfolge).
+- **Buch-Notiz → „In Ordner konsolidieren"** (Befehl, Seitenleiste oder Kontextmenü) — überführt das Buch
+  in einen eigenständigen Ordner: Buch-Notiz + nummerierte Kapiteldateien + `_assets/`. Ein Dialog wählt,
+  ob die Kapitel kopiert oder verschoben werden und wie viele Bilder mitkommen.
 
 Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeichnis,
 `epub_exclude: true` lässt ein Kapitel aus.
@@ -39,7 +43,8 @@ Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeic
 ## Einstellungen
 
 Ausgabeziel (vier Varianten), Buchsprache (folgt standardmäßig der Oberflächensprache),
-Behandlung von Bildern und Code-Blöcken.
+Behandlung von Bildern und Code-Blöcken sowie das Standardverhalten beim Konsolidieren
+(Kapitel kopieren oder verschieben, Bilder-Umfang).
 
 ## Installation
 
