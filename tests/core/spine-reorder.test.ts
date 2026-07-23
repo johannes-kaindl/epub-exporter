@@ -54,6 +54,14 @@ describe("reorderSpine", () => {
     expect(bodyOf(reorderSpine(body, 0, 1, 2))).toBe(["![[B]]", "![[A]]"].join("\r\n"));
   });
 
+  it("uses the predominant style (LF) instead of upgrading every line to CRLF when mixed", () => {
+    // Four bare-LF breaks vs. one CRLF break — LF predominates. The single
+    // \r\n must not spread to the rest of the file once the body is rejoined.
+    const body = "![[A]]\nZwischentext\n![[B]]\r\n![[C]]\nNachwort\n";
+    const out = bodyOf(reorderSpine(body, 0, 1, 3));
+    expect(out).toBe("![[B]]\nZwischentext\n![[A]]\n![[C]]\nNachwort\n");
+  });
+
   it("handles indented embed lines", () => {
     const body = ["  ![[A]]", "![[B]]"].join("\n");
     // The raw line moves verbatim, indentation and all.

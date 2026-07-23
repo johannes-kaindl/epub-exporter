@@ -24,7 +24,13 @@ export function reorderSpine(
 ): ReorderResult {
   if (from === to) return { ok: false, reason: "noop" };
 
-  const eol = body.includes("\r\n") ? "\r\n" : "\n";
+  // Detect the *predominant* line ending, not merely "any CRLF present" —
+  // a body mixing both styles must not have its LF lines silently upgraded
+  // to CRLF, which would break the byte-identical/minimal-diff promise for
+  // every line that wasn't touched by the move.
+  const crlfCount = (body.match(/\r\n/g) ?? []).length;
+  const lfCount = (body.match(/\n/g) ?? []).length; // \r\n also ends in \n, so this counts both
+  const eol = crlfCount > lfCount - crlfCount ? "\r\n" : "\n";
   const lines = body.split(/\r?\n/);
 
   const slots: number[] = [];
