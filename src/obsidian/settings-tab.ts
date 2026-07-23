@@ -1,11 +1,72 @@
 // src/obsidian/settings-tab.ts
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
 import { EpubExporterSettings, OutputDestination } from "./settings";
 import { t } from "../vendor/kit/i18n";
 
 export class EpubSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: { settings: EpubExporterSettings; saveSettings: () => Promise<void> }) {
     super(app, plugin as unknown as Plugin);
+  }
+
+  // Declarative settings (Obsidian 1.13+): drives both rendering and the
+  // settings-search index. On 1.13+ this fully replaces display() below; we
+  // keep display() because manifest minAppVersion is < 1.13.0 and older
+  // Obsidian ignores this method.
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [
+      {
+        name: t("settings.output.name"),
+        control: {
+          type: "dropdown",
+          key: "outputDestination",
+          options: {
+            besideNote: t("settings.output.besideNote"),
+            attachmentFolder: t("settings.output.attachmentFolder"),
+            customFolder: t("settings.output.customFolder"),
+            share: t("settings.output.share"),
+          },
+        },
+      },
+      {
+        // Always shown (not gated on the output mode): toggling visibility
+        // needs the 1.13-only refreshDomState/update APIs, which we cannot call
+        // at minAppVersion 1.8.7. A desc hint carries the "only when custom
+        // folder" context instead. The <1.13 display() fallback keeps the
+        // conditional row for older Obsidian.
+        name: t("settings.customFolder.name"),
+        desc: t("settings.customFolder.desc"),
+        control: { type: "text", key: "customFolder" },
+      },
+      {
+        // Dropdown, not free text: only the languages the plugin ships UI
+        // strings for (de/en); labels shown in their own language.
+        name: t("settings.language.name"),
+        desc: t("settings.language.desc"),
+        control: {
+          type: "dropdown",
+          key: "defaultLanguage",
+          options: { en: "English", de: "Deutsch" },
+        },
+      },
+      {
+        name: t("settings.openSidebar.name"),
+        desc: t("settings.openSidebar.desc"),
+        control: { type: "toggle", key: "openSidebarOnStartup" },
+      },
+    ];
+  }
+
+  getControlValue(key: string): unknown {
+    const s = this.plugin.settings;
+    // Coerce any legacy free-text language value to a valid dropdown option.
+    if (key === "defaultLanguage") return s.defaultLanguage === "de" ? "de" : "en";
+    return (s as unknown as Record<string, unknown>)[key];
+  }
+
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    const s = this.plugin.settings as unknown as Record<string, unknown>;
+    s[key] = key === "customFolder" ? String(value).trim() : value;
+    await this.plugin.saveSettings();
   }
 
   display(): void {

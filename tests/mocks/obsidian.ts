@@ -102,6 +102,26 @@ export class Notice {
   constructor(public message?: string) {}
 }
 
+// Minimal stand-in for the imperative Setting builder. The declarative path
+// never instantiates it; it only needs to exist as a binding so settings-tab.ts
+// (which still keeps display() as a <1.13 fallback) can be imported under node.
+export class Setting {
+  constructor(_containerEl?: unknown) {}
+}
+
+// Minimal SettingTab/PluginSettingTab base. The declarative-API methods
+// (getSettingDefinitions/getControlValue/setControlValue) live on the plugin
+// subclass; the base only supplies the pieces those methods touch —
+// refreshDomState — plus a call counter for test introspection.
+export class PluginSettingTab {
+  containerEl = makeFakeEl();
+  refreshDomStateCalls = 0;
+  constructor(public app: unknown, public plugin: unknown) {}
+  refreshDomState(): void {
+    this.refreshDomStateCalls++;
+  }
+}
+
 export class TFile {
   path = "";
   basename = "";

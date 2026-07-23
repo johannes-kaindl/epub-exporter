@@ -19,22 +19,19 @@ export default tseslint.config(
     },
   },
   {
-    // The settings tab keeps the classic display() API. obsidian.d.ts documents
-    // display() as `@deprecated Since 1.13.0` but explicitly sanctions it as
-    // "a fallback for plugins that need to support Obsidian versions older
-    // than 1.13.0" (SettingTab#display doc comment) — so this is the
-    // documented, supported path, not a workaround. manifest.json's
-    // minAppVersion is 1.8.7, well below 1.13.0, so hosts on that floor never
-    // call getSettingDefinitions() and must have a working display().
-    // Migrating the four Setting rows to the declarative API is a real
-    // feature change (parallel getControlValue/setControlValue wiring,
-    // re-verifying the conditional customFolder row), not a lint fix — out
-    // of scope for a type-/lint-only cleanup pass that must not alter
-    // behaviour. Revisit as its own dedicated task if/when minAppVersion
-    // moves past 1.13.0 and display() can be retired outright.
+    // The settings tab implements the declarative getSettingDefinitions() API
+    // (Obsidian 1.13+, drives both rendering and settings-search) AND keeps
+    // display() as the documented <1.13 fallback: obsidian.d.ts sanctions
+    // display() as "a fallback for plugins that need to support Obsidian
+    // versions older than 1.13.0" (SettingTab#display doc comment), and
+    // manifest.json's minAppVersion is 1.8.7. Because that kept display()
+    // overrides a method obsidian.d.ts marks `@deprecated Since 1.13.0`,
+    // @typescript-eslint/no-deprecated flags it — silence it for exactly this
+    // file. (prefer-setting-definitions now passes on its own; its former
+    // override was removed with the migration.) Retire display() and this
+    // override once minAppVersion moves past 1.13.0.
     files: ["src/obsidian/settings-tab.ts"],
     rules: {
-      "obsidianmd/settings-tab/prefer-setting-definitions": "off",
       "@typescript-eslint/no-deprecated": "off",
     },
   },
