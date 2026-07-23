@@ -291,7 +291,7 @@ export default class EpubExporterPlugin extends Plugin {
           if (f) void this.consolidateBook(f);
           else new Notice(t("notice.noActiveNote"));
         },
-        onReorder: (from, to, expectedCount) => { void this.reorderChapters(from, to, expectedCount); },
+        onReorder: (from, to, expectedCount) => this.reorderChapters(from, to, expectedCount),
       },
     };
   }

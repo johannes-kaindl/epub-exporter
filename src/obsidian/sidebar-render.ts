@@ -8,7 +8,9 @@ export interface SidebarHandlers {
   onConsolidate(): void;
   // `expectedCount` travels with the request so the writer can detect that the
   // note changed behind the panel's back without re-reading it first.
-  onReorder(from: number, to: number, expectedCount: number): void;
+  // Returns the write's promise (or nothing, for callers that don't need it)
+  // so the view can serialise repeated requests against the file round-trip.
+  onReorder(from: number, to: number, expectedCount: number): Promise<void> | void;
   onDragStart(): void;
   onDragEnd(): void;
 }
@@ -104,7 +106,10 @@ export function renderSidebar(
         const from = dragFrom;
         dragFrom = null;
         clearMarks();
-        if (from !== null && from !== index) handlers.onReorder(from, index, model.chapters.length);
+        // The renderer stays fire-and-forget here: serialising against the
+        // write's promise is the view's job (hub-view's reorderInFlight guard
+        // wraps this same handler), not the DOM layer's.
+        if (from !== null && from !== index) void handlers.onReorder(from, index, model.chapters.length);
       });
       li.addEventListener("dragend", () => {
         dragFrom = null;
@@ -115,10 +120,10 @@ export function renderSidebar(
         if (!e.altKey) return;
         if (e.key === "ArrowUp" && index > 0) {
           e.preventDefault();
-          handlers.onReorder(index, index - 1, model.chapters.length);
+          void handlers.onReorder(index, index - 1, model.chapters.length);
         } else if (e.key === "ArrowDown" && index < model.chapters.length - 1) {
           e.preventDefault();
-          handlers.onReorder(index, index + 1, model.chapters.length);
+          void handlers.onReorder(index, index + 1, model.chapters.length);
         }
       });
     });

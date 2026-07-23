@@ -305,6 +305,99 @@ describe("EpubHubView · Fokus-Anfrage ueberlebt keine unbeteiligte Rebuild (Reg
   });
 });
 
+describe("EpubHubView · Reorder-in-flight guard (Fix 1)", () => {
+  // A snapshot that never changes across renders (kept simple: the model-key
+  // memoisation means later rerenders here are no-ops, which is fine — these
+  // tests dispatch directly on the rows from the one baseline render, exactly
+  // like a stale keypress landing on a not-yet-rebuilt row in production).
+  const bookA: SidebarSnapshot = {
+    kind: "book",
+    title: "B",
+    chapters: [
+      { title: "Eins", status: "ok" },
+      { title: "Zwei", status: "ok" },
+    ],
+  };
+
+  function viewWithOnReorder(onReorder: (from: number, to: number, expectedCount: number) => Promise<void> | void) {
+    const bridge = {
+      snapshot: async () => bookA,
+      handlers: { onExport: () => {}, onInsertFrontmatter: () => {}, onConsolidate: () => {}, onReorder },
+    };
+    return new EpubHubView(new WorkspaceLeaf() as never, bridge);
+  }
+  const priv = (v: EpubHubView) => v as unknown as { rerender: () => Promise<void> };
+  const rowsOf = (v: EpubHubView) =>
+    (v.contentEl as unknown as { findAll(cls: string): Array<{ dispatch: (ev: string, p: Record<string, unknown>) => void }> }).findAll(
+      "epub-sb-chapter"
+    );
+  const altDown = (row: { dispatch: (ev: string, p: Record<string, unknown>) => void }) =>
+    row.dispatch("keydown", { key: "ArrowDown", altKey: true });
+
+  it("drops a second reorder request that arrives while the first is still in flight", async () => {
+    const calls: Array<[number, number, number]> = [];
+    let resolveFirst!: () => void;
+    const onReorder = (from: number, to: number, count: number): Promise<void> => {
+      calls.push([from, to, count]);
+      return new Promise((resolve) => { resolveFirst = resolve; });
+    };
+    const view = viewWithOnReorder(onReorder);
+    await priv(view).rerender();
+    const rows = rowsOf(view);
+
+    altDown(rows[0]); // first request: goes through, promise stays pending
+    altDown(rows[0]); // stale repeat on the same (not-yet-rebuilt) row: must be dropped
+
+    expect(calls).toEqual([[0, 1, 2]]);
+    resolveFirst();
+  });
+
+  it("lets a further request through once the in-flight one has settled", async () => {
+    const calls: Array<[number, number, number]> = [];
+    let pending: Array<() => void> = [];
+    const onReorder = (from: number, to: number, count: number): Promise<void> => {
+      calls.push([from, to, count]);
+      return new Promise((resolve) => { pending.push(resolve); });
+    };
+    const view = viewWithOnReorder(onReorder);
+    await priv(view).rerender();
+    const rows = rowsOf(view);
+
+    altDown(rows[0]);
+    expect(calls).toHaveLength(1);
+
+    pending[0](); // first request settles
+    await Promise.resolve();
+    await Promise.resolve();
+
+    altDown(rows[0]); // now allowed through again
+    expect(calls).toHaveLength(2);
+  });
+
+  it("clears the in-flight flag even when the delegated write rejects", async () => {
+    const calls: Array<[number, number, number]> = [];
+    let rejectFirst!: (e: Error) => void;
+    const onReorder = (from: number, to: number, count: number): Promise<void> => {
+      calls.push([from, to, count]);
+      return new Promise((_resolve, reject) => { rejectFirst = reject; });
+    };
+    const view = viewWithOnReorder(onReorder);
+    await priv(view).rerender();
+    const rows = rowsOf(view);
+
+    altDown(rows[0]);
+    expect(calls).toHaveLength(1);
+
+    rejectFirst(new Error("write failed"));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    altDown(rows[0]); // flag must be clear despite the rejection, or this would be dropped
+    expect(calls).toHaveLength(2);
+  });
+});
+
 describe("EpubHubView · Live-Refresh (M2)", () => {
   function setup(targetPath: string) {
     const md = new MarkdownView();

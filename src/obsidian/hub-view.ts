@@ -39,6 +39,17 @@ export class EpubHubView extends ItemView {
   // drag never steals focus away from wherever the user was working.
   private focusIndex: number | null = null;
 
+  // A reorder write is not reflected in the DOM until its metadataCache
+  // "changed" echo triggers a rerender, so a second reorder request that
+  // arrives before the first settles would still find the old row at its old
+  // index — repeated Alt+↑/↓ (key-repeat is ~30ms) would replay a stale move
+  // and oscillate instead of walking the chapter along. Dropping the second
+  // request (not queuing it) is correct: a queued one would still carry the
+  // stale index once dequeued. Deliberately NOT gated on focusIndex !== null —
+  // that value can legitimately persist across an unrelated rebuild and would
+  // wedge the panel.
+  private reorderInFlight = false;
+
   constructor(leaf: WorkspaceLeaf, private bridge: SidebarBridge) {
     super(leaf);
   }
@@ -75,6 +86,11 @@ export class EpubHubView extends ItemView {
   async onClose(): Promise<void> {
     this.contentEl.empty();
     this.lastModelKey = null;
+    // Cheap insurance alongside onDragEnd: dragend is reliable in Chromium, but
+    // there is no cost to also releasing the gesture lock here, so a closed
+    // (and possibly later reopened/reused) view can never get stuck locked.
+    this.dragging = false;
+    this.pendingRerender = false;
   }
 
   private setDragging(active: boolean): void {
@@ -143,8 +159,21 @@ export class EpubHubView extends ItemView {
     const handlers: SidebarHandlers = {
       ...this.bridge.handlers,
       onReorder: (from, to, expectedCount) => {
+        // Drop, don't queue: see the reorderInFlight field comment for why.
+        if (this.reorderInFlight) return;
+        this.reorderInFlight = true;
         if (!this.dragging) this.focusIndex = to;
-        this.bridge.handlers.onReorder(from, to, expectedCount);
+        const result = this.bridge.handlers.onReorder(from, to, expectedCount);
+        // The delegate (reorderChapters) is responsible for reporting its own
+        // failures via Notice; this chain only clears the lock. The `catch`
+        // swallows a rejection so it can't surface as an unhandled promise
+        // rejection here — `finally` is what guarantees the flag clears
+        // regardless of outcome, so a rejected write can't wedge the panel.
+        void Promise.resolve(result)
+          .catch(() => {})
+          .finally(() => {
+            this.reorderInFlight = false;
+          });
       },
       onDragStart: () => this.setDragging(true),
       onDragEnd: () => this.setDragging(false),
