@@ -1,5 +1,34 @@
 import { sanitizeBase } from "./output-path";
 
+function basename(path: string): string {
+  return path.split("/").pop() ?? path;
+}
+
+function splitExt(name: string): [string, string] {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+}
+
+interface AssetPlanState {
+  assets: AssetCopy[];
+  bySource: Map<string, string>; // source vault path -> "_assets/<finalName>"
+  usedNames: Set<string>;        // final _assets/ names already taken
+}
+
+// Register a source path as an _assets/ copy, de-colliding the basename. Idempotent per source.
+function registerAsset(state: AssetPlanState, sourcePath: string): string {
+  const existing = state.bySource.get(sourcePath);
+  if (existing) return existing;
+  const [stem, ext] = splitExt(basename(sourcePath));
+  let name = `${stem}${ext}`;
+  for (let n = 2; state.usedNames.has(name); n++) name = `${stem} (${n})${ext}`;
+  state.usedNames.add(name);
+  const target = `_assets/${name}`;
+  state.assets.push({ sourcePath, targetName: target });
+  state.bySource.set(sourcePath, target);
+  return target;
+}
+
 export type ChapterMode = "copy" | "move";
 export type AssetMode = "full" | "cover" | "none";
 
@@ -72,13 +101,31 @@ export function buildConsolidatePlan(input: ConsolidateInput): ConsolidatePlan {
   const prose = input.leadingProse.trim();
   const bookNoteBody = prose ? `${prose}\n\n${embedLines}` : embedLines;
 
+  const assetState: AssetPlanState = { assets: [], bySource: new Map(), usedNames: new Set() };
+  let coverRewrite: string | null = null;
+
+  if (input.assetMode !== "none" && input.coverPath) {
+    const target = registerAsset(assetState, input.coverPath);
+    coverRewrite = `[[${target}]]`;
+  }
+
+  if (input.assetMode === "full") {
+    present.forEach((c, i) => {
+      for (const ref of c.imageRefs) {
+        if (!ref.resolvedPath) continue;
+        const target = registerAsset(assetState, ref.resolvedPath);
+        chapters[i].rewrites.push({ from: ref.raw, to: target });
+      }
+    });
+  }
+
   return {
     folderName,
     bookNoteName: `${folderName}.md`,
     bookNoteBody,
     chapters,
-    assets: [],
-    coverRewrite: null,
+    assets: assetState.assets,
+    coverRewrite,
     skipped,
   };
 }
