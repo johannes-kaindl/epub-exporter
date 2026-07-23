@@ -6,6 +6,17 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- **In Ordner konsolidieren:** Eine Buch-Note wird in einen self-contained Ordner
+  überführt (Buch-Note + nummerierte Kapiteldateien + `_assets/`). Ein Bestätigungs-Dialog
+  wählt, ob Kapitel kopiert oder verschoben werden und wie viele Bilder mitgenommen werden
+  (alle · nur Cover · keine); die Vorgaben stehen in den Einstellungen. Erreichbar per Befehl,
+  Sidebar-Button und Rechtsklick auf die Buch-Note.
+- **Ordner als Buch importieren:** Aus einem Ordner mit Markdown-Dateien entsteht eine
+  Buch-Note (Ordner-Note) mit nach Dateinamen sortiertem Embed-Spine — per Rechtsklick auf
+  den Ordner, ohne die vorhandenen Dateien zu verändern.
+
 ## [0.1.1] — 2026-07-23
 
 ### Geändert
