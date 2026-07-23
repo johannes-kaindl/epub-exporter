@@ -110,6 +110,26 @@ export class EpubHubView extends ItemView {
       return;
     }
 
+    // Capture-and-reset must sit exactly here: after both drag-lock checks
+    // above, but before the memoisation check below.
+    //   - Not earlier: the two lock checks only *defer* the render (they set
+    //     pendingRerender and return) — clearing the request there would lose
+    //     it before the deferred render gets a chance to honour it.
+    //   - Not later: the memoisation check below *discards* the render
+    //     outright when the model hasn't changed. A keyboard move can legitimately
+    //     produce an unchanged model (reorderChapters no-ops on a conflict or an
+    //     out-of-range move, so the file — and hence the model — never changes,
+    //     and no metadataCache "changed" event follows to trigger a fresh
+    //     rerender). If the capture stayed below that check, this request would
+    //     survive as stale state and land on the next rebuild that does get
+    //     past it — possibly an unrelated one (e.g. file-open for a different
+    //     note), stealing focus onto an arbitrary row the user never touched.
+    // The success path is unaffected: a keyboard move that actually wrote to
+    // the file produces a changed model, so the following rerender passes the
+    // memoisation check below and restores focus as before.
+    const focus = this.focusIndex;
+    this.focusIndex = null;
+
     const model = buildSidebarModel(failed ? null : snap);
 
     // active-leaf-change fires when the user focuses the sidebar itself, but
@@ -129,11 +149,6 @@ export class EpubHubView extends ItemView {
       onDragStart: () => this.setDragging(true),
       onDragEnd: () => this.setDragging(false),
     };
-    // Only consumed once we're actually about to rebuild — a rerender that
-    // bails out above (either lock check, or the unchanged-model return just
-    // above) must leave a pending keyboard-move focus request untouched.
-    const focus = this.focusIndex;
-    this.focusIndex = null;
     renderSidebar(this.contentEl, model, handlers, focus);
   }
 }

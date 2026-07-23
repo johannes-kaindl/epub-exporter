@@ -159,6 +159,152 @@ describe("EpubHubView · Sperre nach dem Snapshot-Await", () => {
   });
 });
 
+describe("EpubHubView · Fokus-Anfrage ueberlebt keine unbeteiligte Rebuild (Regressionstest)", () => {
+  // Same helper shape as the gesture-lock describes above: a book snapshot with
+  // canReorder chapters, wired through onReorder so keydown on a rendered row
+  // reaches the view's real handler wrapping.
+  function viewWith(snaps: SidebarSnapshot[]) {
+    let i = 0;
+    const bridge = {
+      snapshot: async () => snaps[Math.min(i++, snaps.length - 1)],
+      handlers: {
+        onExport: () => {},
+        onInsertFrontmatter: () => {},
+        onConsolidate: () => {},
+        // Stands in for reorderChapters no-op'ing on a conflict/out-of-range
+        // move: the write never happens, so the file (and thus the next
+        // snapshot) is unchanged.
+        onReorder: () => {},
+      },
+    };
+    return new EpubHubView(new WorkspaceLeaf() as never, bridge);
+  }
+  const priv = (v: EpubHubView) => v as unknown as { rerender: () => Promise<void> };
+  const rowsOf = (v: EpubHubView) =>
+    (v.contentEl as unknown as { findAll(cls: string): Array<{ dispatch: (ev: string, p: Record<string, unknown>) => void; focusCount: number }> }).findAll(
+      "epub-sb-chapter"
+    );
+
+  it("does not leak a stale focus request onto an unrelated later rebuild", async () => {
+    const bookA: SidebarSnapshot = {
+      kind: "book",
+      title: "B",
+      chapters: [
+        { title: "Eins", status: "ok" },
+        { title: "Zwei", status: "ok" },
+      ],
+    };
+    // A different book entirely, e.g. after the user switched notes (file-open).
+    // Three chapters so a stale focusIndex of 1 (from the move below) would
+    // land on a row that actually exists here, making the leak observable.
+    const bookB: SidebarSnapshot = {
+      kind: "book",
+      title: "Other",
+      chapters: [
+        { title: "P", status: "ok" },
+        { title: "Q", status: "ok" },
+        { title: "R", status: "ok" },
+      ],
+    };
+    const view = viewWith([bookA, bookA, bookB]);
+
+    await priv(view).rerender(); // baseline render of bookA
+    const rows = rowsOf(view);
+
+    // Keyboard-originated move: Alt+ArrowDown on row 0 sets a focus request for
+    // row 1. The bridge's onReorder is a no-op, so the file never changes.
+    rows[0].dispatch("keydown", { key: "ArrowDown", altKey: true });
+
+    // A rerender fires next (e.g. the metadataCache "changed" echo, or an
+    // active-leaf-change) but the model is identical, so it bails at the
+    // memoisation check.
+    await priv(view).rerender();
+
+    // A later, entirely unrelated rerender (a different book, e.g. from
+    // switching notes) must not carry the stale request forward.
+    await priv(view).rerender();
+    const newRows = rowsOf(view);
+    for (const r of newRows) expect(r.focusCount).toBe(0);
+  });
+
+  it("keeps a focus request alive through a deferred render and honours it once the lock clears", async () => {
+    const bookA: SidebarSnapshot = {
+      kind: "book",
+      title: "B",
+      chapters: [
+        { title: "Eins", status: "ok" },
+        { title: "Zwei", status: "ok" },
+      ],
+    };
+    // The genuine result of moving "Eins" from 0 to 1 — a real write did
+    // happen this time, so the model actually changes.
+    const bookAMoved: SidebarSnapshot = {
+      kind: "book",
+      title: "B",
+      chapters: [
+        { title: "Zwei", status: "ok" },
+        { title: "Eins", status: "ok" },
+      ],
+    };
+    const view = viewWith([bookA, bookAMoved]);
+    const priv2 = view as unknown as { rerender: () => Promise<void>; setDragging: (a: boolean) => void };
+
+    await priv2.rerender(); // baseline render of bookA
+    const rows = rowsOf(view);
+    rows[0].dispatch("keydown", { key: "ArrowDown", altKey: true }); // sets focus request for row 1
+
+    // A drag starts before the write's "changed" echo arrives.
+    priv2.setDragging(true);
+    await priv2.rerender(); // deferred: must not drop the pending focus request
+    priv2.setDragging(false); // gesture ends → the deferred rerender runs
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const newRows = rowsOf(view);
+    expect(newRows[1].focusCount).toBe(1);
+    expect(newRows[0].focusCount).toBe(0);
+  });
+
+  it("does not set a focus request when onReorder fires while a drag is active", async () => {
+    const bookA: SidebarSnapshot = {
+      kind: "book",
+      title: "B",
+      chapters: [
+        { title: "Eins", status: "ok" },
+        { title: "Zwei", status: "ok" },
+      ],
+    };
+    const bookAMoved: SidebarSnapshot = {
+      kind: "book",
+      title: "B",
+      chapters: [
+        { title: "Zwei", status: "ok" },
+        { title: "Eins", status: "ok" },
+      ],
+    };
+    const view = viewWith([bookA, bookAMoved]);
+    const priv2 = view as unknown as { rerender: () => Promise<void>; setDragging: (a: boolean) => void };
+
+    await priv2.rerender(); // baseline render of bookA
+    const rows = rowsOf(view);
+
+    priv2.setDragging(true);
+    // The wired onReorder handler guards on `this.dragging`, not on the call
+    // site, so dispatching keydown while locked is a faithful, minimal probe
+    // for "a reorder arriving mid-drag" without needing a full drop gesture.
+    rows[0].dispatch("keydown", { key: "ArrowDown", altKey: true });
+    await priv2.rerender(); // deferred by the lock, same as the write's "changed" echo would be
+
+    priv2.setDragging(false); // gesture ends → the deferred rerender runs
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const newRows = rowsOf(view);
+    for (const r of newRows) expect(r.focusCount).toBe(0);
+  });
+});
+
 describe("EpubHubView · Live-Refresh (M2)", () => {
   function setup(targetPath: string) {
     const md = new MarkdownView();
