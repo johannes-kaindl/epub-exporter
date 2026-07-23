@@ -47,6 +47,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: var(--font-ui-small);
+  border-top: 2px solid transparent;
 }
 .epub-sb-chapter-status {
   display: inline-flex;
