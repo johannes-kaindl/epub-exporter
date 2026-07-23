@@ -1,5 +1,8 @@
-import { ConsolidatePlan, ChapterMode } from "../core/consolidate-plan";
-import { rewriteImageRefs } from "../core/image-refs";
+import { App, TFile, TFolder, normalizePath } from "obsidian";
+import { ConsolidatePlan, ChapterMode, ConsolidateInput, AssetMode, ResolvedImageRef } from "../core/consolidate-plan";
+import { extractImageRefs, rewriteImageRefs } from "../core/image-refs";
+import { parseEmbedSpine } from "../core/spine-parser";
+import { parseBookMetadata, isBookNote, stripFrontmatter } from "../core/frontmatter";
 
 export interface ConsolidatePort {
   createFolder(path: string): Promise<void>;
@@ -78,4 +81,130 @@ export async function executeConsolidatePlan(
   });
 
   return { folderPath: folder, chapterCount, assetCount, errors };
+}
+
+export function createConsolidatePort(app: App): ConsolidatePort {
+  const a = app.vault.adapter;
+  return {
+    async createFolder(path) {
+      if (!(await a.exists(normalizePath(path)))) await app.vault.createFolder(normalizePath(path));
+    },
+    async readBody(path) {
+      const f = app.vault.getAbstractFileByPath(path);
+      return f instanceof TFile ? app.vault.read(f) : "";
+    },
+    async copyFile(sourcePath, targetPath) {
+      const f = app.vault.getAbstractFileByPath(sourcePath);
+      if (f instanceof TFile) await app.vault.copy(f, targetPath);
+    },
+    async moveFile(sourcePath, targetPath) {
+      const f = app.vault.getAbstractFileByPath(sourcePath);
+      if (f instanceof TFile) await app.fileManager.renameFile(f, targetPath);
+    },
+    async writeFile(path, content) {
+      const f = app.vault.getAbstractFileByPath(path);
+      if (f instanceof TFile) await app.vault.modify(f, content);
+      else await app.vault.create(path, content);
+    },
+    async copyBinary(sourcePath, targetPath) {
+      const f = app.vault.getAbstractFileByPath(sourcePath);
+      if (f instanceof TFile) {
+        const bytes = await app.vault.readBinary(f);
+        await a.writeBinary(normalizePath(targetPath), bytes);
+      }
+    },
+  };
+}
+
+export interface GatheredConsolidate {
+  input: ConsolidateInput;
+  parentDir: string;         // dir the folder is created in ("" = vault root)
+  frontmatterBlock: string;
+  bookNoteSourcePath: string;
+}
+
+// One spine entry, resolved against the vault: either a present chapter note
+// (with its TFile kept alongside for the image-ref pass below) or a dangling
+// link that `buildConsolidatePlan` will report as skipped.
+interface ResolvedChapter {
+  sourcePath: string | null;
+  title: string;
+  imageRefs: ResolvedImageRef[];
+  dest: TFile | null;
+}
+
+// Read a book note and resolve everything the pure planner needs. Obsidian-only edge.
+export async function gatherConsolidateInput(
+  app: App,
+  bookFile: TFile,
+  assetMode: AssetMode,
+  defaultLanguage: string
+): Promise<GatheredConsolidate> {
+  const content = await app.vault.read(bookFile);
+  const fm = (app.metadataCache.getFileCache(bookFile)?.frontmatter ?? {}) as Record<string, unknown>;
+  if (!isBookNote(fm)) {
+    throw new Error(`${bookFile.path} is not a book note (missing "epub: true" frontmatter)`);
+  }
+  const body = stripFrontmatter(content);
+  const frontmatterBlock = content.slice(0, content.length - body.length).trimEnd();
+
+  const spine = parseEmbedSpine(body);
+  const leadingProse = body
+    .split(/\r?\n/)
+    .filter((line) => !/^!\[\[[^\]]+\]\]$/.test(line.trim()))
+    .join("\n")
+    .trim();
+
+  const chapters: ResolvedChapter[] = spine.map((entry) => {
+    const dest = app.metadataCache.getFirstLinkpathDest(entry.target, bookFile.path);
+    if (!(dest instanceof TFile) || dest.extension !== "md") {
+      return { sourcePath: null, title: entry.target, imageRefs: [], dest: null };
+    }
+    const dfm = (app.metadataCache.getFileCache(dest)?.frontmatter ?? {}) as Record<string, unknown>;
+    const ct = dfm["chapter_title"];
+    const title = typeof ct === "string" && ct ? ct : dest.basename;
+    return { sourcePath: dest.path, title, imageRefs: [], dest };
+  });
+
+  // For full mode, read each present chapter body and resolve image refs.
+  if (assetMode === "full") {
+    for (const c of chapters) {
+      if (!c.sourcePath || !c.dest) continue;
+      const cbody = stripFrontmatter(await app.vault.read(c.dest));
+      c.imageRefs = extractImageRefs(cbody).map((raw) => {
+        const dest = app.metadataCache.getFirstLinkpathDest(raw, c.sourcePath as string);
+        return { raw, resolvedPath: dest instanceof TFile ? dest.path : null };
+      });
+    }
+  }
+
+  // Cover: resolve the frontmatter cover value to a vault path.
+  let coverPath: string | null = null;
+  if (assetMode !== "none") {
+    const meta = parseBookMetadata(fm, { fallbackTitle: bookFile.basename, defaultLanguage });
+    if (meta.coverImagePath) {
+      const inner = meta.coverImagePath.replace(/!?\[\[([^\]]+)\]\]/, "$1").split("|")[0].split("#")[0].trim();
+      const dest = app.metadataCache.getFirstLinkpathDest(inner, bookFile.path);
+      coverPath = dest instanceof TFile ? dest.path : null;
+    }
+  }
+
+  const parent = bookFile.parent && bookFile.parent.path !== "/" ? bookFile.parent.path : "";
+  const siblings = bookFile.parent instanceof TFolder
+    ? bookFile.parent.children
+        .filter((c): c is TFolder => c instanceof TFolder)
+        .map((c) => c.name)
+    : [];
+
+  const bookTitle = parseBookMetadata(fm, { fallbackTitle: bookFile.basename, defaultLanguage }).title;
+
+  const input: ConsolidateInput = {
+    bookTitle,
+    chapters: chapters.map((c) => ({ sourcePath: c.sourcePath, title: c.title, imageRefs: c.imageRefs })),
+    leadingProse,
+    coverPath,
+    assetMode,
+    existingFolderNames: siblings,
+  };
+  return { input, parentDir: parent, frontmatterBlock, bookNoteSourcePath: bookFile.path };
 }

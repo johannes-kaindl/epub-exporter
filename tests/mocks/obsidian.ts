@@ -102,6 +102,21 @@ export class Notice {
   constructor(public message?: string) {}
 }
 
+// Minimal YAML-object serializer, just enough for import.ts's frontmatter
+// block (flat + string-array values). NOT a general YAML implementation.
+export function stringifyYaml(obj: Record<string, unknown>): string {
+  const line = (v: unknown): string => {
+    if (Array.isArray(v)) {
+      return v.length ? `\n${v.map((x) => `  - ${JSON.stringify(String(x))}`).join("\n")}` : " []";
+    }
+    if (typeof v === "boolean" || typeof v === "number") return ` ${v}`;
+    return ` ${JSON.stringify(String(v ?? ""))}`;
+  };
+  return Object.entries(obj)
+    .map(([k, v]) => `${k}:${line(v)}`)
+    .join("\n");
+}
+
 // Minimal stand-in for the imperative Setting builder. The declarative path
 // never instantiates it; it only needs to exist as a binding so settings-tab.ts
 // (which still keeps display() as a <1.13 fallback) can be imported under node.
