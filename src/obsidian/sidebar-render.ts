@@ -88,11 +88,18 @@ export function renderSidebar(
       li.addEventListener("dragstart", (e) => {
         dragFrom = index;
         li.addClass("is-dragging");
-        // Firefox refuses to start a drag unless some data is set.
         const dt = e.dataTransfer;
         if (dt) {
           dt.effectAllowed = "move";
-          dt.setData("text/plain", String(index));
+          // A plugin-private MIME type, not "text/plain": the book note is
+          // typically open in the editor right next to this ~250px panel, and
+          // an overshot drag that releases over CodeMirror would otherwise have
+          // its text/plain payload pasted straight into the note as a stray
+          // digit. No editor pastes a type it doesn't recognise, so this is
+          // effectively inert outside this list. The in-memory `dragFrom`
+          // closure is what the drop handler actually reads; this call only
+          // exists so the drag itself starts.
+          dt.setData("application/x-epub-exporter-chapter", String(index));
         }
         handlers.onDragStart();
       });
