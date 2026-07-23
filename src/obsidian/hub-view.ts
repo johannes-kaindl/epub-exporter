@@ -91,6 +91,10 @@ export class EpubHubView extends ItemView {
     // (and possibly later reopened/reused) view can never get stuck locked.
     this.dragging = false;
     this.pendingRerender = false;
+    // Self-clears on its own (see the field comment), but this is the one lock
+    // exempted from that self-healing story, so reset it here too rather than
+    // rely on a settle that a closed view will never observe.
+    this.reorderInFlight = false;
   }
 
   private setDragging(active: boolean): void {
@@ -163,16 +167,36 @@ export class EpubHubView extends ItemView {
         if (this.reorderInFlight) return;
         this.reorderInFlight = true;
         if (!this.dragging) this.focusIndex = to;
-        const result = this.bridge.handlers.onReorder(from, to, expectedCount);
+        // The handler's signature allows a synchronous `void` implementation
+        // (main.ts's is async today, but nothing pins that), so a throw here
+        // — not just a rejection — must still clear the flag. Without the
+        // try/catch, a synchronous throw would skip the `.finally` below
+        // entirely and wedge the panel against every further reorder.
+        let result: Promise<void> | void;
+        try {
+          result = this.bridge.handlers.onReorder(from, to, expectedCount);
+        } catch (e) {
+          this.reorderInFlight = false;
+          throw e;
+        }
         // The delegate (reorderChapters) is responsible for reporting its own
         // failures via Notice; this chain only clears the lock. The `catch`
         // swallows a rejection so it can't surface as an unhandled promise
         // rejection here — `finally` is what guarantees the flag clears
         // regardless of outcome, so a rejected write can't wedge the panel.
+        // It also re-renders immediately once the write settles: the DOM would
+        // otherwise stay stale until the metadataCache "changed" echo arrives,
+        // leaving a window where the flag is clear but the row is still at its
+        // old index — long enough for a key-repeat to land on it and step the
+        // chapter back one position. buildSnapshot reads via vault.cachedRead,
+        // which is already current the instant the write resolves, and this
+        // render is cheap (memoised by lastModelKey, and still respects the
+        // drag lock like any other render).
         void Promise.resolve(result)
           .catch(() => {})
           .finally(() => {
             this.reorderInFlight = false;
+            void this.rerender();
           });
       },
       onDragStart: () => this.setDragging(true),

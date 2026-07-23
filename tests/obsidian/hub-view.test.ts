@@ -396,6 +396,53 @@ describe("EpubHubView · Reorder-in-flight guard (Fix 1)", () => {
     altDown(rows[0]); // flag must be clear despite the rejection, or this would be dropped
     expect(calls).toHaveLength(2);
   });
+
+  it("re-renders as soon as the write settles, without waiting for a metadataCache 'changed' echo (Fix 1)", async () => {
+    // Two distinct snapshots: the first render sees bookA, and every render
+    // after the write resolves sees bookAMoved. If the panel only refreshed on
+    // the metadataCache echo (never fired in this test), it would still show
+    // bookA's two rows; refreshing on settle instead should already show the
+    // post-move three rows.
+    const bookAMoved: SidebarSnapshot = {
+      kind: "book",
+      title: "B",
+      chapters: [
+        { title: "Zwei", status: "ok" },
+        { title: "Eins", status: "ok" },
+        { title: "Drei", status: "ok" },
+      ],
+    };
+    let resolveWrite!: () => void;
+    let snapCalls = 0;
+    const bridge = {
+      snapshot: async (): Promise<SidebarSnapshot> => {
+        snapCalls++;
+        return snapCalls === 1 ? bookA : bookAMoved;
+      },
+      handlers: {
+        onExport: () => {},
+        onInsertFrontmatter: () => {},
+        onConsolidate: () => {},
+        onReorder: (): Promise<void> => new Promise((resolve) => { resolveWrite = resolve; }),
+      },
+    };
+    const view = new EpubHubView(new WorkspaceLeaf() as never, bridge);
+    await priv(view).rerender(); // baseline render of bookA
+    const rows = rowsOf(view);
+
+    altDown(rows[0]); // fires onReorder, write promise stays pending
+    // No metadataCache "changed" event is ever dispatched in this test — the
+    // only thing that can produce the refresh is the .finally() on settle.
+    resolveWrite();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowsAfter = (
+      view.contentEl as unknown as { findAll(cls: string): Array<{ dispatch: (ev: string, p: Record<string, unknown>) => void }> }
+    ).findAll("epub-sb-chapter");
+    expect(rowsAfter).toHaveLength(3);
+  });
 });
 
 describe("EpubHubView · Live-Refresh (M2)", () => {

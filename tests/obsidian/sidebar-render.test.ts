@@ -206,6 +206,28 @@ describe("renderSidebar · Kapitel umsortieren", () => {
     expect(rows[1].dispatch("dragover").defaultPrevented).toBe(true);
   });
 
+  it("uses the plugin-private MIME type, never text/plain (Fix 2 regression guard)", () => {
+    // text/plain would let a drag that overshoots onto the adjacent editor get
+    // pasted straight into the book note by CodeMirror — the very note this
+    // feature promises to keep byte-identical. Guard the format actually
+    // handed to dataTransfer.setData, not just that a drag starts.
+    const root = makeFakeEl() as unknown as HTMLElement;
+    renderSidebar(root, twoChapterModel, noop);
+    const rows = (root as unknown as ReturnType<typeof makeFakeEl>).findAll("epub-sb-chapter");
+
+    const formats: string[] = [];
+    const dataTransfer = {
+      effectAllowed: "",
+      setData: (format: string, _data: string) => {
+        formats.push(format);
+      },
+    };
+    rows[0].dispatch("dragstart", { dataTransfer });
+
+    expect(formats).toEqual(["application/x-epub-exporter-chapter"]);
+    expect(formats).not.toContain("text/plain");
+  });
+
   it("brackets the gesture with onDragStart and onDragEnd", () => {
     const root = makeFakeEl() as unknown as HTMLElement;
     const seen: string[] = [];
