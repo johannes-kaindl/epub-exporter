@@ -6,6 +6,12 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Geändert
+
+- Deklarative Settings-API (`getSettingDefinitions()`): Die Plugin-Einstellungen
+  erscheinen ab Obsidian 1.13 in der Einstellungs-Suche. Die `display()`-Variante
+  bleibt als Fallback für Obsidian < 1.13 erhalten.
+
 ## [0.1.0] — 2026-07-20
 
 ### Hinzugefügt
