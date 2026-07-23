@@ -18,6 +18,10 @@ describe("extractImageRefs", () => {
   it("ignores non-image wikilink embeds", () => {
     expect(extractImageRefs("![[note]] ![[data.csv]]")).toEqual([]);
   });
+
+  it("returns refs in true document order for mixed embed types", () => {
+    expect(extractImageRefs("![alt](x.png)\n![[y.png]]")).toEqual(["x.png", "y.png"]);
+  });
 });
 
 describe("rewriteImageRefs", () => {
@@ -32,5 +36,19 @@ describe("rewriteImageRefs", () => {
 
   it("leaves refs without a matching rewrite untouched", () => {
     expect(rewriteImageRefs("![[a.png]]", [])).toBe("![[a.png]]");
+  });
+
+  it("preserves the size modifier on a rewritten wikilink embed", () => {
+    const out = rewriteImageRefs("![[cover.png|300]]", [
+      { from: "cover.png", to: "_assets/cover.png" },
+    ]);
+    expect(out).toBe("![[_assets/cover.png|300]]");
+  });
+
+  it("preserves the heading/fragment on a rewritten wikilink embed", () => {
+    const out = rewriteImageRefs("![[a.png#frag]]", [
+      { from: "a.png", to: "_assets/a.png" },
+    ]);
+    expect(out).toBe("![[_assets/a.png#frag]]");
   });
 });
