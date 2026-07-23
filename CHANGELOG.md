@@ -6,6 +6,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-23
+
 ### Hinzugefügt
 
 - **In Ordner konsolidieren:** Eine Buch-Note wird in einen self-contained Ordner
