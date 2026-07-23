@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { makeFakeEl } from "../mocks/obsidian";
 import { renderSidebar } from "../../src/obsidian/sidebar-render";
 import type { SidebarModel } from "../../src/core/sidebar-model";
+import { t } from "../../src/vendor/kit/i18n";
 
 const noop = {
   onExport: () => {},
@@ -125,6 +126,22 @@ describe("renderSidebar · Kapitel umsortieren", () => {
 
     expect(r.findAll("epub-sb-chapter-grip")).toHaveLength(2);
     expect(r.findAll("epub-sb-chapter").every((li) => li.draggable)).toBe(true);
+  });
+
+  it("keeps the grip decorative but exposes the drag hint on the focusable row", () => {
+    // aria-hidden on the grip hides its title from assistive tech too, so the
+    // hint has to live on the li — the element that is actually focusable and
+    // draggable — or a screen reader user gets no drag affordance at all.
+    const root = makeFakeEl() as unknown as HTMLElement;
+    renderSidebar(root, twoChapterModel, noop);
+    const r = root as unknown as ReturnType<typeof makeFakeEl>;
+
+    const grip = r.find("epub-sb-chapter-grip")!;
+    expect(grip.getAttribute("aria-hidden")).toBe("true");
+    expect(grip.getAttribute("title")).toBeNull();
+
+    const row = r.find("epub-sb-chapter")!;
+    expect(row.getAttribute("title")).toBe(t("view.dragHint"));
   });
 
   it("omits handles when there is nothing to reorder", () => {

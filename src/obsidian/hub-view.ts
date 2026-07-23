@@ -53,6 +53,19 @@ export class EpubHubView extends ItemView {
     await this.rerender();
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => void this.rerender()));
     this.registerEvent(this.app.workspace.on("file-open", () => void this.rerender()));
+    // M2 (Plan-4 carry-forward): adding or removing an ![[embed]] *inside* the
+    // open book note changes the spine without any leaf or file change, so the
+    // list would otherwise stay stale until the user switched notes. metadataCache
+    // "changed" fires after the cache is updated (unlike vault "modify", which can
+    // fire while it's still stale) — buildSnapshot reads the cache, so this is the
+    // event that guarantees fresh data. This also covers the echo of our own
+    // reorder write — showing the file's actual state is exactly what we want, and
+    // the model-key memoisation keeps it free when nothing really changed.
+    this.registerEvent(
+      this.app.metadataCache.on("changed", (file: TFile) => {
+        if (file.path === resolveTargetFile(this.app)?.path) void this.rerender();
+      })
+    );
   }
 
   async onClose(): Promise<void> {
@@ -81,6 +94,18 @@ export class EpubHubView extends ItemView {
       console.error("EPUB Exporter: sidebar render failed", e);
       failed = true;
     }
+
+    // The snapshot read above is real I/O (vault.cachedRead) and yields control;
+    // a drag can start while it's in flight (pressing a chapter row focuses the
+    // sidebar leaf, which fires active-leaf-change and starts a rerender a few
+    // frames before the drag itself begins). Re-check the lock on the other side
+    // of the await — otherwise this continuation would call renderSidebar and
+    // destroy the element under the pointer mid-gesture.
+    if (this.dragging) {
+      this.pendingRerender = true;
+      return;
+    }
+
     const model = buildSidebarModel(failed ? null : snap);
 
     // active-leaf-change fires when the user focuses the sidebar itself, but

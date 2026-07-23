@@ -61,9 +61,13 @@ export function renderSidebar(root: HTMLElement, model: SidebarModel, handlers: 
       if (model.canReorder) {
         li.draggable = true;
         li.setAttribute("tabindex", "0");
+        // The grip is a decorative icon (aria-hidden), so its title would be
+        // invisible to assistive tech; the hint belongs on the row itself, which
+        // is the focusable, draggable element a screen reader actually exposes.
+        li.setAttribute("title", t("view.dragHint"));
         const grip = li.createSpan({
           cls: "epub-sb-chapter-grip",
-          attr: { "aria-hidden": "true", title: t("view.dragHint") },
+          attr: { "aria-hidden": "true" },
         });
         setIcon(grip, "grip-vertical");
       }

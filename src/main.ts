@@ -306,6 +306,10 @@ export default class EpubExporterPlugin extends Plugin {
     let conflict = false;
     try {
       await this.app.vault.process(file, (data) => {
+        // Reset on every invocation: vault.process retries the callback on a
+        // concurrent write, and the flag must describe only the final attempt —
+        // not a stale conflict from an earlier retry that then succeeded.
+        conflict = false;
         // Indices count chapters in the body only — a YAML block value could
         // otherwise contribute a line that looks exactly like an embed.
         const { head, body } = splitFrontmatter(data);
