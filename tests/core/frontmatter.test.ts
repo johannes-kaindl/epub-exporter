@@ -3,6 +3,7 @@ import {
   parseBookMetadata,
   isBookNote,
   BOOK_FRONTMATTER_TEMPLATE,
+  splitFrontmatter,
 } from "../../src/core/frontmatter";
 import { stripFrontmatter } from "../../src/core/frontmatter";
 
@@ -126,5 +127,27 @@ describe("stripFrontmatter", () => {
 describe("BOOK_FRONTMATTER_TEMPLATE", () => {
   it("marks the note as a book", () => {
     expect(BOOK_FRONTMATTER_TEMPLATE.epub).toBe(true);
+  });
+});
+
+describe("splitFrontmatter", () => {
+  it("splits a note into frontmatter head and body", () => {
+    const content = "---\ntitle: X\n---\n# Heading\nText";
+    const { head, body } = splitFrontmatter(content);
+    expect(head).toBe("---\ntitle: X\n---\n");
+    expect(body).toBe("# Heading\nText");
+  });
+
+  it("returns an empty head when there is no frontmatter", () => {
+    const { head, body } = splitFrontmatter("# Just a heading");
+    expect(head).toBe("");
+    expect(body).toBe("# Just a heading");
+  });
+
+  it("always recomposes to the original content", () => {
+    for (const c of ["---\na: 1\n---\nbody", "no frontmatter", "---\nunterminated\nbody"]) {
+      const { head, body } = splitFrontmatter(c);
+      expect(head + body).toBe(c);
+    }
   });
 });
