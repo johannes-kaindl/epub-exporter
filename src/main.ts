@@ -7,7 +7,6 @@ import { writeEpub } from "./obsidian/output";
 import { sanitizeBase } from "./core/output-path";
 import { EpubSettingTab } from "./obsidian/settings-tab";
 import { coerceSettings, EpubExporterSettings } from "./obsidian/settings";
-import { BOOK_FRONTMATTER_TEMPLATE } from "./core/frontmatter";
 import { registerI18n } from "./i18n/strings";
 import { pickLang, setLang, t } from "./vendor/kit/i18n";
 import { EpubHubView, VIEW_TYPE_EPUB_HUB, resolveTargetFile, SidebarBridge } from "./obsidian/hub-view";
@@ -17,7 +16,7 @@ import { createConsolidatePort, gatherConsolidateInput, executeConsolidatePlan, 
 import { createImportPort, folderMdBasenames, executeImport } from "./obsidian/import";
 import { buildImportPlan } from "./core/import-plan";
 import { ConsolidateModal } from "./obsidian/consolidate-modal";
-import { isBookNote } from "./core/frontmatter";
+import { BOOK_FRONTMATTER_TEMPLATE, isBookNote } from "./core/frontmatter";
 
 // Defensive feature-detect: getAvailablePathForAttachment is in the installed obsidian
 // typings, but this narrow interface guards hosts older than minAppVersion (1.8.7),
@@ -203,9 +202,11 @@ export default class EpubExporterPlugin extends Plugin {
     };
   }
 
-  // Gather for preview only, then open the modal. The chosen asset mode from the
-  // modal changes what needs gathering (image refs are only collected in full mode),
-  // so runConsolidate re-gathers with the confirmed choice.
+  // Gather for preview only, then open the modal. The preview is gathered in "none"
+  // asset mode: folderName/chapterCount/collision don't depend on asset mode, so this
+  // avoids reading every chapter body just to compute a preview. The chosen asset mode
+  // from the modal changes what needs gathering (image refs are only collected in full
+  // mode), so runConsolidate re-gathers with the confirmed choice.
   private async consolidateBook(file: TFile): Promise<void> {
     const fm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<string, unknown>;
     if (!isBookNote(fm)) { new Notice(t("notice.notBookNote")); return; }
@@ -213,7 +214,7 @@ export default class EpubExporterPlugin extends Plugin {
     const assetMode = this.settings.consolidateAssetMode;
     let gathered: Awaited<ReturnType<typeof gatherConsolidateInput>>;
     try {
-      gathered = await gatherConsolidateInput(this.app, file, assetMode, this.settings.defaultLanguage);
+      gathered = await gatherConsolidateInput(this.app, file, "none", this.settings.defaultLanguage);
     } catch (e) {
       console.error("EPUB Exporter: consolidate gather failed", e);
       new Notice(t("notice.notBookNote"));
@@ -225,7 +226,6 @@ export default class EpubExporterPlugin extends Plugin {
     const preview = {
       folderName: plan.folderName,
       chapterCount: plan.chapters.length,
-      assetCount: plan.assets.length,
       // The planner suffixes on collision, so a changed folder name means a sibling existed.
       collision: plan.folderName !== sanitizeBase(input.bookTitle),
       defaultChapterMode: this.settings.consolidateChapterMode,

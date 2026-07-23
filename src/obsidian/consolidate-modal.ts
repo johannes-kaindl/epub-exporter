@@ -5,7 +5,6 @@ import { t } from "../vendor/kit/i18n";
 export interface ConsolidatePreview {
   folderName: string;
   chapterCount: number;
-  assetCount: number;
   collision: boolean;
   defaultChapterMode: ChapterMode;
   defaultAssetMode: AssetMode;
@@ -31,7 +30,7 @@ export class ConsolidateModal extends Modal {
     contentEl.createEl("h3", { text: t("modal.consolidate.title") });
     contentEl.createEl("p", {
       cls: "epub-consolidate-summary",
-      text: t("modal.consolidate.summary", preview.folderName, preview.chapterCount, preview.assetCount),
+      text: t("modal.consolidate.summary", preview.folderName, preview.chapterCount),
     });
     if (preview.collision) {
       contentEl.createEl("p", {
