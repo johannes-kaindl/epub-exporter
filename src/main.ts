@@ -302,6 +302,15 @@ export default class EpubExporterPlugin extends Plugin {
   private async reorderChapters(from: number, to: number, expectedCount: number): Promise<void> {
     const file = resolveTargetFile(this.app);
     if (!file) { new Notice(t("notice.noActiveNote")); return; }
+    // The lock only defers rerender/reorder requests, not the resolve step
+    // above — if the main-area note changed underneath a deferred request,
+    // resolveTargetFile could hand back a different, non-book file. expectedCount
+    // catches every case where the chapter counts differ, but a same-count
+    // non-book file (or a book note whose frontmatter was stripped meanwhile)
+    // would slip past that guard, so re-check the target is still a book note
+    // right before the one write path that rewrites a user's note.
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+    if (!isBookNote(fm)) { new Notice(t("notice.notBookNote")); return; }
 
     let conflict = false;
     try {
