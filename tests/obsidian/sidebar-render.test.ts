@@ -16,6 +16,7 @@ describe("renderSidebar", () => {
         { title: "Hauptteil", status: "missing" },
       ],
       missingCount: 1,
+      canReorder: true,
     };
 
     renderSidebar(root, model, noop);
@@ -33,7 +34,7 @@ describe("renderSidebar", () => {
     let meta = 0;
     renderSidebar(
       root,
-      { context: "book", title: "B", chapters: [], missingCount: 0 },
+      { context: "book", title: "B", chapters: [], missingCount: 0, canReorder: false },
       { onExport: () => exported++, onInsertFrontmatter: () => meta++, onConsolidate: () => {} }
     );
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
@@ -50,7 +51,7 @@ describe("renderSidebar", () => {
     let exported = 0;
     renderSidebar(
       root,
-      { context: "note", title: "Solo", chapters: [], missingCount: 0 },
+      { context: "note", title: "Solo", chapters: [], missingCount: 0, canReorder: false },
       { onExport: () => exported++, onInsertFrontmatter: () => {}, onConsolidate: () => {} }
     );
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
@@ -64,7 +65,7 @@ describe("renderSidebar", () => {
 
   it("none context: shows an empty-state hint and no action buttons", () => {
     const root = makeFakeEl() as unknown as HTMLElement;
-    renderSidebar(root, { context: "none", title: "", chapters: [], missingCount: 0 }, noop);
+    renderSidebar(root, { context: "none", title: "", chapters: [], missingCount: 0, canReorder: false }, noop);
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
 
     expect(r.find("epub-sb-empty")).not.toBeNull();
@@ -74,15 +75,15 @@ describe("renderSidebar", () => {
   it("re-render clears prior content (mount-once)", () => {
     const root = makeFakeEl() as unknown as HTMLElement;
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
-    renderSidebar(root, { context: "book", title: "B", chapters: [{ title: "A", status: "ok" }], missingCount: 0 }, noop);
-    renderSidebar(root, { context: "none", title: "", chapters: [], missingCount: 0 }, noop);
+    renderSidebar(root, { context: "book", title: "B", chapters: [{ title: "A", status: "ok" }], missingCount: 0, canReorder: false }, noop);
+    renderSidebar(root, { context: "none", title: "", chapters: [], missingCount: 0, canReorder: false }, noop);
     expect(r.findAll("epub-sb-chapter")).toHaveLength(0);
   });
 
   it("renders a consolidate button in the book context and wires the handler", () => {
     const root = makeFakeEl() as unknown as HTMLElement;
     let consolidated = 0;
-    const model = { context: "book" as const, title: "B", chapters: [], missingCount: 0 };
+    const model = { context: "book" as const, title: "B", chapters: [], missingCount: 0, canReorder: false };
     renderSidebar(root as unknown as HTMLElement, model, {
       onExport() {},
       onInsertFrontmatter() {},

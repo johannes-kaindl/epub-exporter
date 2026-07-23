@@ -36,21 +36,42 @@ describe("buildSidebarModel", () => {
       title: "My Book",
       chapters: snap.chapters,
       missingCount: 1,
+      canReorder: true,
     });
   });
 
   it("maps a note snapshot with no chapters", () => {
     const model = buildSidebarModel({ kind: "note", title: "Some Note", chapters: [] });
-    expect(model).toEqual({ context: "note", title: "Some Note", chapters: [], missingCount: 0 });
+    expect(model).toEqual({ context: "note", title: "Some Note", chapters: [], missingCount: 0, canReorder: false });
   });
 
   it("maps null / none to the empty context", () => {
-    expect(buildSidebarModel(null)).toEqual({ context: "none", title: "", chapters: [], missingCount: 0 });
+    expect(buildSidebarModel(null)).toEqual({ context: "none", title: "", chapters: [], missingCount: 0, canReorder: false });
     expect(buildSidebarModel({ kind: "none", title: "", chapters: [] })).toEqual({
       context: "none",
       title: "",
       chapters: [],
       missingCount: 0,
+      canReorder: false,
     });
+  });
+});
+
+describe("buildSidebarModel · canReorder", () => {
+  const ch = (title: string) => ({ title, status: "ok" as const });
+
+  it("is true for a book with more than one chapter", () => {
+    const m = buildSidebarModel({ kind: "book", title: "B", chapters: [ch("A"), ch("B")] });
+    expect(m.canReorder).toBe(true);
+  });
+
+  it("is false for a book with a single chapter — nothing to reorder", () => {
+    const m = buildSidebarModel({ kind: "book", title: "B", chapters: [ch("A")] });
+    expect(m.canReorder).toBe(false);
+  });
+
+  it("is false in the note and none contexts", () => {
+    expect(buildSidebarModel({ kind: "note", title: "N", chapters: [] }).canReorder).toBe(false);
+    expect(buildSidebarModel(null).canReorder).toBe(false);
   });
 });

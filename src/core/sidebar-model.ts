@@ -22,6 +22,9 @@ export interface SidebarModel {
   title: string;
   chapters: SidebarChapter[];
   missingCount: number;
+  // Reordering needs at least two chapters to mean anything; the renderer uses
+  // this to decide whether rows get drag handles at all.
+  canReorder: boolean;
 }
 
 // Mirror assembleBook's spine walk WITHOUT rendering: cheap enough to run on
@@ -41,11 +44,17 @@ export function buildBookChapters(
 
 export function buildSidebarModel(snap: SidebarSnapshot | null): SidebarModel {
   if (!snap || snap.kind === "none") {
-    return { context: "none", title: "", chapters: [], missingCount: 0 };
+    return { context: "none", title: "", chapters: [], missingCount: 0, canReorder: false };
   }
   if (snap.kind === "note") {
-    return { context: "note", title: snap.title, chapters: [], missingCount: 0 };
+    return { context: "note", title: snap.title, chapters: [], missingCount: 0, canReorder: false };
   }
   const missingCount = snap.chapters.filter((c) => c.status === "missing").length;
-  return { context: "book", title: snap.title, chapters: snap.chapters, missingCount };
+  return {
+    context: "book",
+    title: snap.title,
+    chapters: snap.chapters,
+    missingCount,
+    canReorder: snap.chapters.length > 1,
+  };
 }
