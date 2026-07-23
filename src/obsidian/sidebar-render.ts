@@ -21,7 +21,12 @@ function headerTitle(context: SidebarModel["context"]): string {
 
 // Pure DOM build (mount-once): clears root and rebuilds from the model. Buttons
 // are wired to injected handlers so this stays node-testable with the fake el.
-export function renderSidebar(root: HTMLElement, model: SidebarModel, handlers: SidebarHandlers): void {
+export function renderSidebar(
+  root: HTMLElement,
+  model: SidebarModel,
+  handlers: SidebarHandlers,
+  focusIndex: number | null = null
+): void {
   root.empty();
   root.addClass("epub-exporter-sidebar");
 
@@ -106,7 +111,21 @@ export function renderSidebar(root: HTMLElement, model: SidebarModel, handlers: 
         clearMarks();
         handlers.onDragEnd();
       });
+      li.addEventListener("keydown", (e) => {
+        if (!e.altKey) return;
+        if (e.key === "ArrowUp" && index > 0) {
+          e.preventDefault();
+          handlers.onReorder(index, index - 1, model.chapters.length);
+        } else if (e.key === "ArrowDown" && index < model.chapters.length - 1) {
+          e.preventDefault();
+          handlers.onReorder(index, index + 1, model.chapters.length);
+        }
+      });
     });
+
+    // The rebuild replaced the DOM, so the row the user was on is gone. Restore
+    // focus, otherwise a second Alt+Arrow press would have nothing to act on.
+    if (focusIndex !== null) rows[focusIndex]?.focus();
 
     if (model.missingCount > 0) {
       root.createDiv({ cls: "epub-sb-warning", text: t("view.missing", model.missingCount) });

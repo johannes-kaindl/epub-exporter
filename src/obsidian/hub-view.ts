@@ -35,6 +35,10 @@ export class EpubHubView extends ItemView {
   private dragging = false;
   private pendingRerender = false;
 
+  // Row to focus after the next rebuild — set for keyboard moves only, so a
+  // drag never steals focus away from wherever the user was working.
+  private focusIndex: number | null = null;
+
   constructor(leaf: WorkspaceLeaf, private bridge: SidebarBridge) {
     super(leaf);
   }
@@ -118,9 +122,18 @@ export class EpubHubView extends ItemView {
     this.lastModelKey = key;
     const handlers: SidebarHandlers = {
       ...this.bridge.handlers,
+      onReorder: (from, to, expectedCount) => {
+        if (!this.dragging) this.focusIndex = to;
+        this.bridge.handlers.onReorder(from, to, expectedCount);
+      },
       onDragStart: () => this.setDragging(true),
       onDragEnd: () => this.setDragging(false),
     };
-    renderSidebar(this.contentEl, model, handlers);
+    // Only consumed once we're actually about to rebuild — a rerender that
+    // bails out above (either lock check, or the unchanged-model return just
+    // above) must leave a pending keyboard-move focus request untouched.
+    const focus = this.focusIndex;
+    this.focusIndex = null;
+    renderSidebar(this.contentEl, model, handlers, focus);
   }
 }

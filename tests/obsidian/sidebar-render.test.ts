@@ -206,3 +206,60 @@ describe("renderSidebar · Kapitel umsortieren", () => {
     expect(seen).toEqual(["start", "end"]);
   });
 });
+
+describe("renderSidebar · Tastatur", () => {
+  const model: SidebarModel = {
+    context: "book",
+    title: "B",
+    chapters: [
+      { title: "Eins", status: "ok" },
+      { title: "Zwei", status: "ok" },
+      { title: "Drei", status: "ok" },
+    ],
+    missingCount: 0,
+    canReorder: true,
+  };
+
+  function rowsFor(handlers: Parameters<typeof renderSidebar>[2]) {
+    const root = makeFakeEl() as unknown as HTMLElement;
+    renderSidebar(root, model, handlers);
+    return (root as unknown as ReturnType<typeof makeFakeEl>).findAll("epub-sb-chapter");
+  }
+
+  it("moves a row up with Alt+ArrowUp", () => {
+    const calls: Array<[number, number, number]> = [];
+    const rows = rowsFor({ ...noop, onReorder: (f, t2, c) => calls.push([f, t2, c]) });
+    rows[1].dispatch("keydown", { key: "ArrowUp", altKey: true });
+    expect(calls).toEqual([[1, 0, 3]]);
+  });
+
+  it("moves a row down with Alt+ArrowDown", () => {
+    const calls: Array<[number, number, number]> = [];
+    const rows = rowsFor({ ...noop, onReorder: (f, t2, c) => calls.push([f, t2, c]) });
+    rows[1].dispatch("keydown", { key: "ArrowDown", altKey: true });
+    expect(calls).toEqual([[1, 2, 3]]);
+  });
+
+  it("ignores the arrows without Alt", () => {
+    let calls = 0;
+    const rows = rowsFor({ ...noop, onReorder: () => calls++ });
+    rows[1].dispatch("keydown", { key: "ArrowUp", altKey: false });
+    expect(calls).toBe(0);
+  });
+
+  it("stays put at the edges", () => {
+    let calls = 0;
+    const rows = rowsFor({ ...noop, onReorder: () => calls++ });
+    rows[0].dispatch("keydown", { key: "ArrowUp", altKey: true });
+    rows[2].dispatch("keydown", { key: "ArrowDown", altKey: true });
+    expect(calls).toBe(0);
+  });
+
+  it("focuses the requested row after building, so repeated presses keep working", () => {
+    const root = makeFakeEl() as unknown as HTMLElement;
+    renderSidebar(root, model, noop, 2);
+    const rows = (root as unknown as ReturnType<typeof makeFakeEl>).findAll("epub-sb-chapter");
+    expect(rows[2].focusCount).toBe(1);
+    expect(rows[0].focusCount).toBe(0);
+  });
+});
