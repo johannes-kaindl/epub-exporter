@@ -6,6 +6,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-24
+
 ### Hinzugefügt
 
 - Kapitel lassen sich in der Sidebar per Ziehen oder `Alt+↑/↓` umsortieren; die neue
