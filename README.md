@@ -30,6 +30,8 @@ es gibt keine separate Projektdatei, die mit der Notiz aus dem Tritt geraten kö
 ## Benutzung
 
 - **Seitenleiste** — öffnet die Buchübersicht mit Kapitelliste, Export- und Konsolidieren-Schaltfläche.
+- **Kapitel umsortieren** — in der Seitenleiste per Ziehen oder `Alt+↑/↓`; die neue Reihenfolge wandert
+  sofort in den Embed-Spine der Buch-Notiz, sodass das Buch in der Leseansicht direkt neu sortiert erscheint.
 - **Befehl** „Export as EPUB" — exportiert die aktive Notiz.
 - **Kontextmenü eines Ordners** — exportiert den Ordner als Buch **oder** importiert ihn als Buch-Notiz
   (Embed-Spine aus der Dateinamen-Reihenfolge).
