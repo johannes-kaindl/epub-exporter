@@ -1,7 +1,8 @@
 # AGENTS.md — epub-exporter
 
-> **Workspace-Standards:** Die verbindliche Leitkonvention steht in
-> `../_docs/CONVENTIONS.md` (Modell comply-or-explain). Begründete Abweichungen
+> **Workspace-Standards (maintainer-lokal):** Die verbindliche Leitkonvention steht in `_docs/CONVENTIONS.md`
+> im Multi-Projekt-Workspace des Maintainers, `../../_docs` relativ zu diesem Repo — nicht Teil dieses Repos,
+> ignorieren falls im Klon nicht vorhanden. Modell comply-or-explain. Begründete Abweichungen
 > stehen unten unter „Abweichungen von der Leitkonvention".
 
 Conventions for AI agents (Claude Code, Codex, …) working on this repository.
@@ -109,7 +110,7 @@ wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht 
   `scripts/check-no-inline-disables.mjs`, erster Schritt von `npm run lint`; der Store wertet es
   als Error). Genuine Ausnahmen **nur** file-scoped in `eslint.config.mjs`, mit Begründung.
 - i18n zweisprachig (EN/DE) in `src/i18n/strings.ts` — ein Parity-Test hält die Key-Mengen gleich.
-- Workspace-weite Standards: `../_docs/CONVENTIONS.md`.
+- Workspace-weite Standards: `_docs/CONVENTIONS.md` im Maintainer-Workspace (siehe Kopf; maintainer-lokal).
 
 ## Gotchas
 
@@ -124,7 +125,17 @@ wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht 
 `$VAULT/25_Coding/epub-exporter/epub-exporter.md` (Pallas-Vault). Das Daemon-Memory unter
 `~/.claude/projects/<slug>/memory/` (Index: `MEMORY.md`) ist nur die **Zeiger-Schicht** aufs
 Cockpit — dauerhafte „Warum"-Erkenntnis gehört in Cockpit-§🧭, nicht als Dublette ins Memory.
-Session-Handoff unter `.remember/` (gitignored). Cross-project-Lektionen: `../_docs/LESSONS.md`.
+Session-Handoff unter `.remember/` (gitignored). Cross-project-Lektionen: `_docs/LESSONS.md`
+im Maintainer-Workspace (`../../_docs`, maintainer-lokal).
+
+- **SDD-Artefakte (seit 2026-07-16): Cockpit, nicht Repo** — Specs/Plans/Task-Reports leben im
+  Coding-Cockpit des Maintainers (`$VAULT/25_Coding/epub-exporter/_SDD/`, CORE-META-14, maintainer-lokal).
+  Sie tragen Arbeitskontext (Vault-Pfade, Schwester-Repo-Interna), der in einem public Repo niemandem nützt.
+  Das Repo behält die Design-Essenz in dieser Datei + `CHANGELOG.md`.
+- **Alt-Bestand:** `docs/superpowers/{specs,plans}/` ist eingefroren — nichts Neues dort ablegen.
+- **Nie im Repo:** absolute Pfade außerhalb des Repos (`/Users/…`, Vault-Pfade) — Platzhalter nutzen
+  (`$VAULT/…`, `~/…`, repo-relativ). Herkunftsnachweise als Repo-Name + `Datei:Zeile` sind dagegen erwünscht.
+  Gate: `scripts/check-no-abs-paths.mjs` (Teil von `npm test`).
 
 ## Abweichungen von der Leitkonvention
 

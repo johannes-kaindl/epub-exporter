@@ -1288,7 +1288,7 @@ Trage unter `## [Unreleased]` ein (Abschnitt `### Added` anlegen, falls nicht vo
 
 ```bash
 npm run build
-VAULT_PLUGIN="/Users/Shared/10_ObsidianVaults/10_Pallas/.obsidian/plugins/epub-exporter"
+VAULT_PLUGIN="$VAULT/.obsidian/plugins/epub-exporter"
 cp main.js styles.css "$VAULT_PLUGIN/"
 grep -c "epub-sb-chapter-grip" "$VAULT_PLUGIN/main.js"
 ```

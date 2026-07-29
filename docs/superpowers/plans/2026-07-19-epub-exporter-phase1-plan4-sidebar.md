@@ -1139,7 +1139,7 @@ git commit -m "feat(obsidian): register EPUB sidebar view, open command, opt-in 
 Install into the Pallas vault plugin folder and verify by hand. Copy the built artifacts:
 
 ```bash
-cp main.js manifest.json styles.css "/Users/Shared/10_ObsidianVaults/10_Pallas/.obsidian/plugins/epub-exporter/"
+cp main.js manifest.json styles.css "$VAULT/.obsidian/plugins/epub-exporter/"
 ```
 
 Then reload the plugin (Obsidian → community plugins → toggle off/on, or reload the app) and confirm against the test book in `10_Pallas/_epub-testing/`:
