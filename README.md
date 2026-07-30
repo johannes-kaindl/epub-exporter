@@ -2,9 +2,9 @@
 
 Exportiert Notizen als EPUB3 — eine einzelne Notiz oder ein ganzes Buch aus eingebetteten Kapiteln.
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://codeberg.org/jkaindl/epub-exporter/src/branch/main/LICENSE)
-[![Release](https://img.shields.io/badge/Release-0.2.0-green.svg)](https://codeberg.org/jkaindl/epub-exporter/releases)
-[![Platform: Desktop + Mobile](https://img.shields.io/badge/Platform-Desktop%20%2B%20Mobile-blue.svg)](https://codeberg.org/jkaindl/epub-exporter/src/branch/main/manifest.json)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://git.jkaindl.de/jkaindl/epub-exporter/src/branch/main/LICENSE)
+[![Release](https://img.shields.io/badge/Release-0.2.0-green.svg)](https://git.jkaindl.de/jkaindl/epub-exporter/releases)
+[![Platform: Desktop + Mobile](https://img.shields.io/badge/Platform-Desktop%20%2B%20Mobile-blue.svg)](https://git.jkaindl.de/jkaindl/epub-exporter/src/branch/main/manifest.json)
 
 ## Das Buch-Modell
 

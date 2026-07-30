@@ -97,7 +97,7 @@ eigenes `scripts/release.mjs` (es ist der erste Nutznießer des zentralen Toolin
 version-bump` / `preflight` / `release` delegieren dorthin und **erroren mit lesbarer Meldung**,
 wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht release-fähig.**
 
-- Remotes: **Codeberg** `origin` (`jkaindl/epub-exporter`), **GitHub-Mirror**
+- Remotes: **Forgejo** `origin` (`jkaindl/epub-exporter`), **GitHub-Mirror**
   (`johannes-kaindl/epub-exporter`) — der GitHub-Push triggert die Store-Release-Action.
 - **Store-Einreichung** übers Obsidian **Developer Dashboard** (community.obsidian.md) — der
   PR-Flow gegen `obsidianmd/obsidian-releases` ist seit Mai 2026 retired (PROF-OBS-14).
