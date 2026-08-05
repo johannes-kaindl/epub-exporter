@@ -7,7 +7,7 @@
     "build": "node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/check-no-abs-paths.mjs && vitest run",
+    "test": "node scripts/check-no-abs-paths.mjs && node scripts/check-no-nul-bytes.mjs && vitest run",
     "check:pure": "sh -c '! grep -rlE \"from [\\\"'\\'']obsidian[\\\"'\\'']\" src/core src/vendor 2>/dev/null'",
     "lint": "node scripts/check-no-inline-disables.mjs && eslint src",
     "gate": "npm run typecheck && npm test && npm run check:pure && npm run lint && npm run build",
