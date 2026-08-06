@@ -32,8 +32,9 @@ export class EpubSettingTab extends PluginSettingTab {
         // Always shown (not gated on the output mode): toggling visibility
         // needs the 1.13-only refreshDomState/update APIs, which we cannot call
         // at minAppVersion 1.8.7. A desc hint carries the "only when custom
-        // folder" context instead. The <1.13 display() fallback keeps the
-        // conditional row for older Obsidian.
+        // folder" context instead — this row is now unconditional on both the
+        // native >=1.13 path and the <1.13 display() fallback below, which
+        // walks this same definitions list.
         name: t("settings.customFolder.name"),
         desc: t("settings.customFolder.desc"),
         control: { type: "text", key: "customFolder" },
