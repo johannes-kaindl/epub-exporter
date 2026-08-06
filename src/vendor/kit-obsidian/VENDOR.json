@@ -1,0 +1,7 @@
+{
+  "source": "obsidian-kit",
+  "version": "0.25.0",
+  "sha": "1ca3861",
+  "vendored": "settings_walker.ts, folder-suggest.ts",
+  "note": "Verbatim snapshot. Never hand-edit. Re-copy from obsidian-kit to update. Kept separate from src/vendor/kit/ because this folder imports \"obsidian\" (Setting, FolderSuggest use DOM/App APIs) and must stay out of check:pure's src/vendor/kit-only scope."
+}

@@ -1,8 +1,8 @@
 // src/obsidian/settings-tab.ts
-import { App, Plugin, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
-import { EpubExporterSettings, OutputDestination } from "./settings";
-import { ChapterMode, AssetMode } from "../core/consolidate-plan";
+import { App, Plugin, PluginSettingTab, SettingDefinitionItem } from "obsidian";
+import { EpubExporterSettings } from "./settings";
 import { t } from "../vendor/kit/i18n";
+import { renderSettingDefinitions } from "../vendor/kit-obsidian/settings_walker";
 
 export class EpubSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: { settings: EpubExporterSettings; saveSettings: () => Promise<void> }) {
@@ -95,83 +95,18 @@ export class EpubSettingTab extends PluginSettingTab {
     await this.plugin.saveSettings();
   }
 
+  // <1.13 fallback: walks the SAME getSettingDefinitions() array the native
+  // path reads (Kit walker, vendored in src/vendor/kit-obsidian). Previously
+  // this method hand-rebuilt the UI from the classic Setting API, drifting
+  // from getSettingDefinitions() — e.g. it alone hid the customFolder row
+  // unless outputDestination === "customFolder", a condition the declarative
+  // definitions never expressed. Fixed by rendering the one definitions list
+  // through both paths; the customFolder row is now always visible with its
+  // desc hint on both paths, matching what the native >=1.13 renderer already
+  // did (see the comment on that definition above).
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    const s = this.plugin.settings;
-    const save = () => this.plugin.saveSettings();
-
-    new Setting(containerEl).setName(t("settings.output.name")).addDropdown((d) =>
-      d
-        .addOptions({
-          besideNote: t("settings.output.besideNote"),
-          attachmentFolder: t("settings.output.attachmentFolder"),
-          customFolder: t("settings.output.customFolder"),
-          share: t("settings.output.share"),
-        })
-        .setValue(s.outputDestination)
-        .onChange(async (v) => {
-          s.outputDestination = v as OutputDestination;
-          await save();
-          // The custom-folder row is conditional on the mode; re-render is Obsidian's
-          // supported way to show/hide dependent settings.
-          this.display();
-        })
-    );
-
-    // Only visible in the matching mode — so it needs no "only when X" helper text.
-    if (s.outputDestination === "customFolder") {
-      new Setting(containerEl)
-        .setName(t("settings.customFolder.name"))
-        .addText((txt) => txt.setValue(s.customFolder).onChange(async (v) => {
-          s.customFolder = v.trim();
-          await save();
-        }));
-    }
-
-    // Dropdown, not free text: only the languages the plugin actually ships
-    // UI strings for (de/en). Labels are shown in their own language, unlocalised.
-    new Setting(containerEl)
-      .setName(t("settings.language.name"))
-      .setDesc(t("settings.language.desc"))
-      .addDropdown((d) => d
-        .addOptions({ en: "English", de: "Deutsch" })
-        // Coerce any legacy free-text value to a valid option for display.
-        .setValue(s.defaultLanguage === "de" ? "de" : "en")
-        .onChange(async (v) => {
-          s.defaultLanguage = v;
-          await save();
-        }));
-
-    new Setting(containerEl)
-      .setName(t("settings.openSidebar.name"))
-      .setDesc(t("settings.openSidebar.desc"))
-      .addToggle((tg) => tg.setValue(s.openSidebarOnStartup).onChange(async (v) => {
-        s.openSidebarOnStartup = v;
-        await save();
-      }));
-
-    new Setting(containerEl)
-      .setName(t("settings.consolidateChapter.name"))
-      .setDesc(t("settings.consolidateChapter.desc"))
-      .addDropdown((d) => d
-        .addOptions({
-          copy: t("settings.consolidateChapter.copy"),
-          move: t("settings.consolidateChapter.move"),
-        })
-        .setValue(s.consolidateChapterMode)
-        .onChange(async (v) => { s.consolidateChapterMode = v as ChapterMode; await save(); }));
-
-    new Setting(containerEl)
-      .setName(t("settings.consolidateAsset.name"))
-      .setDesc(t("settings.consolidateAsset.desc"))
-      .addDropdown((d) => d
-        .addOptions({
-          full: t("settings.consolidateAsset.full"),
-          cover: t("settings.consolidateAsset.cover"),
-          none: t("settings.consolidateAsset.none"),
-        })
-        .setValue(s.consolidateAssetMode)
-        .onChange(async (v) => { s.consolidateAssetMode = v as AssetMode; await save(); }));
+    renderSettingDefinitions(containerEl, this.getSettingDefinitions(), this, this.app);
   }
 }

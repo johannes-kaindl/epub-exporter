@@ -8,7 +8,7 @@
     "dev": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/check-no-abs-paths.mjs && node scripts/check-no-nul-bytes.mjs && vitest run",
-    "check:pure": "sh -c '! grep -rlE \"from [\\\"'\\'']obsidian[\\\"'\\'']\" src/core src/vendor 2>/dev/null'",
+    "check:pure": "sh -c '! grep -rlE \"from [\\\"'\\'']obsidian[\\\"'\\'']\" src/core src/vendor/kit 2>/dev/null'",
     "lint": "node scripts/check-no-inline-disables.mjs && eslint src",
     "gate": "npm run typecheck && npm test && npm run check:pure && npm run lint && npm run build",
     "version-bump": "test -f ../tools/release/version-bump.mjs || { echo \"FEHLER: ../tools/release/ fehlt. Dieses Repo muss im Dach-Verzeichnis obsidian-plugins/ neben tools/ liegen — das Release-Tooling liegt dort zentral, nicht im Plugin. Ein Clone ohne Dach ist nicht release-faehig.\" >&2; exit 1; }; node ../tools/release/version-bump.mjs",

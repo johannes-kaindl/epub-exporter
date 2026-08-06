@@ -160,6 +160,15 @@ export class Setting {
   constructor(_containerEl?: unknown) {}
 }
 
+// Minimal stand-in so src/vendor/kit-obsidian/folder-suggest.ts can be
+// imported under node — `class FolderSuggest extends AbstractInputSuggest`
+// evaluates its heritage clause at module load, so this binding must exist
+// even though epub-exporter has no "folder" control and never instantiates
+// FolderSuggest in tests.
+export abstract class AbstractInputSuggest<T> {
+  constructor(_app: unknown, _textInputEl: unknown) {}
+}
+
 // Minimal SettingTab/PluginSettingTab base. The declarative-API methods
 // (getSettingDefinitions/getControlValue/setControlValue) live on the plugin
 // subclass; the base only supplies the pieces those methods touch —
