@@ -6,6 +6,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-08-14
+
 ### Behoben
 
 - Die Einstellungen sehen jetzt auf allen unterstützten Obsidian-Versionen gleich aus.
