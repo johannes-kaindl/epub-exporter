@@ -5,6 +5,6 @@
   "minAppVersion": "1.8.7",
   "description": "Export a note — or a book note with embedded chapters — as an EPUB.",
   "author": "Johannes Kaindl",
-  "authorUrl": "https://jkaindl.de",
+  "authorUrl": "https://github.com/johannes-kaindl",
   "isDesktopOnly": false
 }
