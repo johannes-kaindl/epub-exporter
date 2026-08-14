@@ -6,6 +6,23 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Behoben
+
+- Die Einstellungen sehen jetzt auf allen unterstützten Obsidian-Versionen gleich aus.
+  Auf Versionen vor 1.13 blendete die Ausweich-Ansicht die Zeile „Eigener Ordner“ aus,
+  solange das Ausgabeziel nicht bereits darauf stand — ab 1.13 war sie durchgehend
+  sichtbar. Beide Ansichten lesen jetzt dieselbe Einstellungs-Definition.
+
+### Geändert
+
+- Die README ist jetzt englisch (`README.md`); die deutsche Fassung steht als
+  `README.de.md` daneben.
+- Die README dokumentiert erstmals die Frontmatter-Felder der Buch-Notiz samt ihrer
+  deutschen Aliase (`titel`, `autor`, `sprache`, `verlag`, …) sowie die Funktionsweise
+  des Exports. Die Beschreibung der Einstellungen war inhaltlich falsch — sie nannte
+  Optionen für Bilder und Code-Blöcke, die es nicht gibt — und listet jetzt die
+  tatsächlich vorhandenen Einstellungen mit ihren Vorgabewerten.
+
 ## [0.3.0] — 2026-07-24
 
 ### Hinzugefügt
