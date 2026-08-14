@@ -1,50 +1,53 @@
 # EPUB Exporter
 
-Exportiert Notizen als EPUB3 — eine einzelne Notiz oder ein ganzes Buch aus eingebetteten Kapiteln.
+Export notes as EPUB3 — a single note, or a whole book assembled from embedded chapters.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://git.jkaindl.de/jkaindl/epub-exporter/src/branch/main/LICENSE)
-[![Releases](https://img.shields.io/badge/Releases-latest-green.svg)](https://git.jkaindl.de/jkaindl/epub-exporter/releases)
+[![Release](https://img.shields.io/gitea/v/release/jkaindl/epub-exporter?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/epub-exporter/releases)
 [![Platform: Desktop + Mobile](https://img.shields.io/badge/Platform-Desktop%20%2B%20Mobile-blue.svg)](https://git.jkaindl.de/jkaindl/epub-exporter/src/branch/main/manifest.json)
+
+*Auch auf Deutsch verfügbar: [`README.de.md`](README.de.md).*
 
 ## Features
 
-- **Ein Buch ist eine Notiz.** Frontmatter trägt die Metadaten, die eingebetteten
-  Kapitel bilden den Spine — keine separate Projektdatei, die aus dem Tritt gerät.
-- Einzelne Notiz, Buch-Notiz oder ganzer **Ordner** als EPUB3 exportieren.
-- **Seitenleiste** mit Kapitelliste; Umsortieren per Ziehen oder `Alt+↑/↓` schreibt
-  die neue Reihenfolge direkt in den Embed-Spine der Buch-Notiz zurück.
-- **Ordner als Buch importieren** und Buch-Notizen **in einen Ordner konsolidieren**
-  (nummerierte Kapiteldateien + `_assets/`).
-- Metadaten-Felder auf Deutsch oder Englisch (`autor`/`author`, `titelbild`/`cover`, …).
-- Bilder, interne Links und Code-Blöcke wandern mit ins Buch; nicht darstellbare
-  Elemente werden vereinfacht statt verschluckt und am Ende gemeldet.
-- Erzeugt das EPUB **ohne externe Bibliothek** — läuft deshalb auch auf Mobile.
+- **A book is a note.** Frontmatter carries the metadata, the embedded chapters form
+  the spine — no separate project file that drifts out of sync.
+- Export a single note, a book note, or an entire **folder** as EPUB3.
+- **Sidebar** with the chapter list; reordering by drag or `Alt+↑/↓` writes the new
+  order straight back into the book note's embed spine.
+- **Import a folder as a book** and **consolidate a book note into a folder**
+  (numbered chapter files + `_assets/`).
+- Metadata fields in German or English (`autor`/`author`, `titelbild`/`cover`, …).
+- Images, internal links and code blocks travel into the book; anything EPUB cannot
+  represent is simplified rather than swallowed, and reported afterwards.
+- Builds the EPUB **without an external library** — which is why it also runs on
+  mobile.
 
-## Voraussetzungen
+## Requirements
 
-- **Obsidian 1.8.7** oder neuer.
-- Desktop **und** Mobile — das Plugin ist nicht desktop-only.
-- Für den Kapitel-Spine: eine Notiz, deren Embeds (`![[…]]`) die Kapitel in der
-  gewünschten Reihenfolge nennen. Alles Weitere ist optional.
+- **Obsidian 1.8.7** or newer.
+- Desktop **and** mobile — the plugin is not desktop-only.
+- For the chapter spine: a note whose embeds (`![[…]]`) name the chapters in the
+  intended order. Everything else is optional.
 
-## Installation
+## Install
 
-**Community-Plugin-Liste (empfohlen):** *Einstellungen* → *Community-Plugins* →
-*Durchsuchen* → nach **„EPUB Exporter"** suchen → installieren und aktivieren.
+**Community plugin list (recommended):** *Settings* → *Community plugins* → *Browse* →
+search for **"EPUB Exporter"** → install and enable.
 
-**Manuell (manual install):** `main.js`, `manifest.json` und `styles.css` aus dem
-[Release](https://git.jkaindl.de/jkaindl/epub-exporter/releases) nach
-`<vault>/.obsidian/plugins/epub-exporter/` kopieren.
+**Manual install:** copy `main.js`, `manifest.json` and `styles.css` from a
+[release](https://git.jkaindl.de/jkaindl/epub-exporter/releases) into
+`<vault>/.obsidian/plugins/epub-exporter/`.
 
-**Aus dem Quelltext (from source):** Repository klonen, `npm install && npm run build`,
-dann dieselben drei Dateien in denselben Ordner kopieren.
+**From source:** clone the repository, run `npm install && npm run build`, then copy the
+same three files into the same folder.
 
-## Verwendung
+## Usage
 
-### Das Buch-Modell
+### The book model
 
-Eine Buch-Notiz ist die einzige Quelle der Wahrheit. Ihr Frontmatter trägt die Metadaten, ihre
-geordneten Embeds bilden den Kapitel-Spine:
+A book note is the single source of truth. Its frontmatter carries the metadata, its
+ordered embeds form the chapter spine:
 
 ```markdown
 ---
@@ -59,63 +62,65 @@ cover: assets/cover.png
 ![[03 Nathanael an Lothar]]
 ```
 
-Weil die Kapitel echte Embeds sind, ist das fertige Buch in der Leseansicht direkt sichtbar —
-es gibt keine separate Projektdatei, die mit der Notiz aus dem Tritt geraten könnte.
+Because the chapters are real embeds, the finished book is visible as such in reading
+view — there is no separate project file that could drift out of sync with the note.
 
-Erkannt werden `title`, `author`, `language`, `identifier`/`isbn`, `description`,
-`publisher`, `date`, `series` + `series_index`, `subject`/`tags`, `rights` und `cover`
-— jeweils **auch unter dem deutschen Namen** (`titel`, `autor`, `sprache`, `verlag`,
-`datum`, `reihe` + `reihe_nr`, `schlagworte`, `rechte`, `titelbild`). Fehlt `title`,
-dient der Dateiname als Titel; fehlt `identifier`, wird eine UUID erzeugt.
-Der Befehl **„Buch-Frontmatter in Notiz einfügen"** legt das Gerüst an.
+Recognized fields are `title`, `author`, `language`, `identifier`/`isbn`, `description`,
+`publisher`, `date`, `series` + `series_index`, `subject`/`tags`, `rights` and `cover` —
+each **also under its German name** (`titel`, `autor`, `sprache`, `verlag`, `datum`,
+`reihe` + `reihe_nr`, `schlagworte`, `rechte`, `titelbild`). Without `title` the file
+name is used; without `identifier` a UUID is generated. The command **"Insert book
+frontmatter into note"** lays out the scaffold.
 
-### Wege in den Export
+### Ways into an export
 
-- **Seitenleiste** — öffnet die Buchübersicht mit Kapitelliste, Export- und Konsolidieren-Schaltfläche.
-- **Kapitel umsortieren** — in der Seitenleiste per Ziehen oder `Alt+↑/↓`; die neue Reihenfolge wandert
-  sofort in den Embed-Spine der Buch-Notiz, sodass das Buch in der Leseansicht direkt neu sortiert erscheint.
-- **Befehl** „Als EPUB exportieren" — exportiert die aktive Notiz.
-- **Kontextmenü eines Ordners** — exportiert den Ordner als Buch **oder** importiert ihn als Buch-Notiz
-  (Embed-Spine aus der Dateinamen-Reihenfolge).
-- **Buch-Notiz → „In Ordner konsolidieren"** (Befehl, Seitenleiste oder Kontextmenü) — überführt das Buch
-  in einen eigenständigen Ordner: Buch-Notiz + nummerierte Kapiteldateien + `_assets/`. Ein Dialog wählt,
-  ob die Kapitel kopiert oder verschoben werden und wie viele Bilder mitkommen.
+- **Sidebar** — opens the book overview with the chapter list plus export and
+  consolidate buttons.
+- **Reorder chapters** — in the sidebar by dragging or with `Alt+↑/↓`; the new order
+  goes straight into the book note's embed spine, so the book reorders itself in
+  reading view immediately.
+- **Command** "Export as EPUB" — exports the active note.
+- **A folder's context menu** — exports the folder as a book **or** imports it as a book
+  note (embed spine from the file name order).
+- **Book note → "Consolidate book to folder"** (command, sidebar or context menu) —
+  moves the book into a folder of its own: book note + numbered chapter files +
+  `_assets/`. A dialog picks whether chapters are copied or moved, and how many images
+  come along.
 
-Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeichnis,
-`epub_exclude: true` lässt ein Kapitel aus.
+Per chapter: `chapter_title` overrides the title in the table of contents,
+`epub_exclude: true` leaves a chapter out.
 
-## Konfiguration
+## Configuration
 
-*Einstellungen* → *Community-Plugins* → **EPUB Exporter**:
+*Settings* → *Community plugins* → **EPUB Exporter**:
 
-| Einstellung | Standard | Bedeutung |
+| Setting | Default | Meaning |
 |---|---|---|
-| Ausgabeziel | Neben der Notiz | Oder: Anhang-Ordner, eigener Ordner, oder „Teilen / in anderer App öffnen" (Mobile) |
-| Eigener Ordner | *(leer)* | Nur wirksam, wenn das Ausgabeziel „Eigener Ordner" ist |
-| Standard-Buchsprache | `en` | Wird verwendet, wenn eine Buch-Notiz kein Sprachfeld hat |
-| Seitenleiste beim Start öffnen | aus | Blendet das EPUB-Exporter-Panel beim Start von Obsidian ein |
-| Konsolidieren: Kapiteldateien | Kopieren | Kopieren (Originale bleiben) oder Verschieben |
-| Konsolidieren: Bilder | Vollständig | Cover + alle Kapitelbilder, nur Cover, oder keine |
+| Output destination | Beside the note | Or: attachment folder, custom folder, or "Share / open in another app" (mobile) |
+| Custom folder | *(empty)* | Only used when the output destination is "Custom folder" |
+| Default book language | `en` | Used when a book note has no language field |
+| Open sidebar on startup | off | Reveals the EPUB Exporter panel when Obsidian starts |
+| Consolidate: chapter files | Copy | Copy (keep originals) or move |
+| Consolidate: images | Full | Cover + all chapter images, cover only, or none |
 
-Die beiden Konsolidieren-Einstellungen sind nur der **Vorschlag** im Dialog — dort lässt
-sich je Vorgang abweichen.
+The two consolidate settings are only the **default** in the dialog — it lets you
+deviate per run.
 
-## Funktionsweise
+## How it works
 
-Das EPUB wird vollständig im Plugin gebaut, ohne EPUB- oder ZIP-Bibliothek: ein
-minimaler, unkomprimierter ZIP-Writer schreibt `mimetype` zuerst (wie die Spezifikation
-es verlangt), darauf Container, OPF-Paket und Navigations-Dokument. Deshalb läuft der
-Export auch auf Mobile und braucht keine Netzwerkverbindung.
+The EPUB is built entirely inside the plugin, without an EPUB or ZIP library: a minimal,
+uncompressed ZIP writer puts `mimetype` first (as the specification demands), followed by
+the container, the OPF package and the navigation document. That is why the export also
+works on mobile and needs no network connection.
 
-Jedes Kapitel wird von Obsidian gerendert und dann aus dem DOM nach XHTML übersetzt.
-Was EPUB nicht kennt, wird auf das nächstliegende Element heruntergebrochen statt
-weggelassen — wie viele Elemente das betraf, meldet eine Notiz nach dem Export.
-Code-Blöcke werden vor dem Rendern gegen Platzhalter getauscht und danach unverändert
-wieder eingesetzt, damit kein Syntax-Highlighting im Buch landet. Bilder sammelt eine
-Registry ein und legt sie einmalig mit passendem Medientyp ab (PNG, JPEG, GIF, SVG,
-WebP); Links auf Notizen innerhalb desselben Buchs werden zu internen Sprungzielen,
-Links nach außen zu einfachem Text.
+Each chapter is rendered by Obsidian and then translated from the DOM into XHTML.
+Whatever EPUB does not know is degraded to the closest element rather than dropped — a
+notice reports how many elements that affected. Code blocks are swapped for placeholders
+before rendering and put back unchanged afterwards, so no syntax highlighting ends up in
+the book. Images are collected by a registry and stored once with the right media type
+(PNG, JPEG, GIF, SVG, WebP); links to notes within the same book become internal jump
+targets, links pointing outside become plain text.
 
-## Lizenz
+## License
 
-AGPL-3.0-or-later — siehe [LICENSE](LICENSE).
+AGPL-3.0-or-later — see [LICENSE](LICENSE).
