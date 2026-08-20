@@ -19,6 +19,14 @@ describe("resolveOutputPath", () => {
   it("custom folder", () => {
     expect(resolveOutputPath("customFolder", opts)).toBe("Export/My Book.epub");
   });
+  // Neu seit dem Umstieg auf obsidian-kit `joinVaultPath` (Vendoring 0.27.0): customFolder ist ein
+  // freies Textfeld und kommt roh hier an — Backslashes und Mehrfach-Slashes werden jetzt normalisiert.
+  it("normalizes backslashes in a hand-typed custom folder", () => {
+    expect(resolveOutputPath("customFolder", { ...opts, customFolder: "Export\\Bücher" })).toBe("Export/Bücher/My Book.epub");
+  });
+  it("collapses double slashes in a hand-typed custom folder", () => {
+    expect(resolveOutputPath("customFolder", { ...opts, customFolder: "Export//Bücher" })).toBe("Export/Bücher/My Book.epub");
+  });
   it("attachment folder passes the resolved attachment path through", () => {
     expect(resolveOutputPath("attachmentFolder", opts)).toBe("att/My Book.epub");
   });

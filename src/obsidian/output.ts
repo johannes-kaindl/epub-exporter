@@ -2,6 +2,7 @@
 import { App, Notice } from "obsidian";
 import { OutputDestination, resolveOutputPath, sanitizeBase } from "../core/output-path";
 import { t } from "../vendor/kit/i18n";
+import { vaultDirname } from "../vendor/kit/vault-path";
 
 // Runtime-only API surfaces not covered by the public Obsidian typings.
 interface ShareCapableNavigator {
@@ -58,8 +59,7 @@ export async function writeEpub(
   });
   // Only "share" yields null; the guard keeps TypeScript happy and is defensive.
   if (path === null) return { savedPath: null };
-  const slash = path.lastIndexOf("/");
-  const dir = slash === -1 ? "" : path.slice(0, slash);
+  const dir = vaultDirname(path);
   if (dir && !(await adapter.exists(dir))) await adapter.mkdir(dir);
   await adapter.writeBinary(path, bytes.buffer as ArrayBuffer);
   new Notice(t("notice.saved", path));

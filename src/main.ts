@@ -9,6 +9,7 @@ import { EpubSettingTab } from "./obsidian/settings-tab";
 import { coerceSettings, EpubExporterSettings } from "./obsidian/settings";
 import { registerI18n } from "./i18n/strings";
 import { pickLang, setLang, t } from "./vendor/kit/i18n";
+import { vaultDirname } from "./vendor/kit/vault-path";
 import { EpubHubView, VIEW_TYPE_EPUB_HUB, resolveTargetFile, SidebarBridge } from "./obsidian/hub-view";
 import { buildSnapshot } from "./obsidian/sidebar-bridge";
 import { buildConsolidatePlan } from "./core/consolidate-plan";
@@ -151,8 +152,7 @@ export default class EpubExporterPlugin extends Plugin {
   // The note directory + display base name for the output path.
   private outputContextFor(source: BookSource, title: string): { noteDir: string; baseName: string } {
     if (source.kind === "folder") {
-      const slash = source.path.lastIndexOf("/");
-      const parent = slash === -1 ? "" : source.path.slice(0, slash);
+      const parent = vaultDirname(source.path);
       return { noteDir: parent, baseName: title };
     }
     const file = this.app.vault.getAbstractFileByPath(source.path);
