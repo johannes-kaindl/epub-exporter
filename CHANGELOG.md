@@ -6,6 +6,14 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Geändert
+
+- **Die Einstellung „Eigener Ordner“ verträgt jetzt getipptes Slash-Rauschen.** Sie ist ein
+  freies Textfeld, und ihr Wert erreichte den Vault bisher nur um führende und schließende
+  Slashes bereinigt. Backslashes werden jetzt zu `/`, wiederholte innere Slashes werden
+  zusammengefasst — `Export\Bücher` und `Export//Bücher` ergeben beide `Export/Bücher`, also die
+  Form, die Obsidians Vault-Adapter erwartet. Aus `obsidian-kit` 0.27.0 (`pure/vault-path.ts`).
+
 ## [0.3.1] — 2026-08-14
 
 ### Behoben

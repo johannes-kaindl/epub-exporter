@@ -25,8 +25,12 @@ anderes Ausgabeformat.
 
 - **Drei Schichten:** `src/core/*` (pur, Obsidian-frei, node-testbar) · `src/obsidian/*`
   (Runtime-Shell, berührt die Obsidian-API) · `src/vendor/kit/*` (vendored pure Kit-Module:
-  `i18n`, `settings`). `npm run check:pure` erzwingt, dass `src/core` + `src/vendor` **kein**
-  `obsidian` importieren (Muster fängt beide Quote-Stile: `from "obsidian"` und `'obsidian'`).
+  `i18n`, `settings`, `vault-path`). **Den verbindlichen Stand nennt `src/vendor/kit/VENDOR.json`,
+  nicht diese Aufzählung** — eine Modulliste in der Prosa altert still. `npm run check:pure`
+  erzwingt, dass `src/core` + **`src/vendor/kit`** **kein** `obsidian` importieren (Muster fängt
+  beide Quote-Stile: `from "obsidian"` und `'obsidian'`). Ausdrücklich **nicht** geprüft wird
+  `src/vendor/kit-obsidian/` — dieser Ordner importiert `obsidian` bestimmungsgemäß und liegt
+  genau deshalb getrennt (Begründung in `src/vendor/kit-obsidian/VENDOR.json`).
 - **Dep-freie Engine — einfacher als PDF:** EPUB = XHTML+CSS im ZIP; Obsidian rendert MD→HTML
   selbst. Kern: `dom-to-xhtml.ts` (Schwester zu paperizes `dom-to-ir`, gleiche
   graceful-degradation — Unbekanntes wird vereinfacht, nicht abgebrochen; der Zähler treibt die
