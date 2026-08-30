@@ -2,3 +2,5 @@
 node_modules/
 main.js
 *.epub
+.shots.mjs
+docs/images/.frames/

@@ -8,6 +8,8 @@ Export notes as EPUB3 — a single note, or a whole book assembled from embedded
 
 *Auch auf Deutsch verfügbar: [`README.de.md`](README.de.md).*
 
+<p align="center"><img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/hero.png" width="820" alt="A book note in reading view: the embedded chapters run on as continuous prose, with the EPUB Exporter panel listing them on the right"></p>
+
 ## Features
 
 - **A book is a note.** Frontmatter carries the metadata, the embedded chapters form
@@ -87,6 +89,13 @@ frontmatter into note"** lays out the scaffold.
   `_assets/`. A dialog picks whether chapters are copied or moved, and how many images
   come along.
 
+<a href="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/sidebar-book.png"><img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/thumbs/sidebar-book.png" width="380" alt="The EPUB Exporter panel for a book note: chapter list with drag handles, the hint “Drag to reorder · Alt+arrow keys”, and the buttons Export as EPUB, Edit metadata and Consolidate to folder"></a><br><sub>The panel — click the preview for full size</sub>
+
+<a href="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/reorder.gif"><img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/reorder.gif" width="380" alt="A chapter is moved with Alt+arrow-down; the matching embed line moves with it in the book note"></a>
+<sub>Reordering, by dragging or with <code>Alt+↑/↓</code> — the embed line in the note moves with it.</sub>
+
+<img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/consolidate-modal.png" width="820" alt="The Consolidate to folder dialog: a summary line, the choice between copying and moving chapter files, and how many images come along">
+
 Per chapter: `chapter_title` overrides the title in the table of contents,
 `epub_exclude: true` leaves a chapter out.
 
@@ -105,6 +114,8 @@ Per chapter: `chapter_title` overrides the title in the table of contents,
 
 The two consolidate settings are only the **default** in the dialog — it lets you
 deviate per run.
+
+<a href="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/settings.png"><img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/thumbs/settings.png" width="380" alt="The EPUB Exporter settings tab with all six settings"></a><br><sub>Click the preview for the full-size settings tab</sub>
 
 ## How it works
 

@@ -9,6 +9,8 @@ Exportiert Notizen als EPUB3 — eine einzelne Notiz oder ein ganzes Buch aus ei
 > **Hinweis:** Diese Übersetzung folgt der englischen [`README.md`](README.md).
 > Bei Abweichungen gilt die englische Fassung.
 
+<p align="center"><img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/hero.png" width="820" alt="Eine Buch-Notiz in der Leseansicht: die eingebetteten Kapitel laufen als fortlaufender Text durch, rechts listet das EPUB-Exporter-Panel sie auf"></p>
+
 ## Features
 
 - **Ein Buch ist eine Notiz.** Frontmatter trägt die Metadaten, die eingebetteten
@@ -84,6 +86,8 @@ Der Befehl **„Buch-Frontmatter in Notiz einfügen"** legt das Gerüst an.
   in einen eigenständigen Ordner: Buch-Notiz + nummerierte Kapiteldateien + `_assets/`. Ein Dialog wählt,
   ob die Kapitel kopiert oder verschoben werden und wie viele Bilder mitkommen.
 
+<img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/consolidate-modal.png" width="820" alt="Der Dialog „In Ordner konsolidieren“: Zusammenfassungszeile, die Wahl zwischen Kopieren und Verschieben der Kapiteldateien und wie viele Bilder mitkommen">
+
 Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeichnis,
 `epub_exclude: true` lässt ein Kapitel aus.
 
@@ -102,6 +106,8 @@ Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeic
 
 Die beiden Konsolidieren-Einstellungen sind nur der **Vorschlag** im Dialog — dort lässt
 sich je Vorgang abweichen.
+
+<a href="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/settings.png"><img src="https://git.jkaindl.de/jkaindl/epub-exporter/raw/branch/main/docs/images/thumbs/settings.png" width="380" alt="Der Einstellungen-Tab von EPUB Exporter mit allen sechs Einstellungen"></a><br><sub>Vorschau anklicken für den vollständigen Einstellungen-Tab</sub>
 
 ## Funktionsweise
 
