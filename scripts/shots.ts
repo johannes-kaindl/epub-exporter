@@ -32,7 +32,14 @@
  *
  * Richtig ist:
  *   1. Laeuft schon ein Obsidian mit `--remote-debugging-port=9222`? Dann diesen Port
- *      mitbenutzen — und **vorher die Session fragen, der er gehoert**.
+ *      mitbenutzen — und **vorher die Session fragen, der er gehoert**:
+ *
+ *      ```bash
+ *      lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "belegt — erst fragen, wem"
+ *      ```
+ *
+ *      ⚠️ Die Pruefung ersetzt die Frage nicht: sie zeigt aktive CDP-Treiber, aber nicht,
+ *      wer ein Fenster offen haelt oder auf den Port wartet.
  *   2. Den Aufnahme-Vault per IPC oeffnen: in `obsidian.json` eintragen, dann
  *      `ipcRenderer.send("vault-open", <pfad>)` aus einem beliebigen Renderer. Das erzeugt
  *      ein zweites **Fenster im selben Prozess**. Weder `open -a Obsidian` noch
