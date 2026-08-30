@@ -89,7 +89,7 @@ import {
   Cdp,
   closeExtraLeaves,
   openExisting,
-  pollUntil,
+  requireUntil,
   setAppConfig,
 } from "../../tools/obsidian-cdp/cdp.js";
 import {
@@ -162,7 +162,7 @@ async function openPanel(cdp: Cdp): Promise<void> {
     }
     return true;
   `);
-  await warteAuf(cdp, `!!document.querySelector(".epub-sb-header")`, "Panel erschien nicht");
+  await requireUntil(cdp, `!!document.querySelector(".epub-sb-header")`, "Panel erschien nicht");
 }
 
 /** Buch-Notiz im Lesemodus oeffnen — die Voraussetzung fuer jedes Bild, das das Buch zeigt. */
@@ -171,46 +171,12 @@ async function openBook(cdp: Cdp, mode: "preview" | "source" = "preview"): Promi
   if (!ok) throw new Error(`Buch-Notiz ${BOOK} liess sich nicht oeffnen (gerendert?)`);
   // Das Panel folgt dem aktiven Blatt ueber `active-leaf-change`; ohne diese Wartephase
   // zeigt es beim ersten Bild noch den vorherigen Kontext.
-  await warteAuf(
+  await requireUntil(
     cdp,
     `!!document.querySelector(".epub-sb-title") && !!document.querySelector(".epub-sb-chapter")`,
     "Panel zeigte die Kapitel des Buchs nicht",
   );
 }
-
-/**
- * Auf eine Bedingung im Renderer warten und **scheitern, wenn sie nicht eintritt**.
- *
- * Zwei Fallen auf einmal, beide gemessen (2026-08-30, erster Lauf dieses Rezepts):
- *
- * 1. **`cdp.evaluate` nimmt einen FUNKTIONSKOERPER, keinen Ausdruck** — die Bruecke
- *    wickelt den String in `(async () => { … })()` (`cdp.ts:245`). Ein blosser Ausdruck
- *    ohne `return` liefert deshalb immer `undefined`, also falsy, also laeuft jedes
- *    Warten in seinen Timeout. Der erste Lauf scheiterte an allen sechs Bildern mit
- *    "Panel erschien nicht", waehrend das Panel sichtbar im Fenster stand (276x18 px).
- *    Deshalb nimmt dieser Helfer einen **Ausdruck** und setzt das `return` selbst davor:
- *    der Aufrufer kann es nicht mehr vergessen.
- * 2. **`pollUntil` liefert bei Zeitablauf `null`, statt zu werfen.** Wer das Ergebnis
- *    nicht prueft, nimmt danach ein Bild von einem Zustand auf, der nie zustande kam —
- *    und der Lauf meldet Erfolg.
- */
-async function warteAuf(
-  cdp: Cdp,
-  ausdruck: string,
-  meldung: string,
-  timeoutMs = 15_000,
-): Promise<void> {
-  const da = await pollUntil<boolean>(cdp, `return Boolean(${ausdruck});`, timeoutMs);
-  if (!da) throw new Error(meldung);
-}
-// ⚠️ ABLOESE-KANDIDAT, sobald die zentrale Bruecke nachzieht (angekuendigt 2026-08-30):
-// `pollUntil` soll das `return Boolean(...)` kuenftig selbst setzen und bei Zeitablauf
-// werfen — dann tut die Bruecke genau das, was dieser Helfer tut, und er ist ueberfluessig.
-// Das Dach baut die Aenderung rueckwaertskompatibel (ein bereits vorhandenes `return`
-// bleibt unangetastet), dieser Helfer bricht also nicht sofort. Wenn du hier vorbeikommst
-// und die Bruecke es kann: `warteAuf` durch den direkten `pollUntil`-Aufruf ersetzen und
-// diesen Block loeschen. Vorher NICHT — ohne die Bruecken-Aenderung ist der Wrapper das
-// Einzige, was das vergessene `return` verhindert (siehe Falle 1 oben).
 
 /**
  * Alle offenen Modals und Menues schliessen — **vor** jedem Bild, nicht nur nach dem, das
@@ -436,7 +402,7 @@ const SHOTS: Shot[] = [
         btn?.click();
         return true;
       `);
-      await warteAuf(cdp, `!!document.querySelector(".epub-consolidate-modal")`, "Modal kam nicht");
+      await requireUntil(cdp, `!!document.querySelector(".epub-consolidate-modal")`, "Modal kam nicht");
       await ruhe(400);
       const box = await boxOf(cdp, ".modal-container .modal", 0);
       const png = box ? await capture(cdp, box, 2) : await capture(cdp);
@@ -516,7 +482,7 @@ const SHOTS: Shot[] = [
 
       const s = await Cdp.connect(url);
       try {
-        await warteAuf(s, `!!document.querySelector(".setting-item")`, "Tab kam nicht");
+        await requireUntil(s, `!!document.querySelector(".setting-item")`, "Tab kam nicht");
         await ruhe(400);
         // Inhaltsbewusster Zuschnitt: der Tab-Container ist ein Volle-Hoehe-Flex-Element.
         const box = await inhaltsBox(s, ".setting-item", 20);
