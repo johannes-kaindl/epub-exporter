@@ -6,6 +6,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-08-30
+
 ### Geändert
 
 - **Die Einstellung „Eigener Ordner“ verträgt jetzt getipptes Slash-Rauschen.** Sie ist ein
