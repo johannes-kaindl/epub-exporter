@@ -27,7 +27,7 @@ function plan(over: Partial<ConsolidatePlan> = {}): ConsolidatePlan {
     bookNoteBody: "![[01 - A]]",
     chapters: [{ sourcePath: "notes/A.md", targetName: "01 - A.md", rewrites: [] }],
     assets: [],
-    coverRewrite: null,
+    coverTarget: null,
     skipped: 0,
     ...over,
   };
@@ -70,11 +70,11 @@ describe("executeConsolidatePlan", () => {
     expect(port.folders).toContain("Book/_assets");
   });
 
-  it("applies coverRewrite to the folder-note frontmatter", async () => {
+  it("applies coverTarget to the folder-note frontmatter", async () => {
     const port = new FakePort({ "notes/A.md": "x" });
     await executeConsolidatePlan(
       port,
-      plan({ coverRewrite: "[[_assets/cover.png]]" }),
+      plan({ coverTarget: "_assets/cover.png" }),
       ctx({ bookNoteFrontmatter: "---\nepub: true\ncover: \"[[cover.png]]\"\n---" })
     );
     expect(port.files.get("Book/Book.md")).toContain("cover: \"[[_assets/cover.png]]\"");

@@ -25,6 +25,9 @@ export interface SidebarModel {
   // Reordering needs at least two chapters to mean anything; the renderer uses
   // this to decide whether rows get drag handles at all.
   canReorder: boolean;
+  // Whether an image provider is installed, enabled and reports itself usable.
+  // Optional so existing callers and fixtures stay valid; absent means "no".
+  canGenerateCover?: boolean;
 }
 
 // Mirror assembleBook's spine walk WITHOUT rendering: cheap enough to run on
@@ -42,12 +45,21 @@ export function buildBookChapters(
   });
 }
 
-export function buildSidebarModel(snap: SidebarSnapshot | null): SidebarModel {
+/** Runtime facts the snapshot cannot know, because they live outside the vault. */
+export interface SidebarCapabilities {
+  /** An image provider is installed, enabled and reports itself usable. */
+  canGenerateCover: boolean;
+}
+
+export function buildSidebarModel(
+  snap: SidebarSnapshot | null,
+  caps?: SidebarCapabilities
+): SidebarModel {
   if (!snap || snap.kind === "none") {
-    return { context: "none", title: "", chapters: [], missingCount: 0, canReorder: false };
+    return { context: "none", title: "", chapters: [], missingCount: 0, canReorder: false, canGenerateCover: false };
   }
   if (snap.kind === "note") {
-    return { context: "note", title: snap.title, chapters: [], missingCount: 0, canReorder: false };
+    return { context: "note", title: snap.title, chapters: [], missingCount: 0, canReorder: false, canGenerateCover: false };
   }
   const missingCount = snap.chapters.filter((c) => c.status === "missing").length;
   return {
@@ -56,5 +68,8 @@ export function buildSidebarModel(snap: SidebarSnapshot | null): SidebarModel {
     chapters: snap.chapters,
     missingCount,
     canReorder: snap.chapters.length > 1,
+    // Absence of information is not permission: a caller that predates this
+    // feature must not switch a button on by saying nothing.
+    canGenerateCover: caps?.canGenerateCover ?? false,
   };
 }

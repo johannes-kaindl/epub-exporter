@@ -83,7 +83,7 @@ describe("buildConsolidatePlan assets", () => {
       baseInput({ assetMode: "none", coverPath: "img/cover.png" })
     );
     expect(p.assets).toEqual([]);
-    expect(p.coverRewrite).toBeNull();
+    expect(p.coverTarget).toBeNull();
   });
 
   it("cover mode copies only the cover and rewrites the cover value", () => {
@@ -91,7 +91,7 @@ describe("buildConsolidatePlan assets", () => {
       baseInput({ assetMode: "cover", coverPath: "img/cover.png" })
     );
     expect(p.assets).toEqual([{ sourcePath: "img/cover.png", targetName: "_assets/cover.png" }]);
-    expect(p.coverRewrite).toBe("[[_assets/cover.png]]");
+    expect(p.coverTarget).toBe("_assets/cover.png");
     expect(p.chapters.every((c) => c.rewrites.length === 0)).toBe(true);
   });
 

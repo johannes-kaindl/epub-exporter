@@ -4,6 +4,8 @@ import {
   isBookNote,
   BOOK_FRONTMATTER_TEMPLATE,
   splitFrontmatter,
+  setCoverPath,
+  setCoverPrompt,
 } from "../../src/core/frontmatter";
 import { stripFrontmatter } from "../../src/core/frontmatter";
 
@@ -149,5 +151,67 @@ describe("splitFrontmatter", () => {
       const { head, body } = splitFrontmatter(c);
       expect(head + body).toBe(c);
     }
+  });
+});
+
+describe("cover prompt", () => {
+  it("reads cover_prompt and its German alias", () => {
+    expect(parseBookMetadata({ cover_prompt: "a lighthouse" }, opts).coverPrompt)
+      .toBe("a lighthouse");
+    expect(parseBookMetadata({ titelbild_prompt: "ein Leuchtturm" }, opts).coverPrompt)
+      .toBe("ein Leuchtturm");
+  });
+
+  it("leaves coverPrompt undefined when the key is absent", () => {
+    expect(parseBookMetadata({ title: "x" }, opts).coverPrompt).toBeUndefined();
+  });
+});
+
+describe("setCoverPath", () => {
+  it("replaces an existing cover value", () => {
+    const fm = '---\ntitle: X\ncover: "[[old.png]]"\n---';
+    expect(setCoverPath(fm, "new.png")).toContain('cover: "[[new.png]]"');
+    expect(setCoverPath(fm, "new.png")).not.toContain("old.png");
+  });
+
+  it("replaces the German alias in place, without adding a second key", () => {
+    // Writing an English `cover:` next to an existing `titelbild:` would leave
+    // the note with two cover keys, and `pick()` would answer with the first.
+    const out = setCoverPath('---\ntitelbild: "[[alt.png]]"\n---', "neu.png");
+    expect(out).toContain('titelbild: "[[neu.png]]"');
+    expect(out).not.toContain("cover:");
+  });
+
+  it("adds a cover key when the note has none", () => {
+    const out = setCoverPath("---\ntitle: X\n---", "new.png");
+    expect(out).toContain('cover: "[[new.png]]"');
+    expect(out.trimEnd().endsWith("---")).toBe(true);
+  });
+});
+
+describe("setCoverPrompt", () => {
+  it("stores the prompt so the next run starts from it", () => {
+    const out = setCoverPrompt("---\nepub: true\n---", "a marsh at dusk");
+    expect(out).toContain('cover_prompt: "a marsh at dusk"');
+  });
+
+  it("replaces an existing prompt and its German alias in place", () => {
+    expect(setCoverPrompt('---\ncover_prompt: "old"\n---', "new")).toContain('cover_prompt: "new"');
+    const de = setCoverPrompt('---\ntitelbild_prompt: "alt"\n---', "neu");
+    expect(de).toContain('titelbild_prompt: "neu"');
+    expect(de).not.toContain("cover_prompt:");
+  });
+
+  it("escapes quotes so a prompt cannot break the YAML block", () => {
+    // Prompts are free text from a text area. An unescaped quote would leave
+    // the note with frontmatter Obsidian can no longer parse — which would
+    // silently stop it being a book note at all.
+    const out = setCoverPrompt("---\nepub: true\n---", 'a "quoted" phrase');
+    expect(out).toContain('cover_prompt: "a \\"quoted\\" phrase"');
+  });
+
+  it("leaves the block alone for an empty prompt", () => {
+    const fm = "---\nepub: true\n---";
+    expect(setCoverPrompt(fm, "   ")).toBe(fm);
   });
 });

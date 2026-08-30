@@ -2,7 +2,7 @@ import { App, TFile, TFolder, normalizePath } from "obsidian";
 import { ConsolidatePlan, ChapterMode, ConsolidateInput, AssetMode, ResolvedImageRef } from "../core/consolidate-plan";
 import { extractImageRefs, rewriteImageRefs } from "../core/image-refs";
 import { parseEmbedSpine } from "../core/spine-parser";
-import { parseBookMetadata, isBookNote, stripFrontmatter } from "../core/frontmatter";
+import { parseBookMetadata, isBookNote, setCoverPath, stripFrontmatter } from "../core/frontmatter";
 
 export interface ConsolidatePort {
   createFolder(path: string): Promise<void>;
@@ -24,16 +24,6 @@ export interface ConsolidateResult {
   chapterCount: number;
   assetCount: number;
   errors: string[];
-}
-
-// Rewrite the cover value inside a raw frontmatter block. Matches `cover:` (or its
-// German alias `titelbild:`) and replaces the rest of the line with a quoted wikilink.
-function applyCoverRewrite(fm: string, cover: string | null): string {
-  if (!cover) return fm;
-  const line = new RegExp(`^(\\s*(?:cover|titelbild)\\s*:).*$`, "mi");
-  if (line.test(fm)) return fm.replace(line, `$1 "${cover}"`);
-  // No cover key present: inject one before the closing fence.
-  return fm.replace(/\n---\s*$/, `\ncover: "${cover}"\n---`);
 }
 
 export async function executeConsolidatePlan(
@@ -73,7 +63,7 @@ export async function executeConsolidatePlan(
   }
 
   await run("folder note", async () => {
-    const fm = applyCoverRewrite(ctx.bookNoteFrontmatter, plan.coverRewrite);
+    const fm = setCoverPath(ctx.bookNoteFrontmatter, plan.coverTarget);
     const content = fm ? `${fm}\n${plan.bookNoteBody}` : plan.bookNoteBody;
     const target = `${folder}/${plan.bookNoteName}`;
     if (ctx.mode === "move") await port.moveFile(ctx.bookNoteSourcePath, target);

@@ -64,7 +64,9 @@ export interface ConsolidatePlan {
   bookNoteBody: string;
   chapters: PlannedChapterOp[];
   assets: AssetCopy[];
-  coverRewrite: string | null;
+  /** Vault path of the copied cover asset, or null. Bare path, not a wikilink:
+   *  the link syntax belongs to whoever writes it into a note. */
+  coverTarget: string | null;
   skipped: number;
 }
 
@@ -102,11 +104,11 @@ export function buildConsolidatePlan(input: ConsolidateInput): ConsolidatePlan {
   const bookNoteBody = prose ? `${prose}\n\n${embedLines}` : embedLines;
 
   const assetState: AssetPlanState = { assets: [], bySource: new Map(), usedNames: new Set() };
-  let coverRewrite: string | null = null;
+  let coverTarget: string | null = null;
 
   if (input.assetMode !== "none" && input.coverPath) {
     const target = registerAsset(assetState, input.coverPath);
-    coverRewrite = `[[${target}]]`;
+    coverTarget = target;
   }
 
   if (input.assetMode === "full") {
@@ -125,7 +127,7 @@ export function buildConsolidatePlan(input: ConsolidateInput): ConsolidatePlan {
     bookNoteBody,
     chapters,
     assets: assetState.assets,
-    coverRewrite,
+    coverTarget,
     skipped,
   };
 }

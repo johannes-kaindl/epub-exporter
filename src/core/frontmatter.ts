@@ -15,6 +15,10 @@ const ALIASES: Record<string, string[]> = {
   subject: ["subject", "subjects", "tags", "schlagworte"],
   rights: ["rights", "rechte", "lizenz"],
   cover: ["cover", "titelbild"],
+  // What the cover should DEPICT, as opposed to `cover`, which says where the
+  // finished image LIVES. Kept in the note rather than in plugin settings: it
+  // describes this one book, and the book note is where a book's own facts go.
+  coverPrompt: ["cover_prompt", "coverPrompt", "titelbild_prompt"],
 };
 
 function pick(fm: Record<string, unknown>, canonical: string): unknown {
@@ -87,6 +91,7 @@ export function parseBookMetadata(
     subjects: asStringArray(pick(fm, "subject")),
     rights: asString(pick(fm, "rights")),
     coverImagePath: asString(pick(fm, "cover")),
+    coverPrompt: asString(pick(fm, "coverPrompt")),
   };
 }
 
@@ -124,3 +129,47 @@ export const BOOK_FRONTMATTER_TEMPLATE: Record<string, unknown> = {
   subject: [],
   rights: "",
 };
+
+/**
+ * Points a book note's cover key at a vault path, as a quoted wikilink.
+ *
+ * Operates on the raw frontmatter text rather than a parsed object on purpose:
+ * rewriting the whole block would reorder keys, drop comments and normalise
+ * quoting in a note the user hand-writes. Only the one line changes.
+ *
+ * The German alias is replaced IN PLACE rather than joined by an English key —
+ * two cover keys in one note would leave `pick()` to decide which wins, and it
+ * answers with whichever the alias list names first, not the newer one.
+ *
+ * Moved here from `obsidian/consolidate.ts` (2026-08-30), where it was private:
+ * it is pure string work on frontmatter, and a second caller now needs it.
+ */
+export function setCoverPath(frontmatter: string, coverPath: string | null): string {
+  if (!coverPath) return frontmatter;
+  return setQuotedKey(frontmatter, /^(\s*(?:cover|titelbild)\s*:).*$/mi, "cover", `[[${coverPath}]]`);
+}
+
+/**
+ * Stores what the cover should depict, so the next run starts from it.
+ *
+ * The value is free text from a text area, so quotes are escaped: an unescaped
+ * one would end the YAML string early and leave a note Obsidian can no longer
+ * parse — which would silently stop it being a book note at all.
+ */
+export function setCoverPrompt(frontmatter: string, prompt: string): string {
+  const value = prompt.trim();
+  if (!value) return frontmatter;
+  return setQuotedKey(
+    frontmatter,
+    /^(\s*(?:cover_prompt|coverPrompt|titelbild_prompt)\s*:).*$/mi,
+    "cover_prompt",
+    value
+  );
+}
+
+/** Replaces a key's value in place, or appends the key before the closing fence. */
+function setQuotedKey(frontmatter: string, line: RegExp, canonicalKey: string, value: string): string {
+  const quoted = `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  if (line.test(frontmatter)) return frontmatter.replace(line, `$1 ${quoted}`);
+  return frontmatter.replace(/\n---\s*$/, `\n${canonicalKey}: ${quoted}\n---`);
+}

@@ -12,6 +12,7 @@ export interface BookMetadata {
   rights?: string;
   modified?: string; // ISO 8601; EPUB3 dcterms:modified. Plugin supplies real time.
   coverImagePath?: string; // raw frontmatter value (e.g. "[[cover.png]]"); resolved in Plan 2
+  coverPrompt?: string; // what the cover should depict, if the book asks for a generated one
 }
 
 export interface Chapter {

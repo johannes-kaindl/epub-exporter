@@ -301,3 +301,51 @@ describe("renderSidebar · Tastatur", () => {
     expect(rows[0].focusCount).toBe(0);
   });
 });
+
+describe("renderSidebar — generated cover", () => {
+  const bookModel = (over: Partial<SidebarModel> = {}): SidebarModel => ({
+    context: "book",
+    title: "Salt Marsh",
+    chapters: [{ title: "One", status: "ok" }],
+    missingCount: 0,
+    canReorder: false,
+    ...over,
+  });
+
+  it("offers cover generation only when a provider is available", () => {
+    // The button is not a permanent fixture: local-image-generator is optional
+    // and can be disabled while Obsidian runs. Showing a control that cannot
+    // work is the failure this asserts against.
+    const withProvider = makeFakeEl() as unknown as HTMLElement;
+    renderSidebar(withProvider, bookModel({ canGenerateCover: true }), noop);
+    expect((withProvider as unknown as ReturnType<typeof makeFakeEl>).allText)
+      .toContain(t("view.generateCover"));
+
+    const without = makeFakeEl() as unknown as HTMLElement;
+    renderSidebar(without, bookModel({ canGenerateCover: false }), noop);
+    expect((without as unknown as ReturnType<typeof makeFakeEl>).allText)
+      .not.toContain(t("view.generateCover"));
+  });
+
+  it("never offers cover generation outside a book note", () => {
+    // A plain note has no title, author or spine to draw a cover for — and no
+    // frontmatter to write the result into.
+    const root = makeFakeEl() as unknown as HTMLElement;
+    renderSidebar(root, bookModel({ context: "note", canGenerateCover: true }), noop);
+    expect((root as unknown as ReturnType<typeof makeFakeEl>).allText)
+      .not.toContain(t("view.generateCover"));
+  });
+
+  it("cover button fires onGenerateCover", () => {
+    const root = makeFakeEl() as unknown as HTMLElement;
+    let fired = 0;
+    renderSidebar(root, bookModel({ canGenerateCover: true }), {
+      ...noop,
+      onGenerateCover: () => fired++,
+    });
+    const r = root as unknown as ReturnType<typeof makeFakeEl>;
+    const btn = r.findAll("epub-sb-btn").find((b: { text?: string }) => b.text === t("view.generateCover"));
+    btn?.click?.();
+    expect(fired).toBe(1);
+  });
+});

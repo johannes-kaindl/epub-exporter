@@ -93,3 +93,30 @@
   outline: 1px solid var(--interactive-accent);
   outline-offset: -1px;
 }
+
+/* Cover-Dialog. Der Status folgt UI-STANDARD §8: der Zustand steckt in Klasse,
+   Icon UND Farbe — nie in der Farbe allein (WCAG 1.4.1). */
+.epub-cover-modal .epub-cover-warning { color: var(--text-warning); }
+.epub-cover-modal .epub-cover-prompt { width: 100%; resize: vertical; }
+.epub-cover-status {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-2);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.epub-cover-status-icon {
+  display: flex;
+  align-items: center;
+}
+.epub-cover-status.is-ok .epub-cover-status-icon { color: var(--text-success); }
+.epub-cover-status.is-error .epub-cover-status-icon { color: var(--text-error); }
+.epub-cover-status.is-warning .epub-cover-status-icon { color: var(--text-warning); }
+.epub-cover-status.is-checking .epub-cover-status-icon {
+  color: var(--text-accent);
+  animation: epub-cover-spin 1s linear infinite;
+}
+@keyframes epub-cover-spin {
+  to { transform: rotate(360deg); }
+}

@@ -17,8 +17,19 @@ import { createConsolidatePort, gatherConsolidateInput, executeConsolidatePlan, 
 import { createImportPort, folderMdBasenames, executeImport } from "./obsidian/import";
 import { buildImportPlan } from "./core/import-plan";
 import { ConsolidateModal } from "./obsidian/consolidate-modal";
+import { CoverModal } from "./obsidian/cover-modal";
+import { readImageApi } from "./obsidian/image-api";
+import { createCoverPort, generateCoverFor } from "./obsidian/cover";
+import { buildCoverPrompt } from "./core/cover-prompt";
+import { ensureImageApiReady } from "./core/image-api";
 import { reorderSpine } from "./core/spine-reorder";
-import { BOOK_FRONTMATTER_TEMPLATE, isBookNote, splitFrontmatter } from "./core/frontmatter";
+import {
+  BOOK_FRONTMATTER_TEMPLATE,
+  isBookNote,
+  parseBookMetadata,
+  setCoverPrompt,
+  splitFrontmatter,
+} from "./core/frontmatter";
 
 // Defensive feature-detect: getAvailablePathForAttachment is in the installed obsidian
 // typings, but this narrow interface guards hosts older than minAppVersion (1.8.7),
@@ -51,6 +62,20 @@ export default class EpubExporterPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE_EPUB_HUB, (leaf: WorkspaceLeaf) => new EpubHubView(leaf, this.makeBridge()));
     this.addCommand({ id: "open-sidebar", name: t("cmd.openSidebar"), callback: () => { void this.openHub(); } });
+
+    this.addCommand({
+      id: "generate-cover",
+      name: t("cmd.generateCover"),
+      checkCallback: (checking) => {
+        const f = this.app.workspace.getActiveFile();
+        const fm = f ? (this.app.metadataCache.getFileCache(f)?.frontmatter ?? {}) : {};
+        // Gated on the provider too, not just on the note: a command that is
+        // listed but always fails is worse than one that is not listed.
+        const ok = !!f && isBookNote(fm) && readImageApi(this.app) !== null;
+        if (ok && !checking && f) void this.generateCover(f);
+        return ok;
+      },
+    });
 
     this.addCommand({
       id: "consolidate-book",
@@ -208,6 +233,87 @@ export default class EpubExporterPlugin extends Plugin {
   // avoids reading every chapter body just to compute a preview. The chosen asset mode
   // from the modal changes what needs gathering (image refs are only collected in full
   // mode), so runConsolidate re-gathers with the confirmed choice.
+  /** Maps a provider failure onto a message that says what the USER can do. */
+  private coverFailureNotice(reason: string): string {
+    switch (reason) {
+      case "busy": return t("notice.cover.busy");
+      case "not-configured": return t("notice.cover.notConfigured");
+      case "unreachable": return t("notice.cover.unreachable");
+      case "model-not-downloaded": return t("notice.cover.modelMissing");
+      case "no-gpu": return t("notice.cover.noGpu");
+      default: return t("notice.cover.failed");
+    }
+  }
+
+  // Readiness is resolved BEFORE the modal opens, not after the user has typed a
+  // prompt: asking someone to describe a cover and only then admitting there is
+  // no GPU wastes their effort at the worst possible moment.
+  private async generateCover(file: TFile): Promise<void> {
+    const fm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<string, unknown>;
+    if (!isBookNote(fm)) { new Notice(t("notice.notBookNote")); return; }
+
+    const api = readImageApi(this.app);
+    if (!api) { new Notice(t("notice.cover.noProvider")); return; }
+
+    const status = await ensureImageApiReady(api);
+    if (!status.ready) { new Notice(this.coverFailureNotice(status.reason ?? "failed")); return; }
+
+    const meta = parseBookMetadata(fm, {
+      fallbackTitle: file.basename,
+      defaultLanguage: this.settings.defaultLanguage,
+    });
+    const prompt = buildCoverPrompt({
+      title: meta.title,
+      authors: meta.authors,
+      coverPrompt: meta.coverPrompt,
+    });
+
+    new CoverModal(
+      this.app,
+      { prompt, hasCover: !!meta.coverImagePath, status },
+      (choice, modal) => { void this.runCoverGeneration(file, api, choice, modal); }
+    ).open();
+  }
+
+  private async runCoverGeneration(
+    file: TFile,
+    api: NonNullable<ReturnType<typeof readImageApi>>,
+    choice: { prompt: string; size: { width: number; height: number } },
+    modal: CoverModal
+  ): Promise<void> {
+    const port = createCoverPort(this.app);
+    let result;
+    try {
+      result = await generateCoverFor(port, api, {
+        notePath: file.path,
+        prompt: choice.prompt,
+        width: choice.size.width,
+        height: choice.size.height,
+        onProgress: (pct, phase) => modal.reportProgress(pct, phase),
+      });
+    } catch (e) {
+      console.error("EPUB Exporter: cover generation threw", e);
+      modal.reportFailure(t("notice.cover.failed"));
+      return;
+    }
+
+    if (!result.ok) {
+      if (result.message) console.error("EPUB Exporter: cover generation failed", result.message);
+      // Reported IN the modal rather than as a Notice: the user is still standing
+      // in front of it with a prompt they may want to adjust and retry.
+      modal.reportFailure(this.coverFailureNotice(result.reason));
+      return;
+    }
+
+    // Only now, and only if the user actually changed it: storing a prompt that
+    // was generated from the title would put a machine's phrasing into the note
+    // and make the next run reuse it instead of re-deriving it.
+    await port.updateFrontmatter(file.path, (block) => setCoverPrompt(block, choice.prompt));
+
+    modal.close();
+    new Notice(t("notice.cover.done", result.imagePath));
+  }
+
   private async consolidateBook(file: TFile): Promise<void> {
     const fm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<string, unknown>;
     if (!isBookNote(fm)) { new Notice(t("notice.notBookNote")); return; }
@@ -279,6 +385,7 @@ export default class EpubExporterPlugin extends Plugin {
   private makeBridge(): SidebarBridge {
     return {
       snapshot: () => buildSnapshot(this.app, this.settings.defaultLanguage),
+      canGenerateCover: () => readImageApi(this.app) !== null,
       handlers: {
         onExport: () => {
           const file = resolveTargetFile(this.app);
@@ -292,6 +399,11 @@ export default class EpubExporterPlugin extends Plugin {
           else new Notice(t("notice.noActiveNote"));
         },
         onReorder: (from, to, expectedCount) => this.reorderChapters(from, to, expectedCount),
+        onGenerateCover: () => {
+          const f = resolveTargetFile(this.app);
+          if (f) void this.generateCover(f);
+          else new Notice(t("notice.noActiveNote"));
+        },
       },
     };
   }

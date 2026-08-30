@@ -6,6 +6,8 @@ export interface SidebarHandlers {
   onExport(): void;
   onInsertFrontmatter(): void;
   onConsolidate(): void;
+  // Optional: panels built before the cover feature existed do not pass it.
+  onGenerateCover?(): void;
   // `expectedCount` travels with the request so the writer can detect that the
   // note changed behind the panel's back without re-reading it first.
   // Returns the write's promise (or nothing, for callers that don't need it)
@@ -166,6 +168,16 @@ export function renderSidebar(
       text: t("view.consolidate"),
     });
     consolidateBtn.addEventListener("click", () => handlers.onConsolidate());
+    // Conditional on purpose: the image provider is an optional neighbouring
+    // plugin that can be disabled while Obsidian runs, so this button appears
+    // and disappears with it rather than sitting there unable to work.
+    if (model.canGenerateCover) {
+      const coverBtn = root.createEl("button", {
+        cls: "epub-sb-btn epub-sb-action-cover",
+        text: t("view.generateCover"),
+      });
+      coverBtn.addEventListener("click", () => handlers.onGenerateCover?.());
+    }
     return;
   }
 

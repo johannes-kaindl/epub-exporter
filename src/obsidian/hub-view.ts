@@ -17,6 +17,10 @@ export function resolveTargetFile(app: App): TFile | null {
 
 export interface SidebarBridge {
   snapshot(): Promise<SidebarSnapshot | null>;
+  // Asked on every rebuild rather than cached: the image provider is a separate
+  // plugin the user can disable mid-session, and the answer is a lookup.
+  // Optional so a bridge that predates the cover feature stays valid.
+  canGenerateCover?(): boolean;
   // The gesture handlers are supplied by the view, not by the plugin: the drag
   // lock is view state, so main.ts has no business knowing about it.
   handlers: Omit<SidebarHandlers, "onDragStart" | "onDragEnd">;
@@ -150,7 +154,9 @@ export class EpubHubView extends ItemView {
     const focus = this.focusIndex;
     this.focusIndex = null;
 
-    const model = buildSidebarModel(failed ? null : snap);
+    const model = buildSidebarModel(failed ? null : snap, {
+      canGenerateCover: this.bridge.canGenerateCover?.() ?? false,
+    });
 
     // active-leaf-change fires when the user focuses the sidebar itself, but
     // resolveTargetFile reads rootSplit (which excludes sidebars), so the target

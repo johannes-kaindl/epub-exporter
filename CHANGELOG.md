@@ -6,6 +6,22 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- **Titelbilder lassen sich jetzt erzeugen, wenn das Plugin „Local Image Generator“
+  installiert und aktiv ist.** Im Seitenpanel erscheint bei einer Buch-Notiz ein Knopf
+  „Titelbild erzeugen“ (und ein gleichnamiger Befehl); ein Dialog fragt, was das Bild zeigen
+  soll, und schlägt dafür etwas aus Titel und Autor vor. Das Ergebnis wird **als Datei neben
+  der Buch-Notiz gespeichert** und `cover:` zeigt darauf — das Titelbild ist damit im
+  Lesemodus sichtbar, bleibt über Exporte hinweg dasselbe und lässt sich jederzeit von Hand
+  ersetzen. Die Beschreibung landet als `cover_prompt:` in der Notiz, damit der nächste Lauf
+  davon ausgeht.
+
+  Der Dialog bietet nur an, was der Bildgenerator wirklich kann: die Größenauswahl kommt aus
+  seinen gemeldeten Fähigkeiten und entfällt, wo es nur eine Größe gibt. Fehlt das Plugin oder
+  meldet es sich als nicht einsatzbereit, erscheint der Knopf gar nicht erst.
+
+
 ## [0.3.2] — 2026-08-30
 
 ### Geändert
