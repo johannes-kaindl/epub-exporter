@@ -83,6 +83,8 @@ npm run check:pure  # verweigert 'obsidian'-Imports in src/core + src/vendor (be
 npm run lint        # check-no-inline-disables.mjs + eslint src (eslint-plugin-obsidianmd)
 npm run build       # esbuild --production → main.js (Build-Artefakt)
 npm run gate        # typecheck + test + check:pure + lint + build — vor jedem Commit/Release
+npm run smoke:gui   # GUI-Smoke gegen ein LAUFENDES Obsidian (docs/SMOKE.md, 12 Pruefpunkte)
+npm run smoke:gui -- --setup   # Staging-Vault aus dem Fixture herstellen (einmal je Lauf-Runde)
 ```
 
 **Manuelles Deploy (kein `deploy`-Script):** frisch gebautes `main.js` (+ `manifest.json`/
@@ -122,6 +124,15 @@ wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht 
 - **Stale-Build-Deploy:** Plugin-Ordner ist Kopie, kein Symlink (siehe Commands → Deploy).
 - **Settings:** deklarative Rows bei minAppVersion < 1.13 **statisch** halten (siehe Architecture).
 - **Release-Tooling zentral** (`../tools/release/`) — nicht lokal duplizieren.
+- **GUI-Smoke: der Klick braucht eine Haltedauer.** `clickReal(cdp, ausdruck, 200)` — ohne
+  den dritten Parameter gehen `mousePressed`/`mouseReleased` ohne Pause raus, also schneller
+  als der asynchrone Rerender der Sidebar. Der Knopf überlebt dann einen Klick, den er im
+  Gebrauch nicht überlebt, und S4 ist **grün am Falschen** (gemessen 2026-08-30: die
+  Gegenprobe blieb 12/12 grün, obwohl der Fix ausgebaut war).
+- **Obsidian ist Single-Instance — nie blind beenden.** Läuft schon eines mit Debug-Port,
+  mitnutzen (eigenes Fenster per IPC `vault-open`, dann über den Vault-**Namen** anhängen).
+  Ein Beenden trifft die Instanz, an der andere Sessions arbeiten. Seit 2026-08-30 regelt das
+  ein Lock (`~/.claude/hooks/obsidian-cdp-lock.py acquire` / `release`).
 
 ## Memory
 
