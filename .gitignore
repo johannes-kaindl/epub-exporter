@@ -4,3 +4,4 @@ main.js
 *.epub
 .shots.mjs
 docs/images/.frames/
+.gui-smoke.mjs
