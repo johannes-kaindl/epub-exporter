@@ -66,6 +66,21 @@ globalen Toast, in den jedes Plugin im Vault schreibt.
 | **E2** | Das Archiv enthält 5 Kapitel-XHTML-Dateien | Belegt, dass der Spine bis ins Paket durchschlägt — nicht nur bis in die Anzeige |
 | **E3** | Ein Kapitel mit Fenced Code liefert den Code **wörtlich** ins XHTML | Der Code-Block-Hijack-Guard ist die verletzlichste Stelle des Plugins: `MarkdownRenderer.render` führt alle Prozessoren fremder Plugins aus, `<pre>` wird durch Widget-DOM ersetzt, Originalcode ist dann nicht rekonstruierbar. Gegen einen Mock ist dieser Pfad **prinzipiell** nicht prüfbar |
 
+### Titelbild erzeugen (Nachbarplugin-Kopplung)
+
+| # | Prüfpunkt | Warum er existiert |
+|---|---|---|
+| **T1** | Ohne `local-image-generator` im Plugin-Register erscheint `.epub-sb-action-cover` **nicht** | Der Realzustand dieses Vaults, und der Fall, der im Alltag bricht: das Nachbarplugin ist optional und lässt sich zur Laufzeit abschalten. Ein Knopf, der erscheint und dann nichts kann, ist schlimmer als keiner |
+| **T2** | Mit einem eingesetzten Provider-**Stub** erscheint der Knopf, ein Klick (200 ms Haltedauer) öffnet `.epub-cover-modal`, und das Prompt-Feld nennt den **Buchtitel** | Prüft unsere Erkennung (Version **und** Form) und die Vorbelegung aus den Metadaten der Notiz. Wäre nur „Dialog geht auf" gemessen, bliebe eine leere Vorbelegung unsichtbar |
+| **T3** | Nach „Erzeugen" liegt die PNG-Datei **im Vault**, `cover:` zeigt darauf, und der eingegebene Text steht als `cover_prompt:` in der Notiz | Die ganze Naht in einem Punkt — und er wartet am **Dateisystem**, nicht am schließenden Dialog: ein Punkt, der nur dessen Verschwinden sieht, wäre auch dann grün, wenn nichts geschrieben wurde |
+
+**Warum ein Stub und kein echter Lauf:** die Bilderzeugung gehört dem Nachbarplugin, braucht
+eine GPU und dauert im eingebauten Modus Minuten. Was **hier** falsch sein kann, ist unsere
+Seite — Erkennung, Sichtbarkeit, die Reihenfolge von Datei und Notiz. Genau die misst der Stub,
+gegen echtes DOM und einen echten Vault. Er wird nach jedem Punkt wieder entfernt: ein
+liegengebliebener Stub ließe **T1** grün aussehen, während er seinen Gegenstand nicht mehr
+berührt.
+
 ### Aufräumen
 
 | # | Prüfpunkt | Warum er existiert |

@@ -83,7 +83,7 @@ npm run check:pure  # verweigert 'obsidian'-Imports in src/core + src/vendor (be
 npm run lint        # check-no-inline-disables.mjs + eslint src (eslint-plugin-obsidianmd)
 npm run build       # esbuild --production → main.js (Build-Artefakt)
 npm run gate        # typecheck + test + check:pure + lint + build — vor jedem Commit/Release
-npm run smoke:gui   # GUI-Smoke gegen ein LAUFENDES Obsidian (docs/SMOKE.md, 12 Pruefpunkte)
+npm run smoke:gui   # GUI-Smoke gegen ein LAUFENDES Obsidian (docs/SMOKE.md, 15 Pruefpunkte)
 npm run smoke:gui -- --setup   # Staging-Vault aus dem Fixture herstellen (einmal je Lauf-Runde)
 ```
 

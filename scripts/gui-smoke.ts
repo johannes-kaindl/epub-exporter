@@ -104,6 +104,13 @@ const SPINE_TITLES = [
 const SMOKE_DIR = "_smoke";
 const SMOKE_BOOK = `${SMOKE_DIR}/Smoke Book.md`;
 const SMOKE_EPUB = `${SMOKE_DIR}/Smoke Book.epub`;
+const SMOKE_BOOK_TITLE = "Smoke Book";
+const SMOKE_COVER = `${SMOKE_DIR}/Smoke Book cover.png`;
+const SMOKE_PROMPT = "a smoke test cover, plain red";
+/** Ein gueltiges 1x1-PNG (rot). Der Stub liefert es statt eines gerechneten Bildes —
+ *  geprueft wird, DASS Bytes im Vault ankommen, nicht wie sie aussehen. */
+const STUB_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 const FIXTURE_EPUB = "Notes from the Salt Marsh.epub";
 /** Der Code, der den Hijack-Guard belegt. Bewusst mit Sonderzeichen, die eine
  *  HTML-Entitaeten-Wandlung sichtbar machen wuerden. */
@@ -650,7 +657,163 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       return null;
     },
   },
+  {
+    id: "T1",
+    was: "Ohne Bildgenerator erscheint der Titelbild-Knopf nicht",
+    pruefe: async (cdp) => {
+      // Der Realzustand dieses Vaults: local-image-generator ist hier nicht
+      // installiert. Das ist der Fall, der im Alltag bricht — ein Knopf, der
+      // erscheint und dann nichts kann, ist schlimmer als keiner.
+      await entferneProviderStub(cdp);
+      await oeffnePanel(cdp);
+      await schreibeSmokeBuch(cdp);
+      await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".epub-sb-chapter")`);
+      const da = await cdp.evaluate<boolean>(`
+        return !!document.querySelector(".epub-sb-action-cover");
+      `);
+      if (da) return "Titelbild-Knopf ist sichtbar, obwohl kein Bildgenerator vorhanden ist";
+      return null;
+    },
+  },
+  {
+    id: "T2",
+    was: "Mit Bildgenerator erscheint der Knopf und oeffnet den Dialog",
+    pruefe: async (cdp) => {
+      // Der Stub ersetzt das NACHBARPLUGIN, nicht unseren Code: geprueft wird
+      // unsere Erkennung (Version + Form) und unsere UI gegen echtes DOM. Die
+      // fremde Bilderzeugung selbst ist nicht Gegenstand dieses Repos — und ein
+      // echter Lauf braeuchte eine GPU und Minuten.
+      await setzeProviderStub(cdp);
+      await oeffnePanel(cdp);
+      await schreibeSmokeBuch(cdp);
+      await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".epub-sb-chapter")`);
+      await requireUntil(cdp, `document.querySelector(".epub-sb-action-cover")`,
+        "Titelbild-Knopf erschien nicht, obwohl ein Bildgenerator gemeldet ist");
+
+      await clickReal(cdp, `document.querySelector(".epub-sb-action-cover")`, 200);
+      await requireUntil(cdp, `document.querySelector(".epub-cover-modal")`, "Titelbild-Dialog kam nicht");
+
+      const vorbelegt = await cdp.evaluate<string>(`
+        const ta = document.querySelector(".epub-cover-modal .epub-cover-prompt");
+        return ta ? ta.value : "";
+      `);
+      await schliesseUeberlagerungen(cdp);
+      await entferneProviderStub(cdp);
+      // Der Titel der Smoke-Notiz muss im Vorschlag stehen: sonst hat der Dialog
+      // die Metadaten der Notiz nicht gelesen, sondern irgendetwas Generisches.
+      if (!vorbelegt.includes(SMOKE_BOOK_TITLE)) {
+        return `Prompt-Vorbelegung nennt den Buchtitel nicht: ${JSON.stringify(vorbelegt)}`;
+      }
+      return null;
+    },
+  },
+  {
+    id: "T3",
+    was: "Erzeugtes Titelbild landet im Vault und cover:/cover_prompt: zeigen darauf",
+    pruefe: async (cdp) => {
+      await setzeProviderStub(cdp);
+      await oeffnePanel(cdp);
+      await schreibeSmokeBuch(cdp);
+      await inDenPapierkorb(cdp, [SMOKE_COVER]);
+      await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".epub-sb-chapter")`);
+      await requireUntil(cdp, `document.querySelector(".epub-sb-action-cover")`, "Titelbild-Knopf fehlt");
+      await clickReal(cdp, `document.querySelector(".epub-sb-action-cover")`, 200);
+      await requireUntil(cdp, `document.querySelector(".epub-cover-modal")`, "Titelbild-Dialog kam nicht");
+
+      await cdp.evaluate(`
+        const ta = document.querySelector(".epub-cover-modal .epub-cover-prompt");
+        ta.value = ${JSON.stringify(SMOKE_PROMPT)};
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+        return true;
+      `);
+      await clickReal(
+        cdp,
+        `Array.from(document.querySelectorAll(".epub-cover-modal button")).find((b) => b.classList.contains("mod-cta"))`,
+        200
+      );
+
+      // Am DATEISYSTEM warten, nicht am DOM: der Dialog schliesst sich selbst,
+      // und ein Punkt, der nur sein Verschwinden sieht, waere auch dann gruen,
+      // wenn gar nichts geschrieben wurde.
+      await requireUntil(
+        cdp,
+        `!!app.vault.getAbstractFileByPath(${JSON.stringify(SMOKE_COVER)})`,
+        "Titelbild-Datei wurde nicht angelegt"
+      );
+
+      const notiz = (await leseDatei(cdp, SMOKE_BOOK)) ?? "";
+      await schliesseUeberlagerungen(cdp);
+      await entferneProviderStub(cdp);
+
+      if (!notiz.includes(`cover: "[[${SMOKE_COVER}]]"`)) {
+        const kopf = notiz.split("---")[1] ?? notiz.slice(0, 200);
+        return `cover: zeigt nicht auf die erzeugte Datei. Frontmatter: ${JSON.stringify(kopf)}`;
+      }
+      if (!notiz.includes(SMOKE_PROMPT)) {
+        return "Der eingegebene Prompt wurde nicht als cover_prompt: in die Notiz zurueckgeschrieben";
+      }
+      return null;
+    },
+  },
 ];
+
+// ---------------------------------------------------------------------------
+// Provider-Stub fuer die Titelbild-Punkte
+// ---------------------------------------------------------------------------
+
+/**
+ * Setzt ein Stellvertreter-Plugin unter dem Schluessel, unter dem
+ * local-image-generator seine API anbietet.
+ *
+ * Warum ein Stub und kein echter Lauf: die Bilderzeugung gehoert dem
+ * Nachbarplugin, braucht eine GPU und dauert im eingebauten Modus Minuten. Was
+ * HIER falsch sein kann, ist unsere Seite — Erkennung, Sichtbarkeit, die
+ * Reihenfolge von Datei und Notiz. Genau die misst der Stub, und zwar gegen
+ * echtes DOM und einen echten Vault.
+ *
+ * Er wird nach jedem Punkt wieder entfernt: ein liegengebliebener Stub liesse
+ * C1 gruen aussehen, waehrend er seinen Gegenstand nicht mehr beruehrt.
+ */
+async function setzeProviderStub(cdp: Cdp): Promise<void> {
+  await cdp.evaluate(`
+    const reg = app.plugins.plugins;
+    if (!reg["local-image-generator"]) {
+      window.__epubStubGesetzt = true;
+      const zustand = {
+        apiVersion: 1,
+        engine: "server",
+        ready: true,
+        reason: null,
+        capabilities: {
+          negativePrompt: true, cfg: true, maxSteps: 50,
+          fixedSize: null, sizes: null, initImage: false,
+        },
+      };
+      reg["local-image-generator"] = {
+        api: {
+          apiVersion: 1,
+          status: () => zustand,
+          recheck: async () => zustand,
+          generate: async (req) => {
+            if (req.onProgress) req.onProgress(50, "generating");
+            return { ok: true, image: { base64: ${JSON.stringify(STUB_PNG_BASE64)}, params: { seed: 42 } } };
+          },
+        },
+      };
+    }
+    return true;
+  `);
+}
+
+async function entferneProviderStub(cdp: Cdp): Promise<void> {
+  await cdp.evaluate(`
+    if (window.__epubStubGesetzt) {
+      delete app.plugins.plugins["local-image-generator"];
+      delete window.__epubStubGesetzt;
+    }
+    return true;
+  `);
+}
 
 // ---------------------------------------------------------------------------
 // Helfer der schreibenden Punkte
@@ -818,10 +981,15 @@ async function lauf(nur?: string): Promise<number> {
       await inDenPapierkorb(cdp, [
         FIXTURE_EPUB,
         SMOKE_EPUB,
+        SMOKE_COVER,
         SMOKE_BOOK,
         ...SMOKE_CHAPTERS.map((k) => k.pfad),
         SMOKE_DIR,
       ]);
+      // Der Stub haengt am Plugin-Register, nicht an einer Datei — er ueberlebt
+      // einen Abbruch mitten in T2/T3 und liesse T1 beim naechsten Lauf gruen
+      // aussehen, ohne dass er seinen Gegenstand beruehrt.
+      await entferneProviderStub(cdp);
       if (buchVorher !== null) {
         const jetzt = await leseDatei(cdp, BOOK);
         console.log(
