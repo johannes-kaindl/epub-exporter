@@ -3,5 +3,5 @@
   "version": "0.27.0",
   "sha": "548041b",
   "vendored": "i18n.ts, settings.ts, vault-path.ts",
-  "note": "Verbatim snapshot. Never hand-edit. Re-copy from obsidian-kit to update."
+  "note": "Verbatim snapshot aus der Git-Ref 0.27.0 (CORE-META-22: feste Ref, nicht Arbeitsstand). Never hand-edit. Re-vendor via tools/sync-kit.sh. kit-obsidian/ steht bewusst auf einem anderen Stand — siehe dortige VENDOR.json."
 }
