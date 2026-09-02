@@ -85,6 +85,8 @@ npm run build       # esbuild --production → main.js (Build-Artefakt)
 npm run gate        # typecheck + test + check:pure + lint + build — vor jedem Commit/Release
 npm run smoke:gui   # GUI-Smoke gegen ein LAUFENDES Obsidian (docs/SMOKE.md, 15 Pruefpunkte)
 npm run smoke:gui -- --setup   # Staging-Vault aus dem Fixture herstellen (einmal je Lauf-Runde)
+npm run smoke:e2e   # Naht-Lauf ueber die Plugin-Grenze zu local-image-generator (9 Punkte, +G1 mit --gpu)
+npm run smoke:e2e -- --setup   # Staging-Vault + BEIDE Plugins deployen
 ```
 
 **Manuelles Deploy (kein `deploy`-Script):** frisch gebautes `main.js` (+ `manifest.json`/
@@ -124,6 +126,11 @@ wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht 
 - **Stale-Build-Deploy:** Plugin-Ordner ist Kopie, kein Symlink (siehe Commands → Deploy).
 - **Settings:** deklarative Rows bei minAppVersion < 1.13 **statisch** halten (siehe Architecture).
 - **Release-Tooling zentral** (`../tools/release/`) — nicht lokal duplizieren.
+- **`smoke:e2e` gehoert NICHT ins Gate.** Er setzt `local-image-generator` echt installiert im
+  selben Staging-Vault voraus (aus dem Nachbar-Repo deployt, nicht aus dem Store) — genau das,
+  was `smoke:gui` bewusst nicht voraussetzt. Beide zusammen ergeben die Pruefung: T1–T3 messen
+  unsere Haelfte in jedem Durchgang, `smoke:e2e` die Naht, wenn der Nachbar da ist. Der
+  Titelbild-Stub in `gui-smoke.ts` bleibt deshalb, er wird nicht ersetzt.
 - **GUI-Smoke: der Klick braucht eine Haltedauer.** `clickReal(cdp, ausdruck, 200)` — ohne
   den dritten Parameter gehen `mousePressed`/`mouseReleased` ohne Pause raus, also schneller
   als der asynchrone Rerender der Sidebar. Der Knopf überlebt dann einen Klick, den er im

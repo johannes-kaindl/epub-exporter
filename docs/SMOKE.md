@@ -74,18 +74,68 @@ globalen Toast, in den jedes Plugin im Vault schreibt.
 | **T2** | Mit einem eingesetzten Provider-**Stub** erscheint der Knopf, ein Klick (200 ms Haltedauer) öffnet `.epub-cover-modal`, und das Prompt-Feld nennt den **Buchtitel** | Prüft unsere Erkennung (Version **und** Form) und die Vorbelegung aus den Metadaten der Notiz. Wäre nur „Dialog geht auf" gemessen, bliebe eine leere Vorbelegung unsichtbar |
 | **T3** | Nach „Erzeugen" liegt die PNG-Datei **im Vault**, `cover:` zeigt darauf, und der eingegebene Text steht als `cover_prompt:` in der Notiz | Die ganze Naht in einem Punkt — und er wartet am **Dateisystem**, nicht am schließenden Dialog: ein Punkt, der nur dessen Verschwinden sieht, wäre auch dann grün, wenn nichts geschrieben wurde |
 
-**Warum ein Stub und kein echter Lauf:** die Bilderzeugung gehört dem Nachbarplugin, braucht
-eine GPU und dauert im eingebauten Modus Minuten. Was **hier** falsch sein kann, ist unsere
-Seite — Erkennung, Sichtbarkeit, die Reihenfolge von Datei und Notiz. Genau die misst der Stub,
-gegen echtes DOM und einen echten Vault. Er wird nach jedem Punkt wieder entfernt: ein
-liegengebliebener Stub ließe **T1** grün aussehen, während er seinen Gegenstand nicht mehr
-berührt.
+**Warum ein Stub und kein echter Lauf:** die Bilderzeugung gehört dem Nachbarplugin und setzt
+es installiert voraus — kein Treiber soll an eine fremde Installation gebunden sein. Was **hier**
+falsch sein kann, ist unsere Seite — Erkennung, Sichtbarkeit, die Reihenfolge von Datei und
+Notiz. Genau die misst der Stub, gegen echtes DOM und einen echten Vault. Er wird nach jedem
+Punkt wieder entfernt: ein liegengebliebener Stub ließe **T1** grün aussehen, während er seinen
+Gegenstand nicht mehr berührt.
+
+> Hier stand bis 2026-09-02 zusätzlich „braucht eine GPU und dauert im eingebauten Modus
+> Minuten". Die erste Hälfte stimmt, die zweite ist gemessen falsch: ein echter builtin-Lauf
+> (sd-turbo, 4 Steps) dauert mit warmem Modell **6–7 Sekunden**. Die teure Annahme hatte den
+> echten Lauf länger verhindert, als er gekostet hätte.
+
+**Was der Stub per Konstruktion nicht sehen kann, misst `npm run smoke:e2e`** (§ Ende-zu-Ende).
+T1–T3 bleiben, wie sie sind: sie sind die Hälfte, die in **jeden** Durchgang gehört.
 
 ### Aufräumen
 
 | # | Prüfpunkt | Warum er existiert |
 |---|---|---|
 | **C1** | Nach dem Lauf ist die Buch-Note **byte-gleich** zum Vorwert, und die erzeugten Dateien liegen im Papierkorb | Der Treiber verändert die SSOT (R1–R3 schreiben in den Spine). Was er zurückschreibt, gehört ins Protokoll — nicht ins Vertrauen |
+
+## Ende-zu-Ende über die Plugin-Grenze (`npm run smoke:e2e`)
+
+**Wo zwei Repos je ihre Hälfte prüfen, prüft niemand die Naht.** Unsere Punkte T1–T3 fahren
+gegen einen Stub, der Smoke des Nachbarn ruft seine eigene API selbst auf — beides je für sich
+richtig, und beide überspringen genau die Verbindung. Der Befund steht seit `llm-lab` 0.3.0 in
+der REGISTRY; dieser Lauf ist seine Anwendung auf dieses Repo.
+
+```bash
+npm run build
+npm run smoke:e2e -- --setup   # Staging-Vault + BEIDE Plugins deployen
+npm run smoke:e2e              # 9 Punkte, Sekunden
+npm run smoke:e2e -- --gpu     # zusätzlich G1: echte Diffusion, ohne jeden Ersatz
+```
+
+Er ist **kein Teil von `gate` und nicht von `smoke:gui`**: er setzt voraus, was die anderen
+ausdrücklich nicht voraussetzen — `local-image-generator` echt installiert im selben Vault,
+aus dem Nachbar-Repo deployt (nicht aus dem Store: geprüft wird die Naht zum aktuellen Stand).
+
+**Was echt ist und was nicht.** Echt sind das installierte Nachbarplugin, sein `api`-Objekt,
+unsere Erkennung, jeder Aufruf über die Grenze, die zurückgereichten Bytes, unsere
+Schreibreihenfolge. Ersetzt ist **nur das Rechnen dahinter** (`scripts/mock-a1111.mjs` aus dem
+Nachbar-Repo, vom Treiber selbst gestartet). Der Mock sitzt **hinter** dem Nachbarplugin, nicht
+zwischen ihm und uns — die Naht ist vollständig im Spiel. Wer auch das nicht ersetzt haben
+will, fährt `--gpu`.
+
+| # | Prüfpunkt | Was nur er sehen kann |
+|---|---|---|
+| **N1** | Das echt installierte Plugin meldet `apiVersion 1` in vollständiger Form, und unser Knopf erscheint | Der Stub bestätigt nur, dass wir *unsere* Erwartung erfüllen. Ob der Nachbar sie erfüllt, sagt allein das geladene Objekt |
+| **N2** | Endpunkt tot → `unreachable`; Server läuft wieder → `status()` merkt es **nicht**, `recheck()` schon — **und der Dialog geht daraufhin auf** | Der Grund, warum `ensureImageApiReady` existiert. Der Stub meldet immer `ready`, also lief dieser Zweig nie. Die zweite Hälfte (unser Klick) macht ihn erst zum Naht-Punkt |
+| **N3** | Voller Weg über die Oberfläche: die Datei im Vault trägt **byte-gleich** die Base64-Daten, die der Anbieter zurückgab; `cover:`/`cover_prompt:` zeigen darauf | Der Stub liefert ein 1×1-PNG, das wir selbst hineingelegt haben — er kann nicht belegen, dass fremde Bytes unverfälscht ankommen |
+| **N4** | Der `onProgress`, den wir mitgeben, wird vom echten Anbieter gerufen | Ob unser Dialog während des Rechnens stumm bleibt, entscheidet der Nachbar, nicht wir |
+| **N5** | Backend auf HTTP 500 → `{ ok: false, reason: "failed", message }` als **Wert**, der Dialog zeigt ihn und gibt den Knopf frei; nichts wird geschrieben | Dass erwartbare Zustände Werte statt Ausnahmen sind, ist eine Vertragszusage. Ein Stub, der immer `ok` liefert, prüft sie nie |
+| **N6** | Im builtin-Modus meldet der Anbieter **genau eine** Größe (512×512) | Unser `coverSizeOptions` ist darauf gebaut. Der Stub meldet `sizes: null` (Server-Modus) — die Annahme war ungeprüft |
+| **N7** | …und der Dialog zeigt dann **kein** Auswahlfeld | Die Verzweigung, die der Stub per Konstruktion nie erreicht. Ein Dropdown mit einem Eintrag wäre eine Attrappe |
+| **N8** | Nicht bereit (`not-configured`) → **kein** Dialog, eine Meldung, nichts geschrieben | Readiness wird *vor* dem Dialog aufgelöst; jemanden erst einen Prompt tippen zu lassen wäre die schlechteste Stelle dafür. Gegen den Stub unerreichbar |
+| **G1** | `--gpu`: builtin-Engine rechnet wirklich, `loading-model` **und** `generating` kommen an, 512×512 wird angefragt | Der Lauf, in dem nichts mehr ersetzt ist. Braucht die Modell-Assets — die liegen im Cache Storage des Obsidian-**Profils**, nicht im Vault, und `--setup` kann sie nicht herstellen |
+| **N9** | Der Spy ist zurückgebaut | Ein stehengebliebener Wrapper verfälscht still jeden späteren Lauf im selben Fenster — und weil der Konsument Fehler wegfängt, sähe das wie ein Produktfehler aus |
+
+**Der Spy wrappt und reicht durch**, bis in den Callback hinein. Ein Spy, der *ersetzt*, prüft
+wieder nur die eigene Hälfte; einer, der `onProgress` austauscht statt umhüllt, nimmt der
+Oberfläche genau das Signal weg, das N4 messen soll.
 
 ## Nicht automatisiert
 
@@ -126,3 +176,16 @@ einen Pfad, den es im Gebrauch nicht gibt.
 | Datum | Obsidian | Plugin | Ergebnis | Gegenprobe |
 |---|---|---|---|---|
 | 2026-08-30 | 1.13.7 | 0.3.1 (deployt) | **12/12** | ✅ gültig: Memoisierung (`hub-view.ts:161`) ausgebaut → **11/12**, genau S4 rot, kein anderer Punkt mitgefallen |
+
+### Ende-zu-Ende (`smoke:e2e`)
+
+| Datum | Obsidian | epub-exporter | Nachbar | Ergebnis | Gegenproben |
+|---|---|---|---|---|---|
+| 2026-09-02 | 1.13.7 | 0.4.0 (deployt) | LIG 0.11.0 (deployt) | **10/10** (mit `--gpu`) | ✅ drei, jede einzeln gültig — `recheck()`-Zweig aus `ensureImageApiReady` ausgebaut → nur **N2** rot; `sizes.length > 1` zu `>= 1` aufgeweicht → nur **N7** rot; Readiness-Vorprüfung in `main.ts` ausgebaut → nur **N8** rot |
+
+Nebenbefund des ersten Laufs, der einen Prüfpunkt gehärtet hat: die Gegenprobe zu N7 meldete
+**zwei** Auswahlfelder, wo höchstens eines entstehen kann. Der Punkt las mit
+`querySelector(".epub-cover-modal")` einen von womöglich mehreren Dialogen im DOM und
+summierte darüber. Er zählt die Dialoge jetzt mit und wird rot, wenn es nicht genau einer ist
+— ein Prüfpunkt, dessen Ergebnis von Resten eines früheren Punktes abhängt, misst nicht, was
+er behauptet.

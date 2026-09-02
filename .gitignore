@@ -5,3 +5,4 @@ main.js
 .shots.mjs
 docs/images/.frames/
 .gui-smoke.mjs
+.e2e.mjs
