@@ -6,6 +6,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-02
+
 ### Hinzugefügt
 
 - **Titelbilder lassen sich jetzt erzeugen, wenn das Plugin „Local Image Generator“
