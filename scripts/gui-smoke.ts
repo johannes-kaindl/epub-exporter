@@ -661,16 +661,20 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
     id: "T1",
     was: "Ohne Bildgenerator erscheint der Titelbild-Knopf nicht",
     pruefe: async (cdp) => {
-      // Der Realzustand dieses Vaults: local-image-generator ist hier nicht
-      // installiert. Das ist der Fall, der im Alltag bricht — ein Knopf, der
-      // erscheint und dann nichts kann, ist schlimmer als keiner.
+      // Der Fall, der im Alltag bricht — ein Knopf, der erscheint und dann nichts
+      // kann, ist schlimmer als keiner. Der Zustand wird HERGESTELLT, nicht
+      // vorausgesetzt: seit dem Naht-Lauf (`smoke:e2e --setup`) liegt das
+      // Nachbarplugin echt im selben Vault, und ein Punkt, der das nur hofft,
+      // misst je nach Vorgeschichte etwas anderes.
       await entferneProviderStub(cdp);
+      await deaktiviereEchtenAnbieter(cdp);
       await oeffnePanel(cdp);
       await schreibeSmokeBuch(cdp);
       await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".epub-sb-chapter")`);
       const da = await cdp.evaluate<boolean>(`
         return !!document.querySelector(".epub-sb-action-cover");
       `);
+      await stelleAnbieterWiederHer(cdp);
       if (da) return "Titelbild-Knopf ist sichtbar, obwohl kein Bildgenerator vorhanden ist";
       return null;
     },
@@ -698,7 +702,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
         return ta ? ta.value : "";
       `);
       await schliesseUeberlagerungen(cdp);
-      await entferneProviderStub(cdp);
+      await stelleAnbieterWiederHer(cdp);
       // Der Titel der Smoke-Notiz muss im Vorschlag stehen: sonst hat der Dialog
       // die Metadaten der Notiz nicht gelesen, sondern irgendetwas Generisches.
       if (!vorbelegt.includes(SMOKE_BOOK_TITLE)) {
@@ -743,7 +747,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
 
       const notiz = (await leseDatei(cdp, SMOKE_BOOK)) ?? "";
       await schliesseUeberlagerungen(cdp);
-      await entferneProviderStub(cdp);
+      await stelleAnbieterWiederHer(cdp);
 
       if (!notiz.includes(`cover: "[[${SMOKE_COVER}]]"`)) {
         const kopf = notiz.split("---")[1] ?? notiz.slice(0, 200);
@@ -775,6 +779,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
  * C1 gruen aussehen, waehrend er seinen Gegenstand nicht mehr beruehrt.
  */
 async function setzeProviderStub(cdp: Cdp): Promise<void> {
+  await deaktiviereEchtenAnbieter(cdp);
   await cdp.evaluate(`
     const reg = app.plugins.plugins;
     if (!reg["local-image-generator"]) {
@@ -810,6 +815,44 @@ async function entferneProviderStub(cdp: Cdp): Promise<void> {
     if (window.__epubStubGesetzt) {
       delete app.plugins.plugins["local-image-generator"];
       delete window.__epubStubGesetzt;
+    }
+    return true;
+  `);
+}
+
+/**
+ * Ein ECHT installiertes Nachbarplugin fuer die Dauer eines T-Punktes abschalten.
+ *
+ * Warum das noetig wurde: seit `npm run smoke:e2e -- --setup` (Naht-Lauf, 2026-09-02) liegt
+ * `local-image-generator` echt im selben Staging-Vault. Ohne diesen Griff waere **T1 rot**
+ * (er entfernt nur den Stub, das echte Plugin bleibt und meldet einen Anbieter) und T2/T3
+ * liefen ploetzlich gegen die echte API — die ohne erreichbaren Server keinen Dialog
+ * oeffnet. Der GUI-Smoke misst unsere Haelfte und soll das **unabhaengig davon** tun, was
+ * sonst im Vault installiert ist; die Naht misst `smoke:e2e`.
+ *
+ * `disablePlugin` statt eines `delete` auf dem Register: das Register wieder zu fuellen
+ * ergaebe ein Plugin-Objekt ohne laufende Instanz. Zurueckgeschaltet wird in
+ * `stelleAnbieterWiederHer`, auch nach einem Abbruch (Aufraeumblock am Lauf-Ende).
+ */
+async function deaktiviereEchtenAnbieter(cdp: Cdp): Promise<void> {
+  await cdp.evaluate(`
+    if (app.plugins.enabledPlugins.has("local-image-generator")) {
+      await app.plugins.disablePlugin("local-image-generator");
+      window.__epubEchterAnbieterAus = true;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return true;
+  `);
+}
+
+/** Stub weg, ein von uns abgeschaltetes echtes Nachbarplugin wieder an. */
+async function stelleAnbieterWiederHer(cdp: Cdp): Promise<void> {
+  await entferneProviderStub(cdp);
+  await cdp.evaluate(`
+    if (window.__epubEchterAnbieterAus) {
+      await app.plugins.enablePlugin("local-image-generator");
+      delete window.__epubEchterAnbieterAus;
+      await new Promise((r) => setTimeout(r, 300));
     }
     return true;
   `);
@@ -988,8 +1031,10 @@ async function lauf(nur?: string): Promise<number> {
       ]);
       // Der Stub haengt am Plugin-Register, nicht an einer Datei — er ueberlebt
       // einen Abbruch mitten in T2/T3 und liesse T1 beim naechsten Lauf gruen
-      // aussehen, ohne dass er seinen Gegenstand beruehrt.
-      await entferneProviderStub(cdp);
+      // aussehen, ohne dass er seinen Gegenstand beruehrt. Dasselbe gilt fuer ein
+      // echtes Nachbarplugin, das wir abgeschaltet haben: bliebe es aus, saehe der
+      // naechste Lauf einen Vault, den niemand so eingerichtet hat.
+      await stelleAnbieterWiederHer(cdp);
       if (buchVorher !== null) {
         const jetzt = await leseDatei(cdp, BOOK);
         console.log(

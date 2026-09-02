@@ -70,7 +70,7 @@ globalen Toast, in den jedes Plugin im Vault schreibt.
 
 | # | Prüfpunkt | Warum er existiert |
 |---|---|---|
-| **T1** | Ohne `local-image-generator` im Plugin-Register erscheint `.epub-sb-action-cover` **nicht** | Der Realzustand dieses Vaults, und der Fall, der im Alltag bricht: das Nachbarplugin ist optional und lässt sich zur Laufzeit abschalten. Ein Knopf, der erscheint und dann nichts kann, ist schlimmer als keiner |
+| **T1** | Ohne `local-image-generator` im Plugin-Register erscheint `.epub-sb-action-cover` **nicht** — der Zustand wird **hergestellt** (`disablePlugin` + danach zurück), nicht vorausgesetzt | Der Fall, der im Alltag bricht: das Nachbarplugin ist optional und lässt sich zur Laufzeit abschalten. Ein Knopf, der erscheint und dann nichts kann, ist schlimmer als keiner |
 | **T2** | Mit einem eingesetzten Provider-**Stub** erscheint der Knopf, ein Klick (200 ms Haltedauer) öffnet `.epub-cover-modal`, und das Prompt-Feld nennt den **Buchtitel** | Prüft unsere Erkennung (Version **und** Form) und die Vorbelegung aus den Metadaten der Notiz. Wäre nur „Dialog geht auf" gemessen, bliebe eine leere Vorbelegung unsichtbar |
 | **T3** | Nach „Erzeugen" liegt die PNG-Datei **im Vault**, `cover:` zeigt darauf, und der eingegebene Text steht als `cover_prompt:` in der Notiz | Die ganze Naht in einem Punkt — und er wartet am **Dateisystem**, nicht am schließenden Dialog: ein Punkt, der nur dessen Verschwinden sieht, wäre auch dann grün, wenn nichts geschrieben wurde |
 
@@ -176,6 +176,7 @@ einen Pfad, den es im Gebrauch nicht gibt.
 | Datum | Obsidian | Plugin | Ergebnis | Gegenprobe |
 |---|---|---|---|---|
 | 2026-08-30 | 1.13.7 | 0.3.1 (deployt) | **12/12** | ✅ gültig: Memoisierung (`hub-view.ts:161`) ausgebaut → **11/12**, genau S4 rot, kein anderer Punkt mitgefallen |
+| 2026-09-02 | 1.13.7 | 0.4.0 (deployt) | **15/15** | ✅ gültig: die T1-Härtung ausgebaut (`deaktiviereEchtenAnbieter`) → **14/15**, genau T1 rot. Belegt zugleich, dass die Gefahr real war: seit `smoke:e2e -- --setup` liegt `local-image-generator` echt im Staging-Vault, und T1 entfernte vorher nur seinen eigenen Stub |
 
 ### Ende-zu-Ende (`smoke:e2e`)
 

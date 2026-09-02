@@ -37,10 +37,18 @@
  * am Ende auch selbst beendet — beendet wird ausdruecklich **nur ein selbst gestarteter**:
  * laeuft dort schon einer (etwa aus dem Smoke des Nachbarn), ist er fremdes Eigentum.
  *
+ * **Zur vierten Kategorie** (Hinweis aus der obsidian-transmute-Session, 2026-09-02): eine
+ * Bilanz kann „N/N gruen" melden und „alles, was ich geschafft habe" meinen, wenn Pruefpunkte
+ * waehrend des Laufs entstehen und ein Absturz die restlichen nie anlegt. Hier nachgemessen,
+ * nicht abgehakt: die Punktliste ist **statisch deklariert** (`PRUEFPUNKTE`), jeder Punkt
+ * liegt einzeln in `try/catch` — ein abgestuerzter Punkt wird rot, keiner verschwindet. Und
+ * die Bilanzzeile steht **hinter** dem `finally`: wirft etwas vor der Schleife (Mock kommt
+ * nicht hoch, kein Fenster), gibt es gar keine Bilanz statt einer schmeichelhaften.
+ *
  * Durchlauf-Vermerke: `docs/SMOKE.md` § Ende-zu-Ende ueber die Plugin-Grenze.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { argv, cwd, env, exit } from "node:process";
 import {
@@ -314,6 +322,17 @@ async function tippePromptUndErzeuge(cdp: Cdp): Promise<void> {
 // ---------------------------------------------------------------------------
 // Mock-Backend (haengt HINTER dem Nachbarplugin, nicht zwischen ihm und uns)
 // ---------------------------------------------------------------------------
+
+/** Juengste mtime unter einem Verzeichnisbaum — fuer den Build-Guard des Nachbarn. */
+function juengsteAenderung(wurzel: string): number {
+  let neueste = 0;
+  for (const e of readdirSync(wurzel, { withFileTypes: true, recursive: true })) {
+    if (!e.isFile()) continue;
+    const m = statSync(join(e.parentPath ?? wurzel, e.name)).mtimeMs;
+    if (m > neueste) neueste = m;
+  }
+  return neueste;
+}
 
 let mockProzess: ChildProcess | null = null;
 
@@ -811,6 +830,22 @@ function zeigeVertrag(): void {
  * scheiterte an einer Konfiguration statt an der Sache.
  */
 function setup(): void {
+  // Der Build des NACHBARN gegen seinen Quellstand pruefen, nicht nur seine Existenz.
+  // Ein veralteter Fremd-Build ist hier teurer als im eigenen Repo: er sieht aus wie ein
+  // Vertragsbruch des Nachbarn, und gesucht wird dann in dessen Code statt an seiner
+  // `main.js`. Der Hinweis kam aus der local-image-generator-Session (2026-09-02), die
+  // denselben Guard fuer ihren eigenen Smoke gebaut hat — dieselbe Falle, andere Richtung.
+  const neuesteQuelle = juengsteAenderung(join(LIG_REPO, "src"));
+  const gebaut = statSync(join(LIG_REPO, "main.js")).mtimeMs;
+  if (neuesteQuelle > gebaut) {
+    console.error(
+      `\nDer Build des Nachbarn ist AELTER als sein Quellstand ` +
+        `(main.js ${new Date(gebaut).toLocaleTimeString()}, src/ ${new Date(neuesteQuelle).toLocaleTimeString()}).\n` +
+        `Im Nachbar-Repo \`npm run build\` fahren, sonst misst der Naht-Lauf einen Stand, den niemand kennt.`,
+    );
+    exit(1);
+  }
+
   const vaultDir = stagingVaultDir(REPO_NAME);
   const log = buildVault({ repoRoot: REPO_ROOT, vaultDir, fixtureDir: FIXTURE_DIR, pluginId: PLUGIN_ID });
   console.log(`Staging-Vault: ${vaultDir}`);
