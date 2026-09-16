@@ -222,7 +222,7 @@ async function bereiteFensterVor(cdp: Cdp): Promise<boolean> {
   `);
   await schliesseUeberlagerungen(cdp);
 
-  const sprache = await cdp.evaluate<string>(`return localStorage.getItem("language") || "en";`);
+  const sprache = await cdp.evaluate<string>(`return document.documentElement.lang || (window.localStorage && localStorage.getItem("language")) || "en";`);
   if (sprache !== "en") {
     await cdp.evaluate(`localStorage.setItem("language", "en"); return true;`);
     // Reload nur im EIGENEN Fenster — nie im Fenster einer anderen Session.
