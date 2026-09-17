@@ -987,6 +987,53 @@ async function lauf(nur?: string): Promise<number> {
   const rot: string[] = [];
   let buchVorher: string | null = null;
 
+  // Dieselbe Aufraeumarbeit wie im `finally` unten — als eigene Funktion, damit der
+  // SIGINT/SIGTERM-Handler sie aufrufen kann, ohne Code zu duplizieren. Ein Ctrl-C mitten
+  // im Lauf ueberspringt das `finally` NICHT (try/catch-Semantik), sondern beendet den
+  // Node-Prozess sofort — ohne eigenen Handler bleibt der Stub am Plugin-Register haengen
+  // (er ueberlebt einen Abbruch mitten in T2/T3 und liesse T1 beim naechsten Lauf gruen
+  // aussehen, ohne seinen Gegenstand zu beruehren — derselbe Fall, den der Kommentar bei
+  // C1 fuer einen regulaeren Abbruch bereits beschreibt), ebenso die Papierkorb-Dateien.
+  const cleanupState = async (): Promise<void> => {
+    try {
+      await inDenPapierkorb(cdp, [
+        FIXTURE_EPUB,
+        SMOKE_EPUB,
+        SMOKE_COVER,
+        SMOKE_BOOK,
+        ...SMOKE_CHAPTERS.map((k) => k.pfad),
+        SMOKE_DIR,
+      ]);
+      await stelleAnbieterWiederHer(cdp);
+      if (buchVorher !== null) {
+        const jetzt = await leseDatei(cdp, BOOK);
+        console.log(
+          jetzt === buchVorher
+            ? `\nC1   Buch-Notiz nach dem Lauf: byte-gleich`
+            : `\nC1   ABWEICHUNG — die Buch-Notiz hat sich geaendert. Der Lauf sollte sie nicht anfassen.`,
+        );
+        if (jetzt !== buchVorher) rot.push("C1: Buch-Notiz nach dem Lauf nicht byte-gleich");
+      }
+    } catch (e) {
+      console.log(`\nC1   Aufraeumen fehlgeschlagen: ${(e as Error).message}`);
+      rot.push(`C1: Aufraeumen fehlgeschlagen — ${(e as Error).message}`);
+    }
+  };
+
+  let signalCleanupRunning = false;
+  const onAbortSignal = (signal: NodeJS.Signals) => {
+    if (signalCleanupRunning) return;
+    signalCleanupRunning = true;
+    void (async () => {
+      console.log(`\n\nAbbruch durch ${signal} — raeume Smoke-Zustand auf...`);
+      await cleanupState();
+      cdp.close();
+      process.exit(130);
+    })();
+  };
+  process.on("SIGINT", onAbortSignal);
+  process.on("SIGTERM", onAbortSignal);
+
   try {
     await cdp.mitschnitt((zeile) => konsole.push(zeile));
     await requireVisible(cdp);
@@ -994,6 +1041,21 @@ async function lauf(nur?: string): Promise<number> {
 
     const version = await ladePluginNeu(cdp);
     console.log(`Plugin ${PLUGIN_ID} ${version} (aus der deployten manifest.json)\n`);
+
+    // `window.__epubStubGesetzt` haengt am Plugin-Register, nicht an einer Datei — es
+    // ueberlebt einen per SIGINT/SIGTERM abgebrochenen frueheren Lauf, BEVOR dieser Lauf
+    // selbst einen Stub setzt. Ohne diesen Punkt liest T1 den Rest als "echter Anbieter
+    // installiert" und faellt still durch, statt den Rest zu melden.
+    process.stdout.write("C0   Kein liegen gebliebener Stub aus einem abgebrochenen frueheren Lauf … ");
+    const leftoverStub = await cdp.evaluate<boolean>(`return !!window.__epubStubGesetzt;`);
+    if (leftoverStub) {
+      await stelleAnbieterWiederHer(cdp);
+      console.log("ROT — Stub gefunden und entfernt (vermutlich Ctrl-C/Crash im vorigen Lauf vor dessen Aufraeumen; dieser Lauf faehrt normal weiter)");
+      rot.push("C0: liegen gebliebener Provider-Stub aus einem abgebrochenen frueheren Lauf");
+    } else {
+      console.log("ok");
+      gruen++;
+    }
 
     // Vorwert AUSSERHALB des try-Blocks der Pruefpunkte festhalten — C1 vergleicht dagegen.
     buchVorher = await leseDatei(cdp, BOOK);
@@ -1019,35 +1081,11 @@ async function lauf(nur?: string): Promise<number> {
       }
     }
   } finally {
-    // C1: Aufraeumen und das Ergebnis PROTOKOLLIEREN, nicht ihm vertrauen.
-    try {
-      await inDenPapierkorb(cdp, [
-        FIXTURE_EPUB,
-        SMOKE_EPUB,
-        SMOKE_COVER,
-        SMOKE_BOOK,
-        ...SMOKE_CHAPTERS.map((k) => k.pfad),
-        SMOKE_DIR,
-      ]);
-      // Der Stub haengt am Plugin-Register, nicht an einer Datei — er ueberlebt
-      // einen Abbruch mitten in T2/T3 und liesse T1 beim naechsten Lauf gruen
-      // aussehen, ohne dass er seinen Gegenstand beruehrt. Dasselbe gilt fuer ein
-      // echtes Nachbarplugin, das wir abgeschaltet haben: bliebe es aus, saehe der
-      // naechste Lauf einen Vault, den niemand so eingerichtet hat.
-      await stelleAnbieterWiederHer(cdp);
-      if (buchVorher !== null) {
-        const jetzt = await leseDatei(cdp, BOOK);
-        console.log(
-          jetzt === buchVorher
-            ? `\nC1   Buch-Notiz nach dem Lauf: byte-gleich`
-            : `\nC1   ABWEICHUNG — die Buch-Notiz hat sich geaendert. Der Lauf sollte sie nicht anfassen.`,
-        );
-        if (jetzt !== buchVorher) rot.push("C1: Buch-Notiz nach dem Lauf nicht byte-gleich");
-      }
-    } catch (e) {
-      console.log(`\nC1   Aufraeumen fehlgeschlagen: ${(e as Error).message}`);
-      rot.push(`C1: Aufraeumen fehlgeschlagen — ${(e as Error).message}`);
-    }
+    // C1: Aufraeumen und das Ergebnis PROTOKOLLIEREN, nicht ihm vertrauen. Dieselbe Funktion
+    // wie der SIGINT/SIGTERM-Handler oben — kein Doppelcode.
+    process.off("SIGINT", onAbortSignal);
+    process.off("SIGTERM", onAbortSignal);
+    await cleanupState();
     cdp.close();
   }
 
@@ -1056,7 +1094,9 @@ async function lauf(nur?: string): Promise<number> {
     for (const z of konsole.slice(0, 20)) console.log(`  ${z}`);
   }
 
-  const gefahren = nur ? 1 : PRUEFPUNKTE.length;
+  // +1 fuer C0 (der Leftover-Stub-Check laeuft immer, ausserhalb von PRUEFPUNKTE, und nie
+  // unter --only — der ist an einen bestimmten Punkt gebunden, nicht an den Lauf-Anfang).
+  const gefahren = (nur ? 1 : PRUEFPUNKTE.length) + 1;
   console.log(`\n${gruen}/${gefahren} gruen`);
   if (rot.length) {
     console.log("\nRot:");
