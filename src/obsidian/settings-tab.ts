@@ -3,6 +3,7 @@ import { App, Plugin, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import { EpubExporterSettings } from "./settings";
 import { t } from "../vendor/kit/i18n";
 import { renderSettingDefinitions } from "../vendor/kit-obsidian/settings_walker";
+import { githubHelpUrls, helpSettingDefinition } from "../vendor/kit-obsidian/help-setting";
 
 export class EpubSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: { settings: EpubExporterSettings; saveSettings: () => Promise<void> }) {
@@ -15,6 +16,16 @@ export class EpubSettingTab extends PluginSettingTab {
   // Obsidian ignores this method.
   getSettingDefinitions(): SettingDefinitionItem[] {
     return [
+      // UI-STANDARD §8 help row: always the first element, before every other setting.
+      helpSettingDefinition({
+        ...githubHelpUrls("epub-exporter"),
+        texts: {
+          name: t("settings.help.name"),
+          desc: t("settings.help.desc"),
+          openDocs: t("settings.help.openDocs"),
+          reportIssue: t("settings.help.reportIssue"),
+        },
+      }),
       {
         name: t("settings.output.name"),
         control: {

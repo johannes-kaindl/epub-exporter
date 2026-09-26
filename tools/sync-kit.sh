@@ -22,6 +22,9 @@ set -e
 KIT=../obsidian-kit
 KIT_REF=${KIT_REF:-0.27.0}
 KIT_OBS_REF=${KIT_OBS_REF:-0.25.0}
+# Dritter Pin, ebenfalls Absicht: help-setting.ts (Hilfe-Zeile, UI-STANDARD 8) kam mit Kit 0.43.0 und
+# haengt an keinem anderen Modul — die beiden anderen kit-obsidian-Module bleiben auf ihrem Stand.
+KIT_HELP_REF=${KIT_HELP_REF:-0.43.0}
 
 # Der Tag-Commit, nicht der Kit-HEAD — und `^{commit}` ist Pflicht, nicht Kosmetik: obsidian-kit
 # taggt annotiert, ohne die Peelung landet das Tag-OBJEKT in VENDOR.json. Diese SHA kommt in
@@ -30,18 +33,20 @@ KIT_OBS_REF=${KIT_OBS_REF:-0.25.0}
 sha_von() { git -C "$KIT" rev-parse --short "$1^{commit}"; }
 ver_von() { git -C "$KIT" describe --tags --abbrev=0 "$1"; }
 
-for ref in "$KIT_REF" "$KIT_OBS_REF"; do
+for ref in "$KIT_REF" "$KIT_OBS_REF" "$KIT_HELP_REF"; do
   git -C "$KIT" rev-parse --verify --quiet "$ref^{commit}" >/dev/null \
     || { echo "FEHLER: Ref '$ref' existiert nicht in $KIT." >&2; exit 1; }
 done
 
 SHA=$(sha_von "$KIT_REF");         VER=$(ver_von "$KIT_REF")
 OBS_SHA=$(sha_von "$KIT_OBS_REF"); OBS_VER=$(ver_von "$KIT_OBS_REF")
+HELP_SHA=$(sha_von "$KIT_HELP_REF"); HELP_VER=$(ver_von "$KIT_HELP_REF")
 
 mkdir -p src/vendor/kit src/vendor/kit-obsidian
 
 PURE="i18n settings vault-path"
 OBS="settings_walker folder-suggest"
+HELP="help-setting"
 
 # VORPRUEFUNG, bevor irgendetwas geschrieben wird.
 #
@@ -59,6 +64,10 @@ done
 for f in $OBS; do
   git -C "$KIT" cat-file -e "$KIT_OBS_REF:src/obsidian/$f.ts" 2>/dev/null \
     || fehlend="$fehlend src/obsidian/$f.ts@$KIT_OBS_REF"
+done
+for f in $HELP; do
+  git -C "$KIT" cat-file -e "$KIT_HELP_REF:src/obsidian/$f.ts" 2>/dev/null \
+    || fehlend="$fehlend src/obsidian/$f.ts@$KIT_HELP_REF"
 done
 if [ -n "$fehlend" ]; then
   echo "FEHLER: in obsidian-kit fehlen:$fehlend" >&2
@@ -92,6 +101,10 @@ for f in $OBS; do
   vendor "src/vendor/kit-obsidian/$f.ts" "src/obsidian/$f.ts" "$OBS_VER" "$KIT_OBS_REF"
 done
 
+for f in $HELP; do
+  vendor "src/vendor/kit-obsidian/$f.ts" "src/obsidian/$f.ts" "$HELP_VER" "$KIT_HELP_REF"
+done
+
 # write_vendor_json <verzeichnis> <version> <sha> <modul-liste> <zusatz-note>
 write_vendor_json() {
   printf '{\n  "source": "obsidian-kit",\n  "version": "%s",\n  "sha": "%s",\n  "vendored": "%s",\n  "note": "Verbatim snapshot aus der Git-Ref %s (CORE-META-22: feste Ref, nicht Arbeitsstand). Never hand-edit. Re-vendor via tools/sync-kit.sh. %s"\n}\n' \
@@ -101,7 +114,7 @@ write_vendor_json src/vendor/kit "$VER" "$SHA" \
   "$(printf '%s.ts, ' $PURE | sed 's/, $//')" \
   "kit-obsidian/ steht bewusst auf einem anderen Stand — siehe dortige VENDOR.json."
 write_vendor_json src/vendor/kit-obsidian "$OBS_VER" "$OBS_SHA" \
-  "$(printf '%s.ts, ' $OBS | sed 's/, $//')" \
+  "$(printf '%s.ts, ' $OBS | sed 's/, $//'), help-setting.ts (Kit $HELP_VER, $HELP_SHA)" \
   "Getrennt von kit/, weil dieser Ordner \\\"obsidian\\\" importiert (Setting, FolderSuggest nutzen DOM-/App-APIs) und damit ausserhalb des check:pure-Scopes liegen muss. Bewusst auf einem aelteren Stand als kit/ — Heben ist eine inhaltliche Aenderung (KIT_OBS_REF setzen, danach npm run gate)."
 
 echo "vendored: kit@$VER ($SHA) → $PURE | kit-obsidian@$OBS_VER ($OBS_SHA) → $OBS"

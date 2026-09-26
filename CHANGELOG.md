@@ -6,6 +6,10 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- **Hilfe-Zeile ganz oben in den Einstellungen** mit Knöpfen zur Dokumentation und zum Issue-Tracker (aus dem Kit 0.43.0 übernommen).
+
 ## [0.4.0] — 2026-09-02
 
 ### Hinzugefügt
