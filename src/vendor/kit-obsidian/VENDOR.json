@@ -3,5 +3,5 @@
   "version": "0.25.0",
   "sha": "1ca3861",
   "vendored": "settings_walker.ts, folder-suggest.ts, help-setting.ts (obsidian-kit@0.43.0, bcd1805)",
-  "note": "Verbatim snapshot aus der Git-Ref 0.25.0 (CORE-META-22: feste Ref, nicht Arbeitsstand). Never hand-edit. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Getrennt von kit/, weil dieser Ordner \"obsidian\" importiert (Setting, FolderSuggest nutzen DOM-/App-APIs) und damit ausserhalb des check:pure-Scopes liegen muss. Bewusst auf einem aelteren Stand als kit/ — Heben ist eine inhaltliche Aenderung (KIT_OBS_REF setzen, danach npm run gate)."
+  "note": "Verbatim snapshot aus der Git-Ref 0.25.0 (CORE-META-22: feste Ref, nicht Arbeitsstand). Never hand-edit. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Getrennt von kit/, weil dieser Ordner \"obsidian\" importiert (Setting, FolderSuggest nutzen DOM-/App-APIs) und damit ausserhalb des check:pure-Scopes liegen muss. Bewusst auf einem aelteren Stand als kit/ — Heben ist eine inhaltliche Aenderung (Pin in tools/kit-sync.json heben, danach npm run gate)."
 }
