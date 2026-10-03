@@ -1,106 +1,105 @@
 # Changelog
 
-Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
-Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
-Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
+All notable changes to this project are documented here.
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Hinzugefügt
+### Added
 
 - The GitHub release now also carries a ready-to-unpack `epub-exporter.zip` (the plugin folder with `main.js`, `manifest.json` and `styles.css`) and a `checksums.sha256` file. For a manual install, download the zip and unpack it into `.obsidian/plugins/` instead of creating the folder and saving three files by hand.
 
 ## [0.5.0] — 2026-09-26
 
-### Hinzugefügt
+### Added
 
-- **Hilfe-Zeile ganz oben in den Einstellungen** mit Knöpfen zur Dokumentation und zum Issue-Tracker (aus dem Kit 0.43.0 übernommen).
+- **Help row at the very top of the settings** with buttons for the documentation and the issue tracker (taken over from Kit 0.43.0).
 
 ## [0.4.0] — 2026-09-02
 
-### Hinzugefügt
+### Added
 
-- **Titelbilder lassen sich jetzt erzeugen, wenn das Plugin „Local Image Generator“
-  installiert und aktiv ist.** Im Seitenpanel erscheint bei einer Buch-Notiz ein Knopf
-  „Titelbild erzeugen“ (und ein gleichnamiger Befehl); ein Dialog fragt, was das Bild zeigen
-  soll, und schlägt dafür etwas aus Titel und Autor vor. Das Ergebnis wird **als Datei neben
-  der Buch-Notiz gespeichert** und `cover:` zeigt darauf — das Titelbild ist damit im
-  Lesemodus sichtbar, bleibt über Exporte hinweg dasselbe und lässt sich jederzeit von Hand
-  ersetzen. Die Beschreibung landet als `cover_prompt:` in der Notiz, damit der nächste Lauf
-  davon ausgeht.
+- **Cover images can now be generated when the "Local Image Generator" plugin
+  is installed and active.** For a book note, the side panel shows a
+  "Generate cover image" button (and a command of the same name); a dialog asks what the
+  image should show and suggests something based on title and author. The result is **saved
+  as a file next to the book note** and `cover:` points to it — so the cover is visible in
+  reading mode, stays the same across exports and can be replaced by hand at any time.
+  The description is stored in the note as `cover_prompt:`, so the next run starts from it.
 
-  Der Dialog bietet nur an, was der Bildgenerator wirklich kann: die Größenauswahl kommt aus
-  seinen gemeldeten Fähigkeiten und entfällt, wo es nur eine Größe gibt. Fehlt das Plugin oder
-  meldet es sich als nicht einsatzbereit, erscheint der Knopf gar nicht erst.
+  The dialog only offers what the image generator can actually do: the size selection comes from
+  its reported capabilities and is omitted where there is only one size. If the plugin is missing or
+  reports itself as not ready, the button does not appear at all.
 
 
 ## [0.3.2] — 2026-08-30
 
-### Geändert
+### Changed
 
-- **Die Einstellung „Eigener Ordner“ verträgt jetzt getipptes Slash-Rauschen.** Sie ist ein
-  freies Textfeld, und ihr Wert erreichte den Vault bisher nur um führende und schließende
-  Slashes bereinigt. Backslashes werden jetzt zu `/`, wiederholte innere Slashes werden
-  zusammengefasst — `Export\Bücher` und `Export//Bücher` ergeben beide `Export/Bücher`, also die
-  Form, die Obsidians Vault-Adapter erwartet. Aus `obsidian-kit` 0.27.0 (`pure/vault-path.ts`).
+- **The "Custom folder" setting now tolerates typed slash noise.** It is a
+  free text field, and until now its value reached the vault with only leading and trailing
+  slashes cleaned up. Backslashes now become `/`, and repeated inner slashes are
+  collapsed — `Export\Bücher` and `Export//Bücher` both yield `Export/Bücher`, i.e. the
+  form that Obsidian's vault adapter expects. From `obsidian-kit` 0.27.0 (`pure/vault-path.ts`).
 
 ## [0.3.1] — 2026-08-14
 
-### Behoben
+### Fixed
 
-- Die Einstellungen sehen jetzt auf allen unterstützten Obsidian-Versionen gleich aus.
-  Auf Versionen vor 1.13 blendete die Ausweich-Ansicht die Zeile „Eigener Ordner“ aus,
-  solange das Ausgabeziel nicht bereits darauf stand — ab 1.13 war sie durchgehend
-  sichtbar. Beide Ansichten lesen jetzt dieselbe Einstellungs-Definition.
+- The settings now look the same on all supported Obsidian versions.
+  On versions before 1.13, the fallback view hid the "Custom folder" row
+  unless the output target was already set to it — from 1.13 on it was always
+  visible. Both views now read the same settings definition.
 
-### Geändert
+### Changed
 
-- Die README ist jetzt englisch (`README.md`); die deutsche Fassung steht als
-  `README.de.md` daneben.
-- Die README dokumentiert erstmals die Frontmatter-Felder der Buch-Notiz samt ihrer
-  deutschen Aliase (`titel`, `autor`, `sprache`, `verlag`, …) sowie die Funktionsweise
-  des Exports. Die Beschreibung der Einstellungen war inhaltlich falsch — sie nannte
-  Optionen für Bilder und Code-Blöcke, die es nicht gibt — und listet jetzt die
-  tatsächlich vorhandenen Einstellungen mit ihren Vorgabewerten.
+- The README is now in English (`README.md`); the German version sits next to it as
+  `README.de.md`.
+- The README now documents the frontmatter fields of the book note for the first time, including their
+  German aliases (`titel`, `autor`, `sprache`, `verlag`, …), as well as how
+  the export works. The description of the settings was factually wrong — it named
+  options for images and code blocks that do not exist — and now lists the
+  settings that actually exist with their default values.
 
 ## [0.3.0] — 2026-07-24
 
-### Hinzugefügt
+### Added
 
-- Kapitel lassen sich in der Sidebar per Ziehen oder `Alt+↑/↓` umsortieren; die neue
-  Reihenfolge wird sofort in den Embed-Spine der Buch-Notiz geschrieben.
-- Die Kapitelliste aktualisiert sich jetzt auch, wenn Embeds direkt in der offenen
-  Buch-Notiz geändert werden.
+- Chapters can be reordered in the sidebar by dragging or with `Alt+↑/↓`; the new
+  order is written immediately into the embed spine of the book note.
+- The chapter list now also updates when embeds are changed directly in the open
+  book note.
 
 ## [0.2.0] — 2026-07-23
 
-### Hinzugefügt
+### Added
 
-- **In Ordner konsolidieren:** Eine Buch-Note wird in einen self-contained Ordner
-  überführt (Buch-Note + nummerierte Kapiteldateien + `_assets/`). Ein Bestätigungs-Dialog
-  wählt, ob Kapitel kopiert oder verschoben werden und wie viele Bilder mitgenommen werden
-  (alle · nur Cover · keine); die Vorgaben stehen in den Einstellungen. Erreichbar per Befehl,
-  Sidebar-Button und Rechtsklick auf die Buch-Note.
-- **Ordner als Buch importieren:** Aus einem Ordner mit Markdown-Dateien entsteht eine
-  Buch-Note (Ordner-Note) mit nach Dateinamen sortiertem Embed-Spine — per Rechtsklick auf
-  den Ordner, ohne die vorhandenen Dateien zu verändern.
+- **Consolidate into folder:** A book note is turned into a self-contained folder
+  (book note + numbered chapter files + `_assets/`). A confirmation dialog
+  chooses whether chapters are copied or moved and how many images are taken along
+  (all · cover only · none); the defaults are set in the settings. Available via command,
+  sidebar button and right-click on the book note.
+- **Import folder as book:** A folder of Markdown files becomes a
+  book note (folder note) with an embed spine sorted by file name — via right-click on
+  the folder, without changing the existing files.
 
 ## [0.1.1] — 2026-07-23
 
-### Geändert
+### Changed
 
-- Deklarative Settings-API (`getSettingDefinitions()`): Die Plugin-Einstellungen
-  erscheinen ab Obsidian 1.13 in der Einstellungs-Suche. Die `display()`-Variante
-  bleibt als Fallback für Obsidian < 1.13 erhalten.
+- Declarative settings API (`getSettingDefinitions()`): From Obsidian 1.13 on, the plugin settings
+  appear in the settings search. The `display()` variant
+  is kept as a fallback for Obsidian < 1.13.
 
 ## [0.1.0] — 2026-07-20
 
-### Hinzugefügt
+### Added
 
-- Export einer Notiz als EPUB3 — mit Buch-Note als Single Source of Truth:
-  Frontmatter trägt die Metadaten, geordnete `![[embeds]]` bilden den Kapitel-Spine.
-- Sidebar als Hub-View: Buch-Übersicht, Kapitelliste, Export per Klick.
-- Vier Ausgabeziele, Cover-Bild, interne Links, Bilder, Code-Blöcke.
-- `chapter_title`-Override und `epub_exclude` pro Kapitel.
-- Buchsprache Deutsch/Englisch, folgt der Obsidian-UI-Sprache.
-- Abhängigkeitsfreie Engine: eigener store-only ZIP-Writer, eigene DOM→XHTML-Konvertierung.
+- Export of a note as EPUB3 — with the book note as single source of truth:
+  frontmatter carries the metadata, ordered `![[embeds]]` form the chapter spine.
+- Sidebar as hub view: book overview, chapter list, export with one click.
+- Four output targets, cover image, internal links, images, code blocks.
+- `chapter_title` override and `epub_exclude` per chapter.
+- Book language German/English, follows the Obsidian UI language.
+- Dependency-free engine: own store-only ZIP writer, own DOM→XHTML conversion.

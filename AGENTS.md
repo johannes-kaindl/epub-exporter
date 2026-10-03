@@ -154,7 +154,7 @@ im Maintainer-Workspace (`../../_docs`, maintainer-lokal).
   Coding-Cockpit des Maintainers (`$VAULT/25_Coding/epub-exporter/_SDD/`, CORE-META-14, maintainer-lokal).
   Sie tragen Arbeitskontext (Vault-Pfade, Schwester-Repo-Interna), der in einem public Repo niemandem nützt.
   Das Repo behält die Design-Essenz in dieser Datei + `CHANGELOG.md`.
-- **Alt-Bestand:** `docs/superpowers/{specs,plans}/` ist eingefroren — nichts Neues dort ablegen.
+- **Specs und Pläne** liegen im Vault-Cockpit unter `_SDD/` (CORE-META-14); `docs/superpowers/` gibt es nicht mehr — nichts Neues dort ablegen.
 - **Nie im Repo:** absolute Pfade außerhalb des Repos (`/Users/…`, Vault-Pfade) — Platzhalter nutzen
   (`$VAULT/…`, `~/…`, repo-relativ). Herkunftsnachweise als Repo-Name + `Datei:Zeile` sind dagegen erwünscht.
   Gate: `scripts/check-no-abs-paths.mjs` (Teil von `npm test`).
