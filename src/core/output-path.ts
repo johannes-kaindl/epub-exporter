@@ -1,12 +1,14 @@
+import { sanitizeBase as sanitizeBaseKit } from "../vendor/kit/filename-template";
 import { joinVaultPath } from "../vendor/kit/vault-path";
 
 // The four output destinations. Declared here (not imported from src/obsidian/settings.ts)
 // so this module stays free of any obsidian-namespaced import and remains node-testable.
 export type OutputDestination = "besideNote" | "attachmentFolder" | "customFolder" | "share";
 
+/** Dateiname ohne Pfad- und Sonderzeichen; leer wird „Untitled“. Die Regel selbst liegt im Kit
+ *  (`sanitizeBase`, code-kit `filename-template`), hier steht nur der Fallback. */
 export function sanitizeBase(name: string): string {
-  const cleaned = name.replace(/[\\/:*?"<>|]/g, "").trim();
-  return cleaned || "Untitled";
+  return sanitizeBaseKit(name, "Untitled");
 }
 
 export function resolveOutputPath(

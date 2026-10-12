@@ -6,6 +6,10 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Internal only, nothing changes for readers: the Kit pins move to obsidian-kit 0.57.0 and code-kit 0.24.0. The CRC-32 of the EPUB zip writer and the file-name cleaning (`sanitizeBase`, fallback "Untitled") now come from the shared code-kit modules `crc32` and `filename-template` instead of local copies; both behave exactly as before. The `i18n` and `settings` modules move from obsidian-kit to code-kit with unchanged exports. The vendored settings helper gains `installTabRefreshOnOpen` (not used here).
+
 ## [0.5.1] — 2026-10-03
 
 ### Added

@@ -34,7 +34,7 @@ anderes Ausgabeformat.
 - **Dep-freie Engine — einfacher als PDF:** EPUB = XHTML+CSS im ZIP; Obsidian rendert MD→HTML
   selbst. Kern: `dom-to-xhtml.ts` (Schwester zu paperizes `dom-to-ir`, gleiche
   graceful-degradation — Unbekanntes wird vereinfacht, nicht abgebrochen; der Zähler treibt die
-  Sammel-Notice) + **eigener store-only ZIP-Writer** (`zip-writer.ts`, ~100 Zeilen, CRC-32,
+  Sammel-Notice) + **eigener store-only ZIP-Writer** (`zip-writer.ts`, ~80 Zeilen, CRC-32 aus code-kit `crc32`,
   mimetype-first-uncompressed, optional native `CompressionStream`) + `epub-builder.ts`. Der
   ZIP-Writer ist **Original-Code, kein Vendor** — Zero-Dep-Ethos wie Letterheads/Paperizes
   eigener PDF-Writer, **Kit-Kandidat** (REGISTRY).
