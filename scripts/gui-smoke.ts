@@ -984,7 +984,10 @@ async function lauf(nur?: string): Promise<void> {
   }
 
   const konsole: string[] = [];
-  const bilanz = createBilanz({ punkte: PUNKTE });
+  // Teillauf (--only): Soll-Liste ist der gewaehlte Punkt plus die Rahmenpunkte C0/C1.
+  const soll = nur ? (["C0", nur, "C1"] as unknown as typeof PUNKTE) : PUNKTE;
+  const bilanz = createBilanz({ punkte: soll });
+  if (nur) console.log(`Teillauf: ${nur}, ${soll.length} von ${PUNKTE.length} Punkten im Soll`);
   let buchVorher: string | null = null;
 
   // Dieselbe Aufraeumarbeit wie im `finally` unten — als eigene Funktion, damit der
@@ -1082,7 +1085,6 @@ async function lauf(nur?: string): Promise<void> {
     for (const z of konsole.slice(0, 20)) console.log(`  ${z}`);
   }
 
-  // Unter --only fehlen die uebrigen Punkte bewusst: sie zaehlen dann als „nichts gemessen“.
   bilanz.abschluss();
 }
 

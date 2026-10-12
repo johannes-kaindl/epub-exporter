@@ -15,6 +15,7 @@ mehr; die Beschreibungen bleiben stehen, weil sie begruenden, was jeder Punkt pr
 npm run build
 npm run smoke:gui -- --setup --port <port>   # Staging-Vault aus dem Fixture herstellen
 npm run smoke:gui -- --port <port>           # Lauf in der Zweitinstanz
+# mit --only <id> ist die Soll-Liste der Teillauf (C0, der Punkt, C1)
 ```
 
 Der Lauf misst im **eigenen Staging-Vault** (`$STAGING_VAULTS_DIR/epub-exporter`), nicht im
