@@ -30,7 +30,7 @@
  *
  * ```bash
  * npm run smoke:e2e -- --setup   # Staging-Vault + BEIDE Plugins installieren
- * npm run smoke:e2e              # Vault epub-exporter, Port 9222 (CDP_PORT), Mock auf 7861
+ * npm run smoke:e2e -- --port <port>   # Vault epub-exporter in der Zweitinstanz, Mock auf 7861
  * ```
  *
  * Der Mock wird vom Treiber selbst gestartet, wenn auf `MOCK_PORT` keiner antwortet, und dann
@@ -65,7 +65,8 @@ import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 const REPO_NAME = "epub-exporter";
 const PLUGIN_ID = "epub-exporter";
 const VAULT_NAME = REPO_NAME;
-const PORT = Number(env.CDP_PORT ?? 9222);
+/** Pflicht: `--port` oder `CDP_PORT`; gesetzt in `main()`. Kein Default 9222 (regulaere Instanz). */
+let PORT = 0;
 
 const REPO_ROOT = cwd();
 const FIXTURE_DIR = join(REPO_ROOT, "docs", "images", "fixture");
@@ -961,6 +962,14 @@ async function main(): Promise<void> {
   const args = argv.slice(2);
   if (args.includes("--list")) return zeigeVertrag();
   if (args.includes("--setup")) return setup();
+
+  const portIdx = args.indexOf("--port");
+  const portText = (portIdx >= 0 ? args[portIdx + 1] : undefined) ?? env.CDP_PORT;
+  if (!portText || !Number.isInteger(Number(portText))) {
+    console.error("--port <port> fehlt (oder CDP_PORT). Kein Default: 9222 ist die regulaere Instanz.");
+    exit(2);
+  }
+  PORT = Number(portText);
 
   if (!existsSync(join(REPO_ROOT, "main.js"))) {
     console.error("main.js fehlt — erst `npm run build`.");
