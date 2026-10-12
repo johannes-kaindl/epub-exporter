@@ -33,4 +33,24 @@ describe("createZip", () => {
     const files = unzipSync(createZip([{ path: "b.bin", data: bin }]));
     expect(Array.from(files["b.bin"])).toEqual(Array.from(bin));
   });
+
+  // fflate prueft den CRC beim Entpacken nicht — der Round-Trip oben erkennt einen falschen
+  // CRC-32 also nicht. Pruefwert: CRC-32 von "123456789" ist 0xCBF43926 (IEEE 802.3).
+  it("writes the CRC-32 into local header and central directory", () => {
+    const name = "check.txt";
+    const data = enc("123456789");
+    const zip = createZip([{ path: name, data }]);
+    const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+    // local header: CRC at offset 14
+    expect(view.getUint32(14, true)).toBe(0xcbf43926);
+    // central directory follows the single entry's header + data; CRC at offset 16 in it
+    const central = 30 + name.length + data.length;
+    expect(view.getUint32(central, true)).toBe(0x02014b50);
+    expect(view.getUint32(central + 16, true)).toBe(0xcbf43926);
+  });
+
+  it("writes the CRC-32 of an empty entry as 0", () => {
+    const zip = createZip([{ path: "e", data: new Uint8Array(0) }]);
+    expect(new DataView(zip.buffer).getUint32(14, true)).toBe(0);
+  });
 });
