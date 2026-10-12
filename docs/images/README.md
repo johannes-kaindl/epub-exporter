@@ -151,17 +151,11 @@ seinem Obsidian halten. **Ein `quit` vor der Aufnahme ist deshalb destruktiv** �
 vernichtet fremden Zustand, den kein Neustart zurückbringt. (Gemessen am 2026-08-30: ein
 Reindex mit zwei Stunden Rechenzeit, dessen Fortschritt nur im Speicher stand.)
 
-Der Weg, der stattdessen funktioniert:
+Der Weg, der stattdessen funktioniert, ist eine **Zweitinstanz**:
 
-1. **Läuft schon ein Obsidian mit `--remote-debugging-port=9222`?** Dann diesen Port
-   mitbenutzen — und **vorher die Session fragen, der er gehört**.
-2. Den Aufnahme-Vault in `obsidian.json` eintragen und mit
-   `ipcRenderer.send("vault-open", <pfad>)` aus einem beliebigen Renderer öffnen. Das
-   erzeugt ein **zweites Fenster im selben Prozess**, keinen zweiten Prozess.
-3. Der Treiber wählt sein Fenster über `attachTo("workspace", 9222, "epub-exporter")` —
-   der Vault-Name-Filter greift und trifft fremde Fenster nicht.
-4. Läuft **gar kein** Obsidian, ist der klassische Weg zulässig:
-   `open -a Obsidian --args --remote-debugging-port=9222`.
+1. Eigenes Profil (`/tmp/obs-test-epub-exporter`), aktuelle `obsidian-*.asar` aus dem Profil der regulären Instanz hineinkopieren, Aufnahme-Vault und `"language":"en"` in `$UD/obsidian.json` eintragen.
+2. Mit `--user-data-dir="$UD"` und eigenem `--remote-debugging-port=<port>` starten (vorher `lsof -nP -iTCP:<port> -sTCP:LISTEN`); den Lock für diesen Port nehmen.
+3. Das Rezept bekommt den Port ausdrücklich: `npm run shots -- --port <port>` (ohne Angabe bricht es ab). Es wählt sein Fenster über `attachTo("workspace", <port>, "epub-exporter")`, Vertrauensdialog und Restricted Mode erledigt `bereiteInstanzVor`.
 
 **Und:** `attachTo("settings", …)` filtert **nicht** nach Vault — für `settings` ist der
 Vault-Filter per Kurzschluss abgeschaltet (`cdp.ts:466`), es gewinnt der erste Treffer. Aus

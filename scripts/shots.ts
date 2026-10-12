@@ -9,45 +9,25 @@
  *
  * ## Ablauf
  *
+ * Aufgenommen wird in einer **Zweitinstanz** mit eigenem Profil und eigenem Port (Dach-AGENTS
+ * § Staging-Vaults) — nie in der regulaeren Instanz, nie per Quit:
+ *
  * ```bash
- * npm run build && npm run shots -- --setup   # Vault aus dem Fixture bauen
- * #   ... Aufnahme-Vault oeffnen (siehe unten), einmalig als vertrauenswuerdig markieren
- * npm run shots                                # alles aufnehmen
- * npm run shots -- --only hero.png             # ein Bild nachziehen
- * npm run shots -- --list                      # Vertrag anzeigen
+ * npm run build && npm run shots -- --setup --port <port>   # Vault aus dem Fixture bauen
+ * #   Profil UD=/tmp/obs-test-epub-exporter: aktuelle obsidian-*.asar hineinkopieren, Vault und
+ * #   "language":"en" in $UD/obsidian.json eintragen, mit --user-data-dir="$UD" und
+ * #   --remote-debugging-port=<port> starten (vorher: lsof -nP -iTCP:<port> -sTCP:LISTEN)
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label epub-exporter \
+ *   --intent "README-Bilder" --exclusive focus --port <port> --ttl 900
+ * npm run shots -- --port <port>                # alles aufnehmen
+ * npm run shots -- --port <port> --only hero.png # ein Bild nachziehen
+ * npm run shots -- --list                       # Vertrag anzeigen
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
  * ```
  *
- * ## ⚠️ Obsidian ist Single-Instance — NIEMALS blind `quit` vor der Aufnahme
- *
- * Laeuft bereits ein Obsidian, laesst sich **kein zweiter Prozess** mit eigenem Debug-Port
- * starten: `open -a Obsidian --args --remote-debugging-port=9223` ignoriert die Argumente
- * und fokussiert bloss das bestehende Fenster.
- *
- * Die naheliegende Abhilfe — Obsidian beenden und mit Port neu starten — ist in diesem
- * Workspace **destruktiv**: an derselben Maschine arbeiten mehrere Sessions, und ein
- * Nachbar-Plugin kann einen stundenlangen Indexlauf in seinem Obsidian halten, dessen
- * Fortschritt nur im Speicher steht. Am 2026-08-30 waeren das zwei Stunden Rechenzeit
- * gewesen. Der Aufnahme-Vertrag anderer Repos beschreibt den Fall, dass sonst niemand
- * Obsidian benutzt; dieser Vorbehalt steht dort nicht dabei.
- *
- * Richtig ist:
- *   1. Laeuft schon ein Obsidian mit `--remote-debugging-port=9222`? Dann diesen Port
- *      mitbenutzen — und **vorher die Session fragen, der er gehoert**:
- *
- *      ```bash
- *      lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "belegt — erst fragen, wem"
- *      ```
- *
- *      ⚠️ Die Pruefung ersetzt die Frage nicht: sie zeigt aktive CDP-Treiber, aber nicht,
- *      wer ein Fenster offen haelt oder auf den Port wartet.
- *   2. Den Aufnahme-Vault per IPC oeffnen: in `obsidian.json` eintragen, dann
- *      `ipcRenderer.send("vault-open", <pfad>)` aus einem beliebigen Renderer. Das erzeugt
- *      ein zweites **Fenster im selben Prozess**. Weder `open -a Obsidian` noch
- *      `obsidian://open?path=` tun das.
- *   3. Dieser Treiber waehlt sein Fenster ueber den Vault-Namen (`VAULT_NAME`) und trifft
- *      fremde Fenster nicht.
- *   4. Laeuft GAR KEIN Obsidian, ist der klassische Weg zulaessig:
- *      `open -a Obsidian --args --remote-debugging-port=9222`.
+ * `--port` ist Pflicht (auch als `CDP_PORT` lesbar): ohne Angabe bricht der Treiber ab, statt
+ * auf die regulaere Instanz (9222) zu greifen. Vertrauensdialog und Restricted Mode erledigt
+ * `bereiteInstanzVor`; der Treiber waehlt sein Fenster ueber den Vault-Namen (`VAULT_NAME`).
  *
  * ## Fallstricke, die Zeit kosten, wenn man sie nicht kennt
  *
@@ -86,6 +66,7 @@ import { argv, cwd, env, exit } from "node:process";
 
 import {
   attachTo,
+  bereiteInstanzVor,
   Cdp,
   closeExtraLeaves,
   openExisting,
@@ -108,7 +89,8 @@ const REPO_NAME = "epub-exporter";
 const PLUGIN_ID = "epub-exporter";
 /** Vault-Name = Repo-Name. Der Filter in `attachTo` haengt daran. */
 const VAULT_NAME = REPO_NAME;
-const PORT = Number(env.CDP_PORT ?? 9222);
+/** Pflicht: `--port` oder `CDP_PORT`; gesetzt in `main()`. Kein Default 9222 (regulaere Instanz). */
+let PORT = 0;
 
 const REPO_ROOT = cwd();
 const OUT_DIR = join(REPO_ROOT, "docs", "images");
@@ -212,14 +194,9 @@ async function schliesseUeberlagerungen(cdp: Cdp): Promise<void> {
  * und keine Messung haette das gezeigt.
  */
 async function bereiteFensterVor(cdp: Cdp): Promise<boolean> {
-  // Vertrauensdialog: `app.plugins.setEnable(true)` hebt den eingeschraenkten Modus auf,
-  // schliesst aber den DIALOG nicht — er stand im ersten Lauf mitten im hero-Bild.
-  await cdp.evaluate(`
-    const knopf = [...document.querySelectorAll(".modal button")]
-      .find((b) => /vertrauen|trust/i.test(b.textContent || ""));
-    if (knopf) knopf.click();
-    return true;
-  `);
+  // Vertrauensdialog und Restricted Mode: `setEnable(true)` allein schliesst den DIALOG nicht
+  // (er stand im ersten Lauf mitten im hero-Bild) — die Bruecke erledigt beides.
+  await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID], nurVault: VAULT_NAME });
   await schliesseUeberlagerungen(cdp);
 
   const sprache = await cdp.evaluate<string>(`return document.documentElement.lang || (window.localStorage && localStorage.getItem("language")) || "en";`);
@@ -528,10 +505,8 @@ function setup(): void {
   console.log(`Aufnahme-Vault: ${vaultDir}`);
   for (const zeile of log) console.log(`  ${zeile}`);
   console.log(
-    "\nJetzt den Vault oeffnen — NICHT Obsidian beenden, falls es laeuft (Single-Instance,\n" +
-    "siehe Dateikopf). Zweites Fenster per IPC:\n" +
-    `  ipcRenderer.send("vault-open", ${JSON.stringify(vaultDir)})\n` +
-    "Danach: npm run shots",
+    "\nNaechster Schritt: Zweitinstanz mit eigenem Profil und Port auf diesen Vault starten (Dateikopf).\n" +
+    `Danach: npm run shots -- --port ${PORT}`,
   );
 }
 
@@ -612,6 +587,13 @@ async function aufnehmen(nur?: string): Promise<number> {
 async function main(): Promise<void> {
   const args = argv.slice(2);
   if (args.includes("--list")) return zeigeVertrag();
+  const portIdx = args.indexOf("--port");
+  const portText = (portIdx >= 0 ? args[portIdx + 1] : undefined) ?? env.CDP_PORT;
+  if (!portText || !Number.isInteger(Number(portText))) {
+    console.error("--port <port> fehlt (oder CDP_PORT). Kein Default: 9222 ist die regulaere Instanz.");
+    exit(2);
+  }
+  PORT = Number(portText);
   if (args.includes("--setup")) return setup();
 
   if (!existsSync(join(REPO_ROOT, "main.js"))) {

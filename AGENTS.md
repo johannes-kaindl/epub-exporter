@@ -136,10 +136,7 @@ wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht 
   als der asynchrone Rerender der Sidebar. Der Knopf überlebt dann einen Klick, den er im
   Gebrauch nicht überlebt, und S4 ist **grün am Falschen** (gemessen 2026-08-30: die
   Gegenprobe blieb 12/12 grün, obwohl der Fix ausgebaut war).
-- **Obsidian ist Single-Instance — nie blind beenden.** Läuft schon eines mit Debug-Port,
-  mitnutzen (eigenes Fenster per IPC `vault-open`, dann über den Vault-**Namen** anhängen).
-  Ein Beenden trifft die Instanz, an der andere Sessions arbeiten. Seit 2026-08-30 regelt das
-  ein Lock (`~/.claude/hooks/obsidian-cdp-lock.py acquire` / `release`).
+- **GUI-Smoke und Bildaufnahme laufen in einer Zweitinstanz, nie in der regulären — `--port` ist Pflicht.** Eigenes Profil (`/tmp/obs-test-epub-exporter`), eigener Port, Lock für diesen Port (`~/.claude/hooks/obsidian-cdp-lock.py acquire … --port <port>` / `release`); Rezept im Kopf von `scripts/gui-smoke.ts`. Die Bilanz zählt in vier Zuständen (`createBilanz`), Vertrauensdialog und Restricted Mode erledigt `bereiteInstanzVor`.
 
 ## Memory
 

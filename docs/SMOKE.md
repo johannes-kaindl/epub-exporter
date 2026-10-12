@@ -13,8 +13,8 @@ mehr; die Beschreibungen bleiben stehen, weil sie begruenden, was jeder Punkt pr
 
 ```bash
 npm run build
-npm run smoke:gui -- --setup          # Staging-Vault aus dem Fixture herstellen
-npm run smoke:gui -- --vault epub-exporter
+npm run smoke:gui -- --setup --port <port>   # Staging-Vault aus dem Fixture herstellen
+npm run smoke:gui -- --port <port>           # Lauf in der Zweitinstanz
 ```
 
 Der Lauf misst im **eigenen Staging-Vault** (`$STAGING_VAULTS_DIR/epub-exporter`), nicht im
@@ -24,13 +24,10 @@ dieselbe Nummer. Das Prüfmaterial ist das getrackte Fixture unter `docs/images/
 (dasselbe, aus dem die README-Bilder entstehen); was darüber hinaus gebraucht wird, legt der
 Treiber deterministisch selbst an und räumt es in den Papierkorb.
 
-> [!warning] Obsidian ist Single-Instance — niemals blind beenden
-> Läuft schon eines mit offenem Debug-Port, wird der Port **mitgenutzt**: eigenes Fenster per
-> `vault-open` über IPC, dann Anhängen über den Vault-**Namen**, nicht über die Reihenfolge.
-> Ein Beenden trifft die Instanz, an der andere Sessions arbeiten, und zerstört deren Zustand
-> — der eigene Lauf ist danach sauber grün, der Schaden entsteht woanders. Seit 2026-08-30
-> regelt das ein Lock (`~/.claude/hooks/obsidian-cdp-lock.py`), nicht mehr die Absprache
-> allein: vor dem Zugriff `acquire`, danach `release`.
+> [!warning] Zweitinstanz mit eigenem Profil und Port — niemals die reguläre Instanz beenden
+> Der Lauf geht in eine eigene Instanz: Profil `/tmp/obs-test-epub-exporter` (aktuelle `obsidian-*.asar` hineinkopieren, Vault und `"language":"en"` in `obsidian.json` eintragen), `--user-data-dir` und `--remote-debugging-port=<port>` setzen, vorher `lsof -nP -iTCP:<port> -sTCP:LISTEN` prüfen. `--port` ist Pflicht; ohne ihn bricht der Treiber mit Exit 2 ab, statt auf die reguläre Instanz (9222) zu greifen. Vertrauensdialog und Restricted Mode erledigt `bereiteInstanzVor` aus der zentralen Brücke. Ein Quit der regulären Instanz trifft die Sessions, die daran hängen. Vor dem Zugriff gilt der Lock für den eigenen Port (`~/.claude/hooks/obsidian-cdp-lock.py acquire … --port <port>`), danach `release`.
+>
+> Die Bilanz hat vier Zustände (CORE-TEST-19): grün · rot · übersprungen · nichts gemessen. Die Soll-Liste `PUNKTE` ist der Nenner, ein nie aufgezeichneter Punkt zählt als „nichts gemessen“ und setzt Exit 1; ein Abbruch ist Exit 2. C0 (Rest-Stub) und C1 (Buch-Notiz nach dem Lauf byte-gleich) zählen mit.
 
 ## Prüfpunkte
 

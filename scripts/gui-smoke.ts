@@ -13,32 +13,29 @@
  *
  * ## Ablauf
  *
+ * Gelaufen wird in einer **Zweitinstanz** mit eigenem Profil und eigenem Port (Dach-AGENTS
+ * § Staging-Vaults) — nie in der regulaeren Instanz, nie per Quit:
+ *
  * ```bash
  * npm run build
- * npm run smoke:gui -- --setup            # Staging-Vault aus dem Fixture herstellen
- * #   ... Vault-Fenster oeffnen (siehe unten), einmalig als vertrauenswuerdig markieren
- * npm run smoke:gui -- --vault epub-exporter
- * npm run smoke:gui -- --only S4          # einen Punkt nachziehen
- * npm run smoke:gui -- --list             # Vertrag anzeigen
+ * npm run smoke:gui -- --setup --port <port>   # Staging-Vault aus dem Fixture herstellen
+ * #   Profil UD=/tmp/obs-test-epub-exporter: aktuelle obsidian-*.asar hineinkopieren, Vault und
+ * #   "language":"en" in $UD/obsidian.json eintragen, mit --user-data-dir="$UD" und
+ * #   --remote-debugging-port=<port> starten (vorher: lsof -nP -iTCP:<port> -sTCP:LISTEN)
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label epub-exporter \
+ *   --intent "GUI-Smoke" --exclusive focus --port <port> --ttl 300
+ * npm run smoke:gui -- --port <port>           # Vertrauensdialog und Restricted Mode erledigt der Treiber
+ * npm run smoke:gui -- --port <port> --only S4 # einen Punkt nachziehen
+ * npm run smoke:gui -- --list                  # Vertrag anzeigen
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
  * ```
  *
- * ## ⚠️ Obsidian ist Single-Instance — NIEMALS blind beenden
+ * `--port` ist Pflicht (auch als `CDP_PORT` lesbar): ohne Angabe bricht der Treiber ab, statt
+ * auf die reguläre Instanz (9222) zu greifen. Je Messlauf ein frischer Prozess.
  *
- * An derselben Maschine arbeiten mehrere Sessions an **einer** Obsidian-Instanz. Ein
- * `quit` trifft sie alle und zerstoert Zustand, der nur im Speicher steht (offene Fenster,
- * laufende Indizierung, eine Messreihe). Der eigene Lauf ist danach sauber gruen — der
- * Schaden entsteht woanders und faellt nicht auf.
- *
- * Richtig ist Mitnutzen:
- *   1. Laeuft schon eines mit offenem Debug-Port? Dann diesen Port benutzen.
- *   2. Eigenes Fenster auf den Staging-Vault per IPC:
- *      `ipcRenderer.send("vault-open", "<vaultDir>")` — `--setup` gibt den Pfad aus.
- *   3. `attachTo("workspace", PORT, VAULT_NAME)` waehlt ueber den **Vault-Namen**, nicht
- *      ueber die Reihenfolge der Targets.
- *
- * Seit 2026-08-30 regelt das zusaetzlich ein Lock, nicht mehr die Absprache allein:
- * `python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label <name> --intent <text>`,
- * danach `release`. Wer ihn vergisst, wird von einem PreToolUse-Hook geblockt.
+ * Bilanz in vier Zustaenden (CORE-TEST-19, `tools/obsidian-cdp/bilanz.ts`): gruen · rot ·
+ * uebersprungen · nichts gemessen. `PUNKTE` ist der Nenner; ein nie aufgezeichneter Punkt
+ * zaehlt als „nichts gemessen“ und setzt Exit 1, ein Abbruch ist Exit 2.
  *
  * ## Fallen, die dieser Treiber bereits umgeht (alle real getreten)
  *
@@ -66,10 +63,11 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { argv, cwd, env, exit } from "node:process";
+import { argv, cwd, env } from "node:process";
 
 import {
   attachTo,
+  bereiteInstanzVor,
   Cdp,
   clickReal,
   closeExtraLeaves,
@@ -77,13 +75,21 @@ import {
   requireUntil,
   requireVisible,
 } from "../../tools/obsidian-cdp/cdp.js";
+import { createBilanz, parseArgs, runDriver, Vorbedingung } from "../../tools/obsidian-cdp/bilanz.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const REPO_NAME = "epub-exporter";
 const PLUGIN_ID = "epub-exporter";
 /** Vault-Name = Repo-Name. Der Filter in `attachTo` haengt daran. */
 const VAULT_NAME = REPO_NAME;
-const PORT = Number(env.CDP_PORT ?? 9222);
+/** Pflicht: `--port` oder `CDP_PORT`; gesetzt in `main()`. Kein Default 9222 (reguläre Instanz). */
+let PORT = 0;
+
+/** Soll-Liste (Nenner der Bilanz). C0 und C1 rahmen die Pruefpunkte (Rest-Stub / Aufraeumprotokoll). */
+const PUNKTE = [
+  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "C1",
+] as const;
+type PunktId = (typeof PUNKTE)[number];
 
 const REPO_ROOT = cwd();
 const FIXTURE_DIR = join(REPO_ROOT, "docs", "images", "fixture");
@@ -632,7 +638,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
         // Der Writer darf komprimieren (natives CompressionStream); dann ist der Inhalt
         // hier nicht ohne Entpacker lesbar. Das ist kein Defekt, sondern eine Grenze
         // dieses Pruefpunkts — und sie gehoert benannt, nicht als Fehlschlag getarnt.
-        return "UEBERSPRUNGEN: XHTML liegt komprimiert vor, dieser Punkt liest nur unkomprimierte Eintraege";
+        throw new Vorbedingung("XHTML liegt komprimiert vor, dieser Punkt liest nur unkomprimierte Eintraege");
       }
       const gesamt = eintraege.map((e) => e.daten.toString("utf8")).join("\n");
       // Rueckwaerts entschaerfen statt vorwaerts escapen.
@@ -962,29 +968,23 @@ function setup(): void {
   console.log(`Staging-Vault: ${vaultDir}`);
   for (const zeile of log) console.log(`  ${zeile}`);
   console.log(
-    "\nJetzt den Vault oeffnen — NICHT Obsidian beenden, falls es laeuft (Single-Instance,\n" +
-    "siehe Dateikopf). Zweites Fenster per IPC:\n" +
-    `  ipcRenderer.send("vault-open", ${JSON.stringify(vaultDir)})\n` +
-    "Ein frisch geoeffnetes Fenster fragt einmalig nach Vertrauen und beantwortet bis zum\n" +
-    "Wegklicken KEINEN Aufruf — das sieht wie ein haengender Renderer aus.\n" +
-    "Danach: npm run smoke:gui",
+    "\nNaechster Schritt: Zweitinstanz mit eigenem Profil und Port auf diesen Vault starten (Dateikopf).\n" +
+    "Vertrauensdialog und Restricted Mode erledigt der Treiber selbst.\n" +
+    `Danach: npm run smoke:gui -- --port ${PORT}`,
   );
 }
 
-async function lauf(nur?: string): Promise<number> {
+async function lauf(nur?: string): Promise<void> {
   const cdp = await attachTo("workspace", PORT, VAULT_NAME);
   if (!cdp) {
-    console.error(
-      `Kein Obsidian-Fenster fuer Vault "${VAULT_NAME}" auf Port ${PORT}.\n` +
-      "Laeuft Obsidian mit offenem Debug-Port, und ist der Staging-Vault als Fenster offen?\n" +
-      "Siehe Dateikopf: der Vault wird per IPC geoeffnet, nicht durch einen Neustart.",
+    throw new Error(
+      `Kein Obsidian-Fenster fuer Vault "${VAULT_NAME}" auf Port ${PORT}. ` +
+      "Laeuft die Zweitinstanz (Profil, Port, Vault in obsidian.json — siehe Dateikopf)?",
     );
-    return 1;
   }
 
   const konsole: string[] = [];
-  let gruen = 0;
-  const rot: string[] = [];
+  const bilanz = createBilanz({ punkte: PUNKTE });
   let buchVorher: string | null = null;
 
   // Dieselbe Aufraeumarbeit wie im `finally` unten — als eigene Funktion, damit der
@@ -1007,16 +1007,13 @@ async function lauf(nur?: string): Promise<number> {
       await stelleAnbieterWiederHer(cdp);
       if (buchVorher !== null) {
         const jetzt = await leseDatei(cdp, BOOK);
-        console.log(
-          jetzt === buchVorher
-            ? `\nC1   Buch-Notiz nach dem Lauf: byte-gleich`
-            : `\nC1   ABWEICHUNG — die Buch-Notiz hat sich geaendert. Der Lauf sollte sie nicht anfassen.`,
-        );
-        if (jetzt !== buchVorher) rot.push("C1: Buch-Notiz nach dem Lauf nicht byte-gleich");
+        if (jetzt === buchVorher) bilanz.record("C1", true, "Buch-Notiz nach dem Lauf: byte-gleich");
+        else bilanz.record("C1", false, "die Buch-Notiz hat sich geaendert — der Lauf sollte sie nicht anfassen");
+      } else {
+        bilanz.unmeasured("C1", "Vorwert der Buch-Notiz wurde nicht gelesen (Lauf endete vorher)");
       }
     } catch (e) {
-      console.log(`\nC1   Aufraeumen fehlgeschlagen: ${(e as Error).message}`);
-      rot.push(`C1: Aufraeumen fehlgeschlagen — ${(e as Error).message}`);
+      bilanz.record("C1", false, `Aufraeumen fehlgeschlagen — ${(e as Error).message}`);
     }
   };
 
@@ -1037,6 +1034,9 @@ async function lauf(nur?: string): Promise<number> {
   try {
     await cdp.mitschnitt((zeile) => konsole.push(zeile));
     await requireVisible(cdp);
+    // Vertrauensdialog, Restricted Mode und Plugin-Ladung erledigt die Bruecke (frisches Profil).
+    const instanz = await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID], nurVault: VAULT_NAME, sprache: "en" });
+    console.log(`Instanz vorbereitet: ${instanz.hinweis}`);
     await closeExtraLeaves(cdp);
 
     const version = await ladePluginNeu(cdp);
@@ -1046,39 +1046,27 @@ async function lauf(nur?: string): Promise<number> {
     // ueberlebt einen per SIGINT/SIGTERM abgebrochenen frueheren Lauf, BEVOR dieser Lauf
     // selbst einen Stub setzt. Ohne diesen Punkt liest T1 den Rest als "echter Anbieter
     // installiert" und faellt still durch, statt den Rest zu melden.
-    process.stdout.write("C0   Kein liegen gebliebener Stub aus einem abgebrochenen frueheren Lauf … ");
-    const leftoverStub = await cdp.evaluate<boolean>(`return !!window.__epubStubGesetzt;`);
-    if (leftoverStub) {
-      await stelleAnbieterWiederHer(cdp);
-      console.log("ROT — Stub gefunden und entfernt (vermutlich Ctrl-C/Crash im vorigen Lauf vor dessen Aufraeumen; dieser Lauf faehrt normal weiter)");
-      rot.push("C0: liegen gebliebener Provider-Stub aus einem abgebrochenen frueheren Lauf");
-    } else {
-      console.log("ok");
-      gruen++;
-    }
+    await bilanz.punkt("C0", async () => {
+      const leftoverStub = await cdp.evaluate<boolean>(`return !!window.__epubStubGesetzt;`);
+      if (leftoverStub) {
+        await stelleAnbieterWiederHer(cdp);
+        bilanz.record("C0", false, "Stub gefunden und entfernt (vermutlich Ctrl-C/Crash im vorigen Lauf vor dessen Aufraeumen; dieser Lauf faehrt normal weiter)");
+      } else {
+        bilanz.record("C0", true, "kein liegen gebliebener Stub aus einem abgebrochenen frueheren Lauf");
+      }
+    });
 
     // Vorwert AUSSERHALB des try-Blocks der Pruefpunkte festhalten — C1 vergleicht dagegen.
     buchVorher = await leseDatei(cdp, BOOK);
 
     for (const punkt of PRUEFPUNKTE) {
       if (nur && punkt.id !== nur) continue;
-      process.stdout.write(`${punkt.id.padEnd(4)} ${punkt.was} … `);
-      try {
+      const id = punkt.id as PunktId;
+      await bilanz.punkt(id, async () => {
         await schliesseUeberlagerungen(cdp);
         const grund = await punkt.pruefe(cdp);
-        if (grund === null) {
-          console.log("ok");
-          gruen++;
-        } else if (grund.startsWith("UEBERSPRUNGEN")) {
-          console.log(grund);
-        } else {
-          console.log(`ROT — ${grund}`);
-          rot.push(`${punkt.id}: ${grund}`);
-        }
-      } catch (e) {
-        console.log(`FEHLER — ${(e as Error).message}`);
-        rot.push(`${punkt.id}: ${(e as Error).message}`);
-      }
+        bilanz.record(id, grund === null, grund ?? punkt.was);
+      });
     }
   } finally {
     // C1: Aufraeumen und das Ergebnis PROTOKOLLIEREN, nicht ihm vertrauen. Dieselbe Funktion
@@ -1094,38 +1082,30 @@ async function lauf(nur?: string): Promise<number> {
     for (const z of konsole.slice(0, 20)) console.log(`  ${z}`);
   }
 
-  // +1 fuer C0 (der Leftover-Stub-Check laeuft immer, ausserhalb von PRUEFPUNKTE, und nie
-  // unter --only — der ist an einen bestimmten Punkt gebunden, nicht an den Lauf-Anfang).
-  const gefahren = (nur ? 1 : PRUEFPUNKTE.length) + 1;
-  console.log(`\n${gruen}/${gefahren} gruen`);
-  if (rot.length) {
-    console.log("\nRot:");
-    for (const z of rot) console.log(`  ${z}`);
-    console.log(
-      "\nJeden roten Punkt EINZELN auseinandernehmen, nicht die Summe als Befundlage lesen.\n" +
-      "Beim ersten Lauf sind erfahrungsgemaess die meisten roten Punkte Treiberfehler,\n" +
-      "keine Produktfehler — das ist die eigentliche Leistung des ersten Laufs.",
-    );
-  }
-  return rot.length === 0 ? 0 : 1;
+  // Unter --only fehlen die uebrigen Punkte bewusst: sie zaehlen dann als „nichts gemessen“.
+  bilanz.abschluss();
 }
 
 async function main(): Promise<void> {
-  const args = argv.slice(2);
-  if (args.includes("--list")) return zeigeVertrag();
-  if (args.includes("--setup")) return setup();
+  const args = parseArgs(argv.slice(2));
+  if (args.has("list")) return zeigeVertrag();
+
+  const portText = args.value("port") ?? env.CDP_PORT;
+  if (!portText || !Number.isInteger(Number(portText))) {
+    throw new Error("--port <port> fehlt (oder CDP_PORT). Kein Default: 9222 ist die regulaere Instanz.");
+  }
+  PORT = Number(portText);
+
+  if (args.has("setup")) return setup();
 
   if (!existsSync(join(REPO_ROOT, "main.js"))) {
-    console.error("main.js fehlt — erst `npm run build`.");
-    exit(1);
+    throw new Error("main.js fehlt — erst `npm run build`.");
   }
-  const nurIdx = args.indexOf("--only");
-  const nur = nurIdx >= 0 ? args[nurIdx + 1] : undefined;
+  const nur = args.value("only");
   if (nur && !PRUEFPUNKTE.some((p) => p.id === nur)) {
-    console.error(`Unbekannter Pruefpunkt: ${nur}\nBekannt: ${PRUEFPUNKTE.map((p) => p.id).join(", ")}`);
-    exit(1);
+    throw new Error(`Unbekannter Pruefpunkt: ${nur}\nBekannt: ${PRUEFPUNKTE.map((p) => p.id).join(", ")}`);
   }
-  exit(await lauf(nur));
+  await lauf(nur);
 }
 
-void main();
+runDriver(main);
