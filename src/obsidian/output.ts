@@ -1,17 +1,9 @@
 // src/obsidian/output.ts
 import { App, Notice } from "obsidian";
 import { OutputDestination, resolveOutputPath, sanitizeBase } from "../core/output-path";
-import { t } from "../vendor/kit/i18n";
+import { getLang, t } from "../vendor/kit/i18n";
+import { SHARE_EXPORT_STRINGS_DE, SHARE_EXPORT_STRINGS_EN, shareExport } from "../vendor/kit-obsidian/share-export";
 import { vaultDirname } from "../vendor/kit/vault-path";
-
-// Runtime-only API surfaces not covered by the public Obsidian typings.
-interface ShareCapableNavigator {
-  canShare?: (data: { files: File[] }) => boolean;
-  share?: (data: { files: File[] }) => Promise<void>;
-}
-interface AppWithDefaultApp {
-  openWithDefaultApp?: (path: string) => Promise<void>;
-}
 
 const MIME = "application/epub+zip";
 
@@ -22,32 +14,13 @@ export async function writeEpub(
   ctx: { baseName: string; noteDir: string; customFolder: string; attachmentPath: string }
 ): Promise<{ savedPath: string | null }> {
   const adapter = app.vault.adapter;
-  const appExt = app as unknown as AppWithDefaultApp;
   const safe = `${sanitizeBase(ctx.baseName)}.epub`;
 
   if (dest === "share") {
-    const dir = ".epub-export";
-    const path = `${dir}/${safe}`;
-    if (await adapter.exists(dir)) {
-      const l = await adapter.list(dir);
-      for (const f of l.files) await adapter.remove(f);
-    } else {
-      await adapter.mkdir(dir);
-    }
-    await adapter.writeBinary(path, bytes.buffer as ArrayBuffer);
-    const fileObj = typeof File === "function" ? new File([bytes as BlobPart], safe, { type: MIME }) : null;
-    const nav = navigator as ShareCapableNavigator;
-    if (fileObj && nav.canShare?.({ files: [fileObj] }) && nav.share) {
-      try {
-        await nav.share({ files: [fileObj] });
-        new Notice(t("notice.shared"));
-        return { savedPath: null };
-      } catch (e) {
-        if (e instanceof Error && e.name === "AbortError") return { savedPath: null };
-      }
-    }
-    if (typeof appExt.openWithDefaultApp === "function") await appExt.openWithDefaultApp(path);
-    new Notice(t("notice.shared"));
+    // Writing, clearing the hidden folder (own old exports silently, anything else only after a question) and the
+    // hand-over (share sheet, else the default app) are the kit's `shareExport`; the notice texts stay ours.
+    const base = getLang() === "de" ? SHARE_EXPORT_STRINGS_DE : SHARE_EXPORT_STRINGS_EN;
+    await shareExport(app, bytes, { dir: ".epub-export", fileName: safe, mime: MIME, strings: { ...base, done: t("notice.shared") } });
     return { savedPath: null };
   }
 

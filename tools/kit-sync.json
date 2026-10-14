@@ -6,6 +6,6 @@
   "targets": [
     { "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/pure", "modules": ["crc32", "filename-template", "i18n", "settings"] },
     { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["vault-path"] },
-    { "dir": "src/vendor/kit-obsidian", "source": "obsidian-kit", "from": "src/obsidian", "modules": ["settings_walker", "folder-suggest", "help-setting"] }
+    { "dir": "src/vendor/kit-obsidian", "source": "obsidian-kit", "from": "src/obsidian", "modules": ["settings_walker", "folder-suggest", "help-setting", "share-export", "confirm"] }
   ]
 }
