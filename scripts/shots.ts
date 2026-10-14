@@ -71,6 +71,7 @@ import {
   closeExtraLeaves,
   openExisting,
   requireUntil,
+  schliesseDialog,
   setAppConfig,
 } from "../../tools/obsidian-cdp/cdp.js";
 import {
@@ -171,10 +172,9 @@ async function openBook(cdp: Cdp, mode: "preview" | "source" = "preview"): Promi
  * sein Vorgaenger hatte aufgeraeumt, was er nicht aufraeumte.
  */
 async function schliesseUeberlagerungen(cdp: Cdp): Promise<void> {
+  // Schliessen-Knopf in beiden Formen (`.modal-close-button` bis 1.12, `.modal-header-button` ab 1.14).
+  await schliesseDialog(cdp, { escapeRueckfall: false });
   await cdp.evaluate(`
-    // Obsidians eigener Weg zuerst — er raeumt auch den internen Stapel auf.
-    while (app.workspace.activeEditor?.app?.modal) break;
-    document.querySelectorAll(".modal-close-button").forEach((b) => b.click());
     document.querySelectorAll(".menu").forEach((m) => m.remove());
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await new Promise((r) => setTimeout(r, 250));
