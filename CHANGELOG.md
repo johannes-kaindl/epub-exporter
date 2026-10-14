@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-14
+
 ### Added
 
 - Settings, "Custom folder": the field now suggests the vault's folders while you type (it was a bare text field).
