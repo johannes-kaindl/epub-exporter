@@ -56,6 +56,7 @@ import {
   beimAbbruch,
   clearNotices,
   clickReal,
+  bereiteInstanzVor,
   closeExtraLeaves,
   installiereAbbruch,
   istAbgebrochen,
@@ -106,8 +107,10 @@ interface Pruefpunkt {
    *  der Minuten kostet, wird sonst nicht mehr gefahren, und dann misst er gar nichts. */
   nurMitGpu?: boolean;
   /** `null` bei Erfolg, sonst der Grund im Klartext — eine Bilanzzeile ohne Eingabe und
-   *  Antwort blockiert die Fehlersuche (CORE-TEST-14). */
-  pruefe: (cdp: Cdp) => Promise<string | null>;
+   *  Antwort blockiert die Fehlersuche (CORE-TEST-14). `{ uebersprungen }` heisst: der Gegenstand
+   *  steht in dieser Lage nicht zur Verfuegung (etwa fehlende Assets im Profil); das ist weder
+   *  gruen noch rot und setzt keinen Exit 1. */
+  pruefe: (cdp: Cdp) => Promise<string | null | { uebersprungen: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -660,7 +663,8 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       const status = await setzeLigModus(cdp, { engine: "builtin", builtinModel: "sd-turbo" });
       if (status.ready !== true) {
         await setzeLigModus(cdp, { engine: "server", endpoint: ENDPOINT });
-        return `Der builtin-Modus ist hier nicht bereit (${String(status.reason)}) — dieser Punkt braucht die heruntergeladenen Assets im Profil`;
+        // Nicht rot: dass die Assets im Profil fehlen, ist eine Eigenschaft der Lage, nicht des Prueflings.
+        return { uebersprungen: `Der builtin-Modus ist hier nicht bereit (${String(status.reason)}) — dieser Punkt braucht die heruntergeladenen Assets im Profil` };
       }
       await oeffnePanel(cdp);
       await schreibeE2EBuch(cdp);
@@ -904,6 +908,7 @@ async function lauf(nur?: string, mitGpu = false): Promise<number> {
   const konsole: string[] = [];
   let gruen = 0;
   const rot: string[] = [];
+  const uebersprungen: string[] = [];
 
   // Dieses Skript hat keinen `runDriver`: die Signale haengt es selbst ein (Bruecke, README § Abbruch).
   // Was der Lauf am Wirt aendert (Spy, Server-Modus des Nachbarn, Notiz/Buch/Titelbild, der selbst gestartete
@@ -940,6 +945,9 @@ async function lauf(nur?: string, mitGpu = false): Promise<number> {
     await cdp.mitschnitt((zeile) => konsole.push(zeile));
     await requireVisible(cdp);
     await closeExtraLeaves(cdp);
+    // Frisches Profil: Vertrauensdialog, Restricted Mode und beide Plugins aktivieren, bevor der erste Punkt misst.
+    const vorbereitet = await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID, LIG_ID], nurVault: VAULT_NAME, sprache: "en" });
+    if (vorbereitet.hinweis) console.log(`  ${vorbereitet.hinweis}`);
     await ladeBeideNeu(cdp);
 
     for (const punkt of PRUEFPUNKTE) {
@@ -954,6 +962,9 @@ async function lauf(nur?: string, mitGpu = false): Promise<number> {
         if (grund === null) {
           console.log("✓");
           gruen++;
+        } else if (typeof grund === "object") {
+          console.log("– uebersprungen");
+          uebersprungen.push(`${punkt.id}: ${grund.uebersprungen}`);
         } else {
           console.log("✗");
           rot.push(`${punkt.id}: ${grund}`);
@@ -970,7 +981,11 @@ async function lauf(nur?: string, mitGpu = false): Promise<number> {
     if (istAbgebrochen()) return 130;
   }
 
-  console.log(`\n${gruen}/${gruen + rot.length} Pruefpunkte gruen`);
+  console.log(`\n${gruen}/${gruen + rot.length} Pruefpunkte gruen${uebersprungen.length ? `, ${uebersprungen.length} uebersprungen` : ""}`);
+  if (uebersprungen.length) {
+    console.log("\nUebersprungen:");
+    for (const u of uebersprungen) console.log(`  – ${u}`);
+  }
   if (rot.length) {
     console.log("\nOffen:");
     for (const r of rot) console.log(`  ✗ ${r}`);
