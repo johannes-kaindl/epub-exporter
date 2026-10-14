@@ -93,7 +93,7 @@ let PORT = 0;
 
 /** Soll-Liste (Nenner der Bilanz). C0 und C1 rahmen die Pruefpunkte (Rest-Stub / Aufraeumprotokoll). */
 const PUNKTE = [
-  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "C1",
+  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "X1", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "C1",
 ] as const;
 type PunktId = (typeof PUNKTE)[number];
 
@@ -507,6 +507,73 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       `);
       if (datei) return `Das Ribbon hat exportiert — ${FIXTURE_EPUB} entstand, obwohl es nur die Sidebar oeffnen soll`;
       return null;
+    },
+  },
+  {
+    id: "X1",
+    was: "Teilen-Export fragt vor dem Loeschen fremder Dateien und behaelt sie bei „Nein“",
+    pruefe: async (cdp) => {
+      await schreibeSmokeBuch(cdp);
+      await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".markdown-reading-view")`);
+      const epub = `.epub-export/${SMOKE_BOOK_TITLE}.epub`;
+      // `openWithDefaultApp` wuerde auf dem Mac die Standard-App starten; fuer den Lauf ersetzt, danach zurueck.
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        window.__epubX1 = { dest: p.settings.outputDestination, open: app.openWithDefaultApp };
+        p.settings.outputDestination = "share";
+        app.openWithDefaultApp = async () => {};
+        const a = app.vault.adapter;
+        if (!(await a.exists(".epub-export"))) await a.mkdir(".epub-export");
+        await a.write(".epub-export/keep.txt", "meine Datei");
+        await a.write(".epub-export/old.epub", "alt");
+        return true;
+      `);
+      try {
+        await leereNotices(cdp);
+        await cdp.evaluate(`app.commands.executeCommandById("epub-exporter:export-epub"); return true;`);
+        // Die Rueckfrage ist ein Modal mit „Keep them“ — ohne sie waere der Export durchgelaufen und keep.txt weg.
+        const frage = await cdp.evaluate<string | null>(`
+          for (let i = 0; i < 40; i++) {
+            const m = document.querySelector(".modal-container .modal");
+            if (m && /keep\s+them/i.test(m.textContent || "")) return m.textContent;
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          return null;
+        `);
+        if (frage === null) {
+          const lage = await cdp.evaluate<string>(`
+            const a = app.vault.adapter;
+            return JSON.stringify({
+              notices: [...document.querySelectorAll(".notice")].map((n) => n.textContent),
+              dateien: (await a.list(".epub-export")).files,
+              aktiv: app.workspace.getActiveFile()?.path ?? null,
+            });
+          `);
+          return `Keine Rueckfrage erschienen — die fremde Datei wurde ungefragt behandelt (Lage: ${lage})`;
+        }
+        if (!frage.includes("keep.txt")) return `Die Rueckfrage nennt die Datei nicht: ${JSON.stringify(frage)}`;
+        await cdp.evaluate(`
+          const b = [...document.querySelectorAll(".modal-container .modal button")].find((x) => /keep\s+them/i.test(x.textContent || ""));
+          b.click();
+          return true;
+        `);
+        await requireUntil(cdp, `(async () => await app.vault.adapter.exists(${JSON.stringify(epub)}))()`, "Der Export lief nach „Nein“ nicht weiter");
+        const stand = await cdp.evaluate<{ keep: boolean; old: boolean }>(`
+          const a = app.vault.adapter;
+          return { keep: await a.exists(".epub-export/keep.txt"), old: await a.exists(".epub-export/old.epub") };
+        `);
+        if (!stand.keep) return "keep.txt wurde trotz „Nein“ geloescht";
+        if (stand.old) return "Der eigene alte Export old.epub blieb stehen (haette still ersetzt werden muessen)";
+        return null;
+      } finally {
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          if (window.__epubX1) { p.settings.outputDestination = window.__epubX1.dest; app.openWithDefaultApp = window.__epubX1.open; delete window.__epubX1; }
+          const a = app.vault.adapter;
+          if (await a.exists(".epub-export")) await a.rmdir(".epub-export", true);
+          return true;
+        `).catch(() => undefined);
+      }
     },
   },
   {

@@ -78,7 +78,8 @@ const FIXTURE_DIR = join(REPO_ROOT, "docs", "images", "fixture");
 
 /** Das Nachbarplugin — Anbieter der Provider-API v1. */
 const LIG_ID = "local-image-generator";
-const LIG_REPO = join(REPO_ROOT, "..", LIG_ID);
+/** Der Nachbar-Baum: Standard ist das Nachbar-Repo; `LIG_REPO=<pfad>` nimmt einen eigenen Klon (der Arbeitsbaum des Nachbarn ist oft im Umbau). */
+const LIG_REPO = env.LIG_REPO ?? join(REPO_ROOT, "..", LIG_ID);
 const MOCK_PORT = Number(env.MOCK_PORT ?? 7861);
 const ENDPOINT = `http://127.0.0.1:${MOCK_PORT}`;
 
