@@ -2,6 +2,7 @@
 import { App, Plugin, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import { EpubExporterSettings } from "./settings";
 import { t } from "../vendor/kit/i18n";
+import { readImageApi } from "./image-api";
 import { renderSettingDefinitions } from "../vendor/kit-obsidian/settings_walker";
 import { githubHelpUrls, helpSettingDefinition } from "../vendor/kit-obsidian/help-setting";
 
@@ -28,6 +29,7 @@ export class EpubSettingTab extends PluginSettingTab {
       }),
       {
         name: t("settings.output.name"),
+        desc: t("settings.output.desc"),
         control: {
           type: "dropdown",
           key: "outputDestination",
@@ -48,7 +50,7 @@ export class EpubSettingTab extends PluginSettingTab {
         // walks this same definitions list.
         name: t("settings.customFolder.name"),
         desc: t("settings.customFolder.desc"),
-        control: { type: "text", key: "customFolder" },
+        control: { type: "folder", key: "customFolder" },
       },
       {
         // Dropdown, not free text: only the languages the plugin ships UI
@@ -77,6 +79,11 @@ export class EpubSettingTab extends PluginSettingTab {
             move: t("settings.consolidateChapter.move"),
           },
         },
+      },
+      {
+        // No control: this row only says why the cover command and button are there or missing.
+        name: t("settings.cover.name"),
+        desc: readImageApi(this.app) ? t("settings.cover.available") : t("settings.cover.missing"),
       },
       {
         name: t("settings.consolidateAsset.name"),

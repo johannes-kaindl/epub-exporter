@@ -6,7 +6,14 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Settings, "Custom folder": the field now suggests the vault's folders while you type (it was a bare text field).
+- Settings: the "Output destination" setting explains the options, including what "Share" leaves behind (a hidden `.epub-export` folder). A new "Cover generation" row says whether the "Generate cover" command and button are available, and if not, that they need the Local Image Generator plugin.
+
 ### Changed
+
+- **"Share" no longer deletes files you put into `.epub-export`.** Before every export that hidden folder was emptied without asking. Now your own earlier exports (`.epub` files) are replaced silently, and any other file or folder in it is deleted only after you answer a question; if you say no, it stays and the export still runs. If sharing fails, you get a message instead of nothing.
 
 - Internal only, nothing changes for readers: the Kit pins move to obsidian-kit 0.60.2 and code-kit 0.27.1; the vendored modules change only in their origin header. The CRC-32 of the EPUB zip writer and the file-name cleaning (`sanitizeBase`, fallback "Untitled") now come from the shared code-kit modules `crc32` and `filename-template` instead of local copies; both behave exactly as before. The `i18n` and `settings` modules move from obsidian-kit to code-kit with unchanged exports. The vendored settings helper gains `installTabRefreshOnOpen` (not used here).
 

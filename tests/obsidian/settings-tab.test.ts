@@ -50,11 +50,34 @@ describe("EpubSettingTab.getSettingDefinitions", () => {
   test("uses the right control type per setting", () => {
     const tab = makeTab().tab;
     expect(byKey(tab, "outputDestination").control?.type).toBe("dropdown");
-    expect(byKey(tab, "customFolder").control?.type).toBe("text");
+    // A folder control: the text field with the vault folder suggestions (kit FolderSuggest), not a bare text field.
+    expect(byKey(tab, "customFolder").control?.type).toBe("folder");
     expect(byKey(tab, "defaultLanguage").control?.type).toBe("dropdown");
     expect(byKey(tab, "openSidebarOnStartup").control?.type).toBe("toggle");
     expect(byKey(tab, "consolidateChapterMode").control?.type).toBe("dropdown");
     expect(byKey(tab, "consolidateAssetMode").control?.type).toBe("dropdown");
+  });
+
+  test("explains the output destination, including what Share leaves behind", () => {
+    registerI18n(); setLang("en");
+    const tab = makeTab().tab;
+    const desc = byKey(tab, "outputDestination").desc ?? "";
+    expect(desc).toMatch(/Share/);
+    expect(desc).toMatch(/\.epub-export/);
+  });
+
+  test("tells why the cover command is missing without the image generator, and that it is there with it", () => {
+    registerI18n(); setLang("en");
+    const without = defs(makeTab().tab).find((d) => d.name === "Cover generation");
+    expect(without?.desc).toMatch(/Local Image Generator/);
+    expect(without?.desc).toMatch(/not available/i);
+    const withApi = new EpubSettingTab(
+      { plugins: { plugins: { "local-image-generator": { api: { apiVersion: 1, status: () => ({}), generate: () => ({}) } } } } } as unknown as App,
+      { settings: { ...DEFAULT_SETTINGS }, saveSettings: async () => {} },
+    );
+    const row = defs(withApi).find((d) => d.name === "Cover generation");
+    expect(row?.desc).toMatch(/available/i);
+    expect(row?.desc).not.toMatch(/not available/i);
   });
 
   test("offers all four output destinations", () => {
