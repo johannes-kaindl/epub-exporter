@@ -52,9 +52,10 @@
  *    Produktfehler aus (llm-lab, 2026-08-30). Gemessen wird die entstandene Datei und der
  *    Dateiinhalt der Buch-Notiz.
  * 4. **Ein Deploy laedt das Plugin nicht neu.** Der Vault-Plugin-Ordner ist eine Kopie,
- *    kein Symlink; ein veralteter Build maskiert sich als Code-Bug. `ladePluginNeu()` holt
- *    das nach — inklusive `loadManifests`, sonst bleibt die Versionsangabe der Stand vom
- *    App-Start (json_viewer, 2026-08-22).
+ *    kein Symlink; ein veralteter Build maskiert sich als Code-Bug. `ladePluginNeu()` der
+ *    Bruecke holt das nach — inklusive `loadManifests`, sonst bleibt die Versionsangabe der
+ *    Stand vom App-Start (json_viewer, 2026-08-22) — und prueft mit `repoMainJs` vorher, dass
+ *    der Build im Vault der gebaute Repo-Stand ist (`requireEigenerBuild`, CORE-TEST-08 a).
  * 5. **Schreibende Pruefpunkte fassen die Fixture-Buch-Notiz nicht an.** R1–R3 und E1–E3
  *    laufen gegen eine eigene, zur Laufzeit angelegte Smoke-Buch-Notiz. Sonst waeren die
  *    README-Bilder an das Aufraeumen dieses Treibers gekoppelt — zwei Werkzeuge, ein
@@ -67,13 +68,18 @@ import { argv, cwd, env } from "node:process";
 
 import {
   attachTo,
+  beimAbbruch,
   bereiteInstanzVor,
   Cdp,
+  clearNotices,
   clickReal,
   closeExtraLeaves,
+  istAbgebrochen,
+  ladePluginNeu,
   openExisting,
   requireUntil,
   requireVisible,
+  schliesseDialog,
 } from "../../tools/obsidian-cdp/cdp.js";
 import { createBilanz, parseArgs, runDriver, Vorbedingung } from "../../tools/obsidian-cdp/bilanz.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -220,34 +226,13 @@ async function inDenPapierkorb(cdp: Cdp, pfade: string[]): Promise<void> {
   `);
 }
 
-/**
- * Plugin neu laden, ohne Obsidian anzufassen.
- *
- * `loadManifests` gehoert dazu: Obsidian liest die Manifeste beim **App-Start**, und
- * `enablePlugin` allein laedt zwar `main.js` neu, aber nicht die Versionsangabe. Ein
- * Treiber, der `plugin.manifest.version` meldet, meldet sonst den Stand von vorhin — eine
- * Zahl, die genau dann irrefuehrt, wenn man ihr glaubt (json_viewer, 2026-08-22).
- */
-async function ladePluginNeu(cdp: Cdp): Promise<string> {
-  return cdp.evaluate<string>(`
-    const id = ${JSON.stringify(PLUGIN_ID)};
-    await app.plugins.disablePlugin(id);
-    await app.plugins.loadManifests();
-    await app.plugins.enablePlugin(id);
-    await new Promise((r) => setTimeout(r, 500));
-    // Die Version aus der DEPLOYTEN Datei lesen, nicht aus dem Manifest im Speicher.
-    const pfad = app.vault.configDir + "/plugins/" + id + "/manifest.json";
-    const roh = await app.vault.adapter.read(pfad);
-    return JSON.parse(roh).version;
-  `);
-}
-
 /** Alle Overlays schliessen — vor jedem Punkt, nicht nur nach dem, der eines geoeffnet hat.
  *  Ein stehengebliebenes Modal laesst den NAECHSTEN Punkt scheitern, und der Fehlschlag
  *  zeigt dann auf den falschen Pruefpunkt. */
 async function schliesseUeberlagerungen(cdp: Cdp): Promise<void> {
+  // Schliessen-Knopf in beiden Formen (`.modal-close-button` bis 1.12, `.modal-header-button` ab 1.14).
+  await schliesseDialog(cdp, { escapeRueckfall: false });
   await cdp.evaluate(`
-    document.querySelectorAll(".modal-close-button").forEach((b) => b.click());
     document.querySelectorAll(".menu").forEach((m) => m.remove());
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await new Promise((r) => setTimeout(r, 250));
@@ -259,12 +244,7 @@ async function schliesseUeberlagerungen(cdp: Cdp): Promise<void> {
  *  Vault schreibt hinein, und ein fremder Text, der zufaellig passt, macht einen
  *  Pruefpunkt **gruen am Falschen**. */
 async function leereNotices(cdp: Cdp): Promise<void> {
-  await cdp.evaluate(`
-    const docs = new Set([document]);
-    if (typeof activeDocument !== "undefined" && activeDocument) docs.add(activeDocument);
-    for (const d of docs) d.querySelectorAll(".notice").forEach((n) => n.remove());
-    return true;
-  `);
+  await clearNotices(cdp);
 }
 
 /** Auf eine Datei im Vault warten und ihren Pfad im Dateisystem liefern. */
@@ -990,13 +970,11 @@ async function lauf(nur?: string): Promise<void> {
   if (nur) console.log(`Teillauf: ${nur}, ${soll.length} von ${PUNKTE.length} Punkten im Soll`);
   let buchVorher: string | null = null;
 
-  // Dieselbe Aufraeumarbeit wie im `finally` unten — als eigene Funktion, damit der
-  // SIGINT/SIGTERM-Handler sie aufrufen kann, ohne Code zu duplizieren. Ein Ctrl-C mitten
-  // im Lauf ueberspringt das `finally` NICHT (try/catch-Semantik), sondern beendet den
-  // Node-Prozess sofort — ohne eigenen Handler bleibt der Stub am Plugin-Register haengen
-  // (er ueberlebt einen Abbruch mitten in T2/T3 und liesse T1 beim naechsten Lauf gruen
-  // aussehen, ohne seinen Gegenstand zu beruehren — derselbe Fall, den der Kommentar bei
-  // C1 fuer einen regulaeren Abbruch bereits beschreibt), ebenso die Papierkorb-Dateien.
+  // Die Aufraeumarbeit als eigene Funktion, damit Normalweg (`finally`) und Abbruch denselben Schritt
+  // fahren. Ohne Abbruch-Behandlung bliebe der Stub am Plugin-Register haengen (er ueberlebt einen
+  // Abbruch mitten in T2/T3 und liesse T1 beim naechsten Lauf gruen aussehen, ohne seinen Gegenstand
+  // zu beruehren — derselbe Fall, den der Kommentar bei C1 fuer einen regulaeren Abbruch bereits
+  // beschreibt), ebenso die Papierkorb-Dateien.
   const cleanupState = async (): Promise<void> => {
     try {
       await inDenPapierkorb(cdp, [
@@ -1020,19 +998,11 @@ async function lauf(nur?: string): Promise<void> {
     }
   };
 
-  let signalCleanupRunning = false;
-  const onAbortSignal = (signal: NodeJS.Signals) => {
-    if (signalCleanupRunning) return;
-    signalCleanupRunning = true;
-    void (async () => {
-      console.log(`\n\nAbbruch durch ${signal} — raeume Smoke-Zustand auf...`);
-      await cleanupState();
-      cdp.close();
-      process.exit(130);
-    })();
-  };
-  process.on("SIGINT", onAbortSignal);
-  process.on("SIGTERM", onAbortSignal);
+  // Alles, was dieser Lauf am Wirt aendert, raeumt EIN Schritt zurueck: der Normalweg im `finally`
+  // (`zustand.schliesse()`) und Ctrl-C/SIGTERM ueber das Abbruch-Modul der Bruecke (Hauptzweig gesperrt,
+  // Schritt darf noch senden, danach Bilanz, Exit 130). Idempotent und ohne Warten. Angemeldet VOR der
+  // ersten Mutation.
+  const zustand = beimAbbruch(cleanupState, "Stub, Smoke-Dateien und Anbieter zurueckstellen, Buch-Notiz pruefen");
 
   try {
     await cdp.mitschnitt((zeile) => konsole.push(zeile));
@@ -1042,8 +1012,10 @@ async function lauf(nur?: string): Promise<void> {
     console.log(`Instanz vorbereitet: ${instanz.hinweis}`);
     await closeExtraLeaves(cdp);
 
-    const version = await ladePluginNeu(cdp);
-    console.log(`Plugin ${PLUGIN_ID} ${version} (aus der deployten manifest.json)\n`);
+    const neu = await ladePluginNeu(cdp, PLUGIN_ID, { repoMainJs: join(REPO_ROOT, "main.js") });
+    if (!neu.geladen) throw new Error(`Plugin ${PLUGIN_ID} nicht aktiv — ${neu.hinweis}`);
+    if (!neu.aktuell) throw new Error(neu.hinweis);
+    console.log(`${neu.hinweis}\n`);
 
     // `window.__epubStubGesetzt` haengt am Plugin-Register, nicht an einer Datei — es
     // ueberlebt einen per SIGINT/SIGTERM abgebrochenen frueheren Lauf, BEVOR dieser Lauf
@@ -1072,11 +1044,10 @@ async function lauf(nur?: string): Promise<void> {
       });
     }
   } finally {
-    // C1: Aufraeumen und das Ergebnis PROTOKOLLIEREN, nicht ihm vertrauen. Dieselbe Funktion
-    // wie der SIGINT/SIGTERM-Handler oben — kein Doppelcode.
-    process.off("SIGINT", onAbortSignal);
-    process.off("SIGTERM", onAbortSignal);
-    await cleanupState();
+    // C1: Aufraeumen und das Ergebnis PROTOKOLLIEREN, nicht ihm vertrauen. Derselbe Schritt wie im
+    // Abbruch (`zustand`) — kein Doppelcode.
+    await zustand.schliesse();
+    if (istAbgebrochen()) return;
     cdp.close();
   }
 
