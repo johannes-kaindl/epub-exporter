@@ -108,8 +108,8 @@ Per chapter: `chapter_title` overrides the title in the table of contents,
 
 | Setting | Default | Meaning |
 |---|---|---|
-| Output destination | Beside the note | Or: attachment folder, custom folder, or "Share / open in another app" (mobile) |
-| Custom folder | *(empty)* | Only used when the output destination is "Custom folder" |
+| Output destination | Beside the note | Or: attachment folder, custom folder, or "Share / open in another app" (mobile). "Share" writes the file to a hidden `.epub-export` folder in the vault, replacing your earlier exports there; anything else in that folder is deleted only after you confirm |
+| Custom folder | *(empty)* | Only used when the output destination is "Custom folder"; suggests vault folders as you type |
 | Default book language | `en` | Used when a book note has no language field |
 | Open sidebar on startup | off | Reveals the EPUB Exporter panel when Obsidian starts |
 | Consolidate: chapter files | Copy | Copy (keep originals) or move |

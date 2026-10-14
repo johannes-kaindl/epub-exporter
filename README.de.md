@@ -101,8 +101,8 @@ Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeic
 
 | Einstellung | Standard | Bedeutung |
 |---|---|---|
-| Ausgabeziel | Neben der Notiz | Oder: Anhang-Ordner, eigener Ordner, oder „Teilen / in anderer App öffnen" (Mobile) |
-| Eigener Ordner | *(leer)* | Nur wirksam, wenn das Ausgabeziel „Eigener Ordner" ist |
+| Ausgabeziel | Neben der Notiz | Oder: Anhang-Ordner, eigener Ordner, oder „Teilen / in anderer App öffnen" (Mobile). „Teilen" schreibt die Datei in einen versteckten Ordner `.epub-export` im Vault und ersetzt dort deine früheren Exporte; alles andere in diesem Ordner wird nur nach Rückfrage gelöscht |
+| Eigener Ordner | *(leer)* | Nur wirksam, wenn das Ausgabeziel „Eigener Ordner" ist; schlägt Vault-Ordner beim Tippen vor |
 | Standard-Buchsprache | `en` | Wird verwendet, wenn eine Buch-Notiz kein Sprachfeld hat |
 | Seitenleiste beim Start öffnen | aus | Blendet das EPUB-Exporter-Panel beim Start von Obsidian ein |
 | Konsolidieren: Kapiteldateien | Kopieren | Kopieren (Originale bleiben) oder Verschieben |
