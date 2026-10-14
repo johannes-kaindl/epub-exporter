@@ -535,7 +535,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
         const frage = await cdp.evaluate<string | null>(`
           for (let i = 0; i < 40; i++) {
             const m = document.querySelector(".modal-container .modal");
-            if (m && /keep\s+them/i.test(m.textContent || "")) return m.textContent;
+            if (m && /keep\\s+them|behalten/i.test(m.textContent || "")) return m.textContent;
             await new Promise((r) => setTimeout(r, 250));
           }
           return null;
@@ -553,7 +553,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
         }
         if (!frage.includes("keep.txt")) return `Die Rueckfrage nennt die Datei nicht: ${JSON.stringify(frage)}`;
         await cdp.evaluate(`
-          const b = [...document.querySelectorAll(".modal-container .modal button")].find((x) => /keep\s+them/i.test(x.textContent || ""));
+          const b = [...document.querySelectorAll(".modal-container .modal button")].find((x) => /keep\\s+them|behalten/i.test(x.textContent || ""));
           b.click();
           return true;
         `);
