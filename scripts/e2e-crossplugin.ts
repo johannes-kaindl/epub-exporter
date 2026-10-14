@@ -53,8 +53,12 @@ import { join } from "node:path";
 import { argv, cwd, env, exit } from "node:process";
 import {
   attachTo,
+  beimAbbruch,
+  clearNotices,
   clickReal,
   closeExtraLeaves,
+  installiereAbbruch,
+  istAbgebrochen,
   openExisting,
   requireUntil,
   requireVisible,
@@ -184,9 +188,9 @@ async function oeffneBuch(cdp: Cdp): Promise<void> {
 async function schliesseUeberlagerungen(cdp: Cdp): Promise<void> {
   await cdp.evaluate(`
     for (const el of document.querySelectorAll(".modal-container")) el.remove();
-    for (const el of document.querySelectorAll(".notice")) el.remove();
     return true;
   `);
+  await clearNotices(cdp);
 }
 
 /** Beide Plugins neu laden — der Hash-Guard sagt nichts darueber, was geladen IST. Nach
@@ -216,7 +220,7 @@ async function setzeLigModus(
     await p.saveData(p.settings);
     await app.plugins.disablePlugin(${JSON.stringify(LIG_ID)});
     await app.plugins.enablePlugin(${JSON.stringify(LIG_ID)});
-    await new Promise((r) => setTimeout(r, 800));
+    ${istAbgebrochen() ? "" : "await new Promise((r) => setTimeout(r, 800));"}
     return app.plugins.plugins[${JSON.stringify(LIG_ID)}].api.status();
   `);
 }
@@ -901,6 +905,36 @@ async function lauf(nur?: string, mitGpu = false): Promise<number> {
   let gruen = 0;
   const rot: string[] = [];
 
+  // Dieses Skript hat keinen `runDriver`: die Signale haengt es selbst ein (Bruecke, README § Abbruch).
+  // Was der Lauf am Wirt aendert (Spy, Server-Modus des Nachbarn, Notiz/Buch/Titelbild, der selbst gestartete
+  // Mock-Prozess), raeumt EIN Schritt zurueck: der Normalweg im `finally` und Ctrl-C. Idempotent, ohne Warten.
+  // Der Mock ist eine Mutation auf der Node-Seite, die das Modul nicht sperrt; sie steht deshalb im Schritt.
+  installiereAbbruch();
+  // Drei Schritte statt einem: jeder hat im Abbruch eine Frist von 1 s, und der Reload des Nachbarn ist der
+  // langsame. Sie laufen in UMGEKEHRTER Anmeldereihenfolge: zuerst Mock und Dateien (schnell, Node-seitig bzw.
+  // Papierkorb), dann der Spy, zuletzt der Server-Modus des Nachbarn. Gemessen: als ein Schritt wurde er vor
+  // dem Beenden des Mocks abgeschnitten (Mock-Prozess und Dateien blieben stehen).
+  const nachbarModus = beimAbbruch(async () => {
+    await setzeLigModus(cdp, { engine: "server", endpoint: ENDPOINT }).catch(() => ({}));
+  }, "Server-Modus des Nachbarn zuruecksetzen");
+  const spy = beimAbbruch(async () => {
+    await baueSpyZurueck(cdp).catch(() => "");
+  }, "Spy auf api.generate zurueckbauen");
+  const dateienUndMock = beimAbbruch(async () => {
+    if (mockProzess) {
+      mockProzess.kill();
+      mockProzess = null;
+    }
+    await inDenPapierkorb(cdp, [E2E_COVER, E2E_BOOK, E2E_CHAPTER]).catch(() => undefined);
+  }, "selbst gestarteten Mock beenden, Buch/Kapitel/Titelbild in den Papierkorb");
+  const zustand = {
+    schliesse: async (): Promise<void> => {
+      await dateienUndMock.schliesse();
+      await spy.schliesse();
+      await nachbarModus.schliesse();
+    },
+  };
+
   try {
     await starteMockFallsNoetig();
     await cdp.mitschnitt((zeile) => konsole.push(zeile));
@@ -930,15 +964,10 @@ async function lauf(nur?: string, mitGpu = false): Promise<number> {
       }
     }
   } finally {
-    // Aufraeumen auch nach einem Abbruch: der Spy haengt am Plugin-Objekt und ueberlebt
-    // jeden Treiberfehler, der Mock ist ein Prozess.
-    await baueSpyZurueck(cdp).catch(() => "");
-    await setzeLigModus(cdp, { engine: "server", endpoint: ENDPOINT }).catch(() => ({}));
-    await inDenPapierkorb(cdp, [E2E_COVER, E2E_BOOK, E2E_CHAPTER]).catch(() => undefined);
-    if (mockProzess) {
-      mockProzess.kill();
-      mockProzess = null;
-    }
+    // Aufraeumen auch nach einem Fehler: der Spy haengt am Plugin-Objekt und ueberlebt jeden
+    // Treiberfehler, der Mock ist ein Prozess. Nach Ctrl-C uebernimmt das Modul denselben Schritt.
+    await zustand.schliesse();
+    if (istAbgebrochen()) return 130;
   }
 
   console.log(`\n${gruen}/${gruen + rot.length} Pruefpunkte gruen`);
