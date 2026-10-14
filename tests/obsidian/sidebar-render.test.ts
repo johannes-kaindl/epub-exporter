@@ -43,7 +43,7 @@ describe("renderSidebar", () => {
     renderSidebar(
       root,
       { context: "book", title: "B", chapters: [], missingCount: 0, canReorder: false },
-      { onExport: () => exported++, onInsertFrontmatter: () => meta++, onConsolidate: () => {} }
+      { ...noop, onExport: () => { exported++; }, onInsertFrontmatter: () => { meta++; } }
     );
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
 
@@ -60,7 +60,7 @@ describe("renderSidebar", () => {
     renderSidebar(
       root,
       { context: "note", title: "Solo", chapters: [], missingCount: 0, canReorder: false },
-      { onExport: () => exported++, onInsertFrontmatter: () => {}, onConsolidate: () => {} }
+      { ...noop, onExport: () => { exported++; } }
     );
     const r = root as unknown as ReturnType<typeof makeFakeEl>;
 
@@ -93,6 +93,7 @@ describe("renderSidebar", () => {
     let consolidated = 0;
     const model = { context: "book" as const, title: "B", chapters: [], missingCount: 0, canReorder: false };
     renderSidebar(root as unknown as HTMLElement, model, {
+      ...noop,
       onExport() {},
       onInsertFrontmatter() {},
       onConsolidate() {
@@ -177,7 +178,7 @@ describe("renderSidebar · Kapitel umsortieren", () => {
     const calls: Array<[number, number, number]> = [];
     renderSidebar(root, twoChapterModel, {
       ...noop,
-      onReorder: (from, to, count) => calls.push([from, to, count]),
+      onReorder: (from, to, count) => { calls.push([from, to, count]); },
     });
     const rows = (root as unknown as ReturnType<typeof makeFakeEl>).findAll("epub-sb-chapter");
 
@@ -189,7 +190,7 @@ describe("renderSidebar · Kapitel umsortieren", () => {
   it("does not fire when a row is dropped on itself", () => {
     const root = makeFakeEl() as unknown as HTMLElement;
     let calls = 0;
-    renderSidebar(root, twoChapterModel, { ...noop, onReorder: () => calls++ });
+    renderSidebar(root, twoChapterModel, { ...noop, onReorder: () => { calls++; } });
     const rows = (root as unknown as ReturnType<typeof makeFakeEl>).findAll("epub-sb-chapter");
 
     rows[0].dispatch("dragstart");
@@ -266,28 +267,28 @@ describe("renderSidebar · Tastatur", () => {
 
   it("moves a row up with Alt+ArrowUp", () => {
     const calls: Array<[number, number, number]> = [];
-    const rows = rowsFor({ ...noop, onReorder: (f, t2, c) => calls.push([f, t2, c]) });
+    const rows = rowsFor({ ...noop, onReorder: (f, t2, c) => { calls.push([f, t2, c]); } });
     rows[1].dispatch("keydown", { key: "ArrowUp", altKey: true });
     expect(calls).toEqual([[1, 0, 3]]);
   });
 
   it("moves a row down with Alt+ArrowDown", () => {
     const calls: Array<[number, number, number]> = [];
-    const rows = rowsFor({ ...noop, onReorder: (f, t2, c) => calls.push([f, t2, c]) });
+    const rows = rowsFor({ ...noop, onReorder: (f, t2, c) => { calls.push([f, t2, c]); } });
     rows[1].dispatch("keydown", { key: "ArrowDown", altKey: true });
     expect(calls).toEqual([[1, 2, 3]]);
   });
 
   it("ignores the arrows without Alt", () => {
     let calls = 0;
-    const rows = rowsFor({ ...noop, onReorder: () => calls++ });
+    const rows = rowsFor({ ...noop, onReorder: () => { calls++; } });
     rows[1].dispatch("keydown", { key: "ArrowUp", altKey: false });
     expect(calls).toBe(0);
   });
 
   it("stays put at the edges", () => {
     let calls = 0;
-    const rows = rowsFor({ ...noop, onReorder: () => calls++ });
+    const rows = rowsFor({ ...noop, onReorder: () => { calls++; } });
     rows[0].dispatch("keydown", { key: "ArrowUp", altKey: true });
     rows[2].dispatch("keydown", { key: "ArrowDown", altKey: true });
     expect(calls).toBe(0);

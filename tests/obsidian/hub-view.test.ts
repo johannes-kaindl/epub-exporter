@@ -42,7 +42,7 @@ describe("EpubHubView re-render dedup (two-click guard)", () => {
     let i = 0;
     const bridge = {
       snapshot: async () => snaps[Math.min(i++, snaps.length - 1)],
-      handlers: { onExport: () => {}, onInsertFrontmatter: () => {} },
+      handlers: { onExport: () => {}, onInsertFrontmatter: () => {}, onConsolidate: () => {}, onReorder: () => {} },
     };
     return new EpubHubView(new WorkspaceLeaf() as never, bridge);
   }

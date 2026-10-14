@@ -97,7 +97,7 @@ describe("buildSidebarModel — cover capability", () => {
   });
 
   it("never reports the capability for a plain note", () => {
-    const noteSnap = { kind: "note" as const, title: "Just a note" };
+    const noteSnap = { kind: "note" as const, title: "Just a note", chapters: [] };
     expect(buildSidebarModel(noteSnap, { canGenerateCover: true }).canGenerateCover).toBe(false);
   });
 });
