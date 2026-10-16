@@ -1,7 +1,7 @@
 # AGENTS.md — epub-exporter
 
 > **Workspace-Standards (maintainer-lokal):** Die verbindliche Leitkonvention steht in `_docs/CONVENTIONS.md`
-> im Multi-Projekt-Workspace des Maintainers, `../../_docs` relativ zu diesem Repo — nicht Teil dieses Repos,
+> im Multi-Projekt-Workspace des Maintainers, `../../workspace/_docs` relativ zu diesem Repo — nicht Teil dieses Repos,
 > ignorieren falls im Klon nicht vorhanden. Modell comply-or-explain. Begründete Abweichungen
 > stehen unten unter „Abweichungen von der Leitkonvention".
 
@@ -145,7 +145,7 @@ wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht 
 `~/.claude/projects/<slug>/memory/` (Index: `MEMORY.md`) ist nur die **Zeiger-Schicht** aufs
 Cockpit — dauerhafte „Warum"-Erkenntnis gehört in Cockpit-§🧭, nicht als Dublette ins Memory.
 Session-Handoff unter `.remember/` (gitignored). Cross-project-Lektionen: `_docs/LESSONS.md`
-im Maintainer-Workspace (`../../_docs`, maintainer-lokal).
+im Maintainer-Workspace (`../../workspace/_docs`, maintainer-lokal).
 
 - **SDD-Artefakte (seit 2026-07-16): Cockpit, nicht Repo** — Specs/Plans/Task-Reports leben im
   Coding-Cockpit des Maintainers (`$VAULT/25_Coding/epub-exporter/_SDD/`, CORE-META-14, maintainer-lokal).
