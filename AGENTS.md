@@ -1,174 +1,80 @@
 # AGENTS.md — epub-exporter
 
-> **Workspace-Standards (maintainer-lokal):** Die verbindliche Leitkonvention steht in `_docs/CONVENTIONS.md`
-> im Multi-Projekt-Workspace des Maintainers, `../../workspace/_docs` relativ zu diesem Repo — nicht Teil dieses Repos,
-> ignorieren falls im Klon nicht vorhanden. Modell comply-or-explain. Begründete Abweichungen
-> stehen unten unter „Abweichungen von der Leitkonvention".
+> **Workspace-Standards (maintainer-lokal):** Die verbindliche Leitkonvention steht in `_docs/CONVENTIONS.md` im Multi-Projekt-Workspace des Maintainers, `../../workspace/_docs` relativ zu diesem Repo — nicht Teil dieses Repos, ignorieren falls im Klon nicht vorhanden. Modell comply-or-explain. Begründete Abweichungen stehen unten unter „Abweichungen von der Leitkonvention".
 
 Conventions for AI agents (Claude Code, Codex, …) working on this repository.
 
 ## Project character
 
-Obsidian-Plugin „EPUB Exporter": exportiert Markdown-Notizen als **EPUB3-Buch**. Die
-**Buch-Note ist die Single Source of Truth** — ein Letterhead-artiges Frontmatter-Set plus
-geordnete `![[embeds]]` als Kapitel-Spine, wodurch das Buch in Obsidians Lesemodus **live als
-fertiges Buch sichtbar** ist (das Alleinstellungsmerkmal ggü. einer reinen Link-Liste/MOC).
-Geschwister: **paperize** (→PDF) und **letterhead** (→Geschäftsbrief) — gleiches Profil,
-anderes Ausgabeformat.
+Obsidian-Plugin „EPUB Exporter": exportiert Markdown-Notizen als **EPUB3-Buch**. Die **Buch-Note ist die Single Source of Truth** — ein Letterhead-artiges Frontmatter-Set plus geordnete `![[embeds]]` als Kapitel-Spine, wodurch das Buch in Obsidians Lesemodus **live als fertiges Buch sichtbar** ist. Geschwister: **paperize** (→PDF) und **letterhead** (→Geschäftsbrief) — gleiches Profil, anderes Ausgabeformat.
 
 - **Plugin-ID:** `epub-exporter` (deployed unter `.obsidian/plugins/epub-exporter/`).
-- **TS + esbuild:** `main.js` ist ein Build-Artefakt (`.gitignore`) — von `npm run build`
-  bzw. der Release-Action aus `src/` erzeugt, **nicht** committet. `styles.css` **ist**
-  committet und **Installations-Pflicht** (Obsidian lädt es automatisch aus dem Plugin-Ordner).
+- **TS + esbuild:** `main.js` ist ein Build-Artefakt (`.gitignore`) — von `npm run build` bzw. der Release-Action aus `src/` erzeugt, **nicht** committet. `styles.css` **ist** committet und **Installations-Pflicht** (Obsidian lädt es automatisch aus dem Plugin-Ordner).
 
 ## Architecture principles
 
-- **Drei Schichten:** `src/core/*` (pur, Obsidian-frei, node-testbar) · `src/obsidian/*`
-  (Runtime-Shell, berührt die Obsidian-API) · `src/vendor/kit/*` (vendored pure Kit-Module:
-  `i18n`, `settings`, `vault-path`). **Den verbindlichen Stand nennt `src/vendor/kit/VENDOR.json`,
-  nicht diese Aufzählung** — eine Modulliste in der Prosa altert still. `npm run check:pure`
-  erzwingt, dass `src/core` + **`src/vendor/kit`** **kein** `obsidian` importieren (Muster fängt
-  beide Quote-Stile: `from "obsidian"` und `'obsidian'`). Ausdrücklich **nicht** geprüft wird
-  `src/vendor/kit-obsidian/` — dieser Ordner importiert `obsidian` bestimmungsgemäß und liegt
-  genau deshalb getrennt (Begründung in `src/vendor/kit-obsidian/VENDOR.json`).
-- **Dep-freie Engine — einfacher als PDF:** EPUB = XHTML+CSS im ZIP; Obsidian rendert MD→HTML
-  selbst. Kern: `dom-to-xhtml.ts` (Schwester zu paperizes `dom-to-ir`, gleiche
-  graceful-degradation — Unbekanntes wird vereinfacht, nicht abgebrochen; der Zähler treibt die
-  Sammel-Notice) + **eigener store-only ZIP-Writer** (`zip-writer.ts`, ~80 Zeilen, CRC-32 aus code-kit `crc32`,
-  mimetype-first-uncompressed, optional native `CompressionStream`) + `epub-builder.ts`. Der
-  ZIP-Writer ist **Original-Code, kein Vendor** — Zero-Dep-Ethos wie Letterheads/Paperizes
-  eigener PDF-Writer, **Kit-Kandidat** (REGISTRY).
-- **Kernmodell „Buch-Note als SSOT":** `frontmatter.ts` (DE/EN-Aliase, `isBookNote`,
-  `BOOK_FRONTMATTER_TEMPLATE`) + `spine-parser.ts` (`parseEmbedSpine`/`sortFolderChapters`). Der
-  **Entry-Point** bestimmt den Modus (Buch-Note / Einzelnote / Ordner) — **kein** globaler
-  Modus-Schalter. `chapter_title`/`epub_exclude` sind je-Kapitel-**Verfeinerung**, keine Auswahl.
-  **Kein Zwei-Wege-Sync** (bewusst out-of-scope, Komplexitäts-Sumpf).
-- **Code-Block-Hijack-Guard (`code-blocks.ts`):** `MarkdownRenderer.render` führt **alle**
-  registrierten Markdown-Prozessoren fremder Plugins aus → `<pre>` wird durch Widget-DOM ersetzt,
-  Originalcode nicht rekonstruierbar. Fenced-Code wird **vor** dem Rendern rausgezogen
-  (Platzhalter mit Leerzeilen isoliert — sonst geht er verloren, wenn ein Fence an einer
-  Textzeile klebt) und **nach** `dom-to-xhtml` wieder eingesetzt.
-- **Settings-Tab — deklarativ + `display()`-Fallback:** `getSettingDefinitions()` treibt auf
-  Obsidian **1.13+** Rendering **und** die Settings-Suche; `display()` bleibt als dokumentierter
-  **<1.13-Fallback** (obsidian.d.ts sanktioniert es explizit; `minAppVersion` ist **1.8.7**).
-  `getControlValue`/`setControlValue` sind überschrieben (Sprach-Coercion, `customFolder`-Trim,
-  Persistenz via `saveSettings`). **Load-bearing-Gotcha:** deklarative Rows **statisch** halten
-  (kein `visible`-Prädikat) — dynamische Sichtbarkeit bräuchte `refreshDomState`/`update`, die
-  **1.13-only** sind und das Store-Lint-Gate (`obsidianmd/no-unsupported-api`, **Error**) bei
-  minAppVersion 1.8.7 blockt. Kontext wandert stattdessen in einen `desc`-Hinweis; der
-  `display()`-Fallback behält für <1.13 die bedingte Zeile. `eslint.config.mjs` hält dafür einen
-  **file-scoped** `@typescript-eslint/no-deprecated: off` (nur für `settings-tab.ts`, weil das
-  behaltene `display()` deprecated-aber-sanktioniert ist). Bei minAppVersion > 1.13.0: `display()`
-  + Override retiren, Rows dürfen dann dynamisch werden.
-- **Sidebar = EIN kontextsensitives Panel:** bewusst **keine** Tab-Maschinerie wie die
-  Geschwister-Hubs (YAGNI). Pure Render-Fn (`sidebar-render.ts`/`sidebar-model.ts`) vom
-  `ItemView`-Mount (`hub-view.ts`) getrennt → node-testbar. Gotchas: `getMostRecentLeaf(rootSplit)`
-  statt `getActiveViewOfType` (Panel-Klick → sonst null); Model-Key-Memoisierung überspringt
-  redundanten Rerender bei `active-leaf-change` (sonst brauchen Buttons 2 Klicks); Opt-in-Autostart
-  hinter `onLayoutReady`.
-- **Test-Infra:** `tests/mocks/obsidian.ts` (minimaler Obsidian-Stand-in — `makeFakeEl`,
-  `ItemView`, `PluginSettingTab`/`Setting`-Stubs) + vitest `resolve.alias` → `src/`-Code, der
-  `"obsidian"` importiert, ist node-testbar. Der Mock ist **test-only**, nie aus `src/` importiert.
-- **SDD-Artefakte liegen im Coding-Cockpit, nicht hier** (CORE-META-12/14): Specs/Plans tragen
-  Arbeitskontext (Schwester-Repo-Interna, absolute Pfade). Das Repo behält die Design-Essenz —
-  diese Gotchas plus `CHANGELOG.md`. **Keine absoluten Pfade außerhalb des Repos** in committete
-  Dateien; im Zweifel Platzhalter (`<code-workspace>/…`, `$VAULT/…`).
+- **Drei Schichten:** `src/core/*` (pur, Obsidian-frei, node-testbar) · `src/obsidian/*` (Runtime-Shell) · `src/vendor/kit/*` (vendorte pure Kit-Module). `npm run check:pure` (ein `grep` in `package.json`, kein Script) verweigert `from "obsidian"` und `from 'obsidian'` in `src/core` und `src/vendor/kit`, kennt aber weder `import("obsidian")` noch `require` und schluckt Grep-Fehler; `src/vendor/kit-obsidian/` ist ausgenommen und trägt die Obsidian-gekoppelten Module. Den verbindlichen Stand nennt `src/vendor/kit/VENDOR.json`, nicht eine Aufzählung in der Prosa.
+- **Dep-freie Engine:** EPUB = XHTML+CSS im ZIP; `dom-to-xhtml.ts` degradiert Unbekanntes, statt abzubrechen; der ZIP-Writer (`zip-writer.ts`) ist Original-Code, kein Vendor.
+- **Buch-Note als SSOT:** Der **Entry-Point** bestimmt den Modus (Buch-Note / Einzelnote / Ordner) — **kein** globaler Modus-Schalter. **Kein Zwei-Wege-Sync** (bewusst out-of-scope).
+- **Sidebar = EIN kontextsensitives Panel**, keine Tab-Maschinerie.
+- **Settings-Tab deklarativ plus `display()`-Fallback:** deklarative Rows **statisch** halten, kein `visible`-Prädikat (Details in der Pfadregel).
+- Aufbau und Warum: `docs/internal/architecture.md`, `docs/internal/decisions.md`.
 
 ## Commands
 
 ```bash
 npm run typecheck   # tsc --noEmit
 npm test            # vitest run
-npm run check:pure  # verweigert 'obsidian'-Imports in src/core + src/vendor (beide Quote-Stile)
+npm run check:pure  # verweigert `from 'obsidian'`-Imports in src/core + src/vendor/kit (beide Quote-Stile)
 npm run lint        # check-no-inline-disables.mjs + eslint src (eslint-plugin-obsidianmd)
 npm run build       # esbuild --production → main.js (Build-Artefakt)
-npm run gate        # typecheck + test + check:pure + lint + build — vor jedem Commit/Release
-npm run smoke:gui   # GUI-Smoke gegen ein LAUFENDES Obsidian (docs/SMOKE.md, 15 Pruefpunkte)
+npm run gate        # typecheck + typecheck:test + typecheck:scripts + test + check:pure + lint + build — vor jedem Commit/Release
+npm run smoke:gui   # GUI-Smoke gegen ein LAUFENDES Obsidian (docs/SMOKE.md)
 npm run smoke:gui -- --setup   # Staging-Vault aus dem Fixture herstellen (einmal je Lauf-Runde)
-npm run smoke:e2e   # Naht-Lauf ueber die Plugin-Grenze zu local-image-generator (9 Punkte, +G1 mit --gpu)
+npm run smoke:e2e   # Naht-Lauf über die Plugin-Grenze zu local-image-generator (+G1 mit --gpu); NICHT im Gate
 npm run smoke:e2e -- --setup   # Staging-Vault + BEIDE Plugins deployen
+sh tools/sync-kit.sh # Kit neu vendoren (Pins in tools/kit-sync.json); --check vergleicht nur
 ```
 
-**Manuelles Deploy (kein `deploy`-Script):** frisch gebautes `main.js` (+ `manifest.json`/
-`styles.css` **nur bei Änderung**) nach `<vault>/.obsidian/plugins/epub-exporter/` kopieren,
-**dann Plugin neu laden** (aus-/einschalten oder Obsidian-Reload).
-**Gotcha (LESSONS.md 2026-07-23):** Der Vault-Plugin-Ordner ist eine **Kopie, kein Symlink** —
-ein `npm run build` erreicht das laufende Plugin **nicht** von selbst. Ein veralteter Build
-maskiert sich als Code-Bug (die GUI zeigt altes Verhalten statt zu erroren). Diagnose vor jeder
-Code-Interpretation: ein Symbol der Änderung im deployten Bundle greppen
-(`grep -c <symbol> <…>/main.js`).
+**Manuelles Deploy (kein `deploy`-Script):** frisch gebautes `main.js` (+ `manifest.json`/`styles.css` **nur bei Änderung**) nach `<vault>/.obsidian/plugins/epub-exporter/` kopieren, **dann Plugin neu laden** (aus-/einschalten oder Obsidian-Reload). **Gotcha:** Der Vault-Plugin-Ordner ist eine **Kopie, kein Symlink** — ein `npm run build` erreicht das laufende Plugin **nicht** von selbst. Ein veralteter Build maskiert sich als Code-Bug (die GUI zeigt altes Verhalten statt zu erroren). Diagnose vor jeder Code-Interpretation: ein Symbol der Änderung im deployten Bundle greppen (`grep -c <symbol> <…>/main.js`).
 
 ## Releasing
 
-Läuft über das **zentrale** Release-Tooling `../tools/release/` — dieses Repo hat **kein**
-eigenes `scripts/release.mjs` (es ist der erste Nutznießer des zentralen Toolings). `npm run
-version-bump` / `preflight` / `release` delegieren dorthin und **erroren mit lesbarer Meldung**,
-wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht release-fähig.**
-
-- Remotes: **Forgejo** `origin` (`jkaindl/epub-exporter`), **GitHub-Mirror**
-  (`johannes-kaindl/epub-exporter`) — der GitHub-Push triggert die Store-Release-Action.
-- **Store-Einreichung** übers Obsidian **Developer Dashboard** (community.obsidian.md) — der
-  PR-Flow gegen `obsidianmd/obsidian-releases` ist seit Mai 2026 retired (PROF-OBS-14).
+Läuft über das **zentrale** Release-Tooling `../tools/release/` — dieses Repo hat **kein** eigenes `scripts/release.mjs`. `npm run version-bump` / `preflight` / `release` delegieren dorthin und **erroren mit lesbarer Meldung**, wenn `../tools/release/` fehlt: **ein Clone ohne das Dach-Verzeichnis ist nicht release-fähig.** Mirror, Tag-Push, Store-Einreichung über das Developer Dashboard und Rescan: `../.claude/rules/release-und-store.md`.
 
 ## Conventions
 
-- Conventional Commits; SemVer-Tags **ohne** v-Präfix; nur berührte Dateien stagen.
-- `main.js` ist Build-Artefakt (`.gitignore`) — nicht committen.
-- **Store-Gate:** **kein** Inline-`// eslint-disable` in `src/` (erzwungen von
-  `scripts/check-no-inline-disables.mjs`, erster Schritt von `npm run lint`; der Store wertet es
-  als Error). Genuine Ausnahmen **nur** file-scoped in `eslint.config.mjs`, mit Begründung.
+- Conventional Commits; SemVer-Tags **ohne** v-Präfix; nur berührte Dateien stagen. Remotes: Forgejo `origin`; `github` (Store-Release-Action) bekommt Branch und Tag nur über `release.mjs`.
+- **Store-Gate:** **kein** Inline-`// eslint-disable` in `src/` (erzwungen von `scripts/check-no-inline-disables.mjs`, erster Schritt von `npm run lint`; der Store wertet es als Error). Genuine Ausnahmen **nur** file-scoped in `eslint.overrides.mjs`, mit Begründung.
 - i18n zweisprachig (EN/DE) in `src/i18n/strings.ts` — ein Parity-Test hält die Key-Mengen gleich.
+- **Keine absoluten Pfade außerhalb des Repos** in committete Dateien — Platzhalter nutzen (`$VAULT/…`, `~/…`, repo-relativ). Herkunftsnachweise als Repo-Name + `Datei:Zeile` sind erwünscht. Gate: `scripts/check-no-abs-paths.mjs` (Teil von `npm test`). SDD-Artefakte (Specs, Pläne) leben im Coding-Cockpit des Maintainers, nicht hier (CORE-META-12/14).
 - Workspace-weite Standards: `_docs/CONVENTIONS.md` im Maintainer-Workspace (siehe Kopf; maintainer-lokal).
 
 ## Gotchas
 
 - `main.js` **Build-Artefakt** (gitignored); `styles.css` dagegen committet + Installations-Pflicht.
 - **Stale-Build-Deploy:** Plugin-Ordner ist Kopie, kein Symlink (siehe Commands → Deploy).
-- **Settings:** deklarative Rows bei minAppVersion < 1.13 **statisch** halten (siehe Architecture).
 - **Release-Tooling zentral** (`../tools/release/`) — nicht lokal duplizieren.
-- **`smoke:e2e` gehoert NICHT ins Gate.** Er setzt `local-image-generator` echt installiert im
-  selben Staging-Vault voraus (aus dem Nachbar-Repo deployt, nicht aus dem Store) — genau das,
-  was `smoke:gui` bewusst nicht voraussetzt. Beide zusammen ergeben die Pruefung: T1–T3 messen
-  unsere Haelfte in jedem Durchgang, `smoke:e2e` die Naht, wenn der Nachbar da ist. Der
-  Titelbild-Stub in `gui-smoke.ts` bleibt deshalb, er wird nicht ersetzt.
-- **GUI-Smoke: der Klick braucht eine Haltedauer.** `clickReal(cdp, ausdruck, 200)` — ohne
-  den dritten Parameter gehen `mousePressed`/`mouseReleased` ohne Pause raus, also schneller
-  als der asynchrone Rerender der Sidebar. Der Knopf überlebt dann einen Klick, den er im
-  Gebrauch nicht überlebt, und S4 ist **grün am Falschen** (gemessen 2026-08-30: die
-  Gegenprobe blieb 12/12 grün, obwohl der Fix ausgebaut war).
-- **GUI-Smoke und Bildaufnahme laufen in einer Zweitinstanz, nie in der regulären — `--port` ist Pflicht.** Eigenes Profil (`/tmp/obs-test-epub-exporter`), eigener Port, Lock für diesen Port (`~/.claude/hooks/obsidian-cdp-lock.py acquire … --port <port>` / `release`); Rezept im Kopf von `scripts/gui-smoke.ts`. Die Bilanz zählt in vier Zuständen (`createBilanz`), Vertrauensdialog und Restricted Mode erledigt `bereiteInstanzVor`.
+
+## Context index
+
+- Bevor du Einstellungen oder den Settings-Tab änderst, oder `eslint.overrides.mjs` anfasst: `.claude/rules/settings-tab.md`.
+- Bevor du die Sidebar (`hub-view.ts`, `sidebar-*.ts`) änderst: `.claude/rules/sidebar.md`.
+- Bevor du Code-Blöcke, `dom-to-xhtml.ts` oder das Rendern der Kapitel anfasst: `.claude/rules/code-blocks.md`.
+- Bevor du den GUI-Smoke, den Naht-Lauf `smoke:e2e` oder `docs/SMOKE.md` änderst: `.claude/rules/gui-smoke.md`; Treiber-Regeln, Instanz und Lock des Dachs in `../.claude/rules/gui-smoke-treiber.md`, `../.claude/rules/obsidian-instanz.md`, `../.claude/rules/cdp-lock.md`.
+- Vor Änderungen an Modul-Layout, Engine oder Kernmodell: `docs/internal/architecture.md`.
+- Bevor du eine Altentscheidung (Buch-Note als SSOT, kein Zwei-Wege-Sync, eigener ZIP-Writer, statische Rows) übernimmst: `docs/internal/decisions.md`.
+- Vor einem Release oder Store-Rescan: `../.claude/rules/release-und-store.md`, Skills `plugin-release-setup` und `store-rescan`.
+- Vor UI-Arbeit: `../UI-STANDARD.md`, `../.claude/rules/ui-bausteine.md`; vor Änderungen an `styles.css`: `../.claude/rules/store-css.md`; vor README-Bildern: `../.claude/rules/readme-shots.md`.
 
 ## Memory
 
-**Das Coding-Cockpit ist die SSOT** für Stand/Warum/Entscheidungen/History:
-`$VAULT/25_Coding/epub-exporter/epub-exporter.md` (Pallas-Vault). Das Daemon-Memory unter
-`~/.claude/projects/<slug>/memory/` (Index: `MEMORY.md`) ist nur die **Zeiger-Schicht** aufs
-Cockpit — dauerhafte „Warum"-Erkenntnis gehört in Cockpit-§🧭, nicht als Dublette ins Memory.
-Session-Handoff unter `.remember/` (gitignored). Cross-project-Lektionen: `_docs/LESSONS.md`
-im Maintainer-Workspace (`../../workspace/_docs`, maintainer-lokal).
-
-- **SDD-Artefakte (seit 2026-07-16): Cockpit, nicht Repo** — Specs/Plans/Task-Reports leben im
-  Coding-Cockpit des Maintainers (`$VAULT/25_Coding/epub-exporter/_SDD/`, CORE-META-14, maintainer-lokal).
-  Sie tragen Arbeitskontext (Vault-Pfade, Schwester-Repo-Interna), der in einem public Repo niemandem nützt.
-  Das Repo behält die Design-Essenz in dieser Datei + `CHANGELOG.md`.
-- **Specs und Pläne** liegen im Vault-Cockpit unter `_SDD/` (CORE-META-14); `docs/superpowers/` gibt es nicht mehr — nichts Neues dort ablegen.
-- **Nie im Repo:** absolute Pfade außerhalb des Repos (`/Users/…`, Vault-Pfade) — Platzhalter nutzen
-  (`$VAULT/…`, `~/…`, repo-relativ). Herkunftsnachweise als Repo-Name + `Datei:Zeile` sind dagegen erwünscht.
-  Gate: `scripts/check-no-abs-paths.mjs` (Teil von `npm test`).
+**Das Coding-Cockpit ist die SSOT** für Stand/Warum/Entscheidungen/History (`25_Coding/epub-exporter/epub-exporter.md` im Arbeits-Vault). Das Daemon-Memory unter `~/.claude/projects/<slug>/memory/` (Index: `MEMORY.md`) ist nur die **Zeiger-Schicht** aufs Cockpit — dauerhafte „Warum"-Erkenntnis gehört in Cockpit-§🧭, nicht als Dublette ins Memory. Session-Handoff unter `.remember/` (gitignored).
 
 ## Abweichungen von der Leitkonvention
 
-Keine bekannten Abweichungen — Standard-Profil `ts-node · obsidian-plugin` (TypeScript + esbuild +
-vitest), wie die Geschwister paperize/vault-rag. Einzige Besonderheit ist das **zentrale**
-Release-Tooling (`../tools/release/`) statt eines lokalen `scripts/release.mjs` — bewusst, damit
-Bugfixes am Release-Weg nicht N-fach nachgezogen werden müssen (obsidian-plugins-Lektion 2026-07-20).
+Keine bekannten Abweichungen — Standard-Profil `ts-node · obsidian-plugin` (TypeScript + esbuild + vitest), wie die Geschwister paperize/vault-rag. Einzige Besonderheit ist das **zentrale** Release-Tooling (`../tools/release/`) statt eines lokalen `scripts/release.mjs`.
 
 ## Dach-Kontext (obsidian-plugins)
 
-Dieses Repo liegt unter dem Koordinations-Dach `<code-workspace>/obsidian-plugins/`.
-**Vor dem Lösen eines Problems:** `../AGENTS.md` (Kit-first-Regel) und `../REGISTRY.md`
-(Lösungs-Registry) prüfen — viele Probleme sind in Nachbar-Plugins oder im `obsidian-kit`
-bereits gelöst.
-
-**Vor jeder UI-Arbeit** (Views, Modals, Settings-Tabs, CSS): `../UI-STANDARD.md` ist
-verbindlich (Obsidian-nativ first, ein Frontend pro Plugin, nur Theme-CSS-Variablen).
+Dieses Repo liegt unter dem Koordinations-Dach `<code-workspace>/obsidian-plugins/`. **Vor dem Lösen eines Problems:** `../AGENTS.md` (Kit-first-Regel) und `../REGISTRY.md` (Lösungs-Registry) prüfen — viele Probleme sind in Nachbar-Plugins oder im `obsidian-kit` bereits gelöst. **Vor jeder UI-Arbeit** (Views, Modals, Settings-Tabs, CSS): `../UI-STANDARD.md` ist verbindlich.

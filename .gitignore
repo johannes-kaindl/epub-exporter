@@ -6,3 +6,7 @@ main.js
 docs/images/.frames/
 .gui-smoke.mjs
 .e2e.mjs
+
+# Claude Code: Rules versionieren, lokale Einstellungen nicht
+.claude/*
+!.claude/rules/
