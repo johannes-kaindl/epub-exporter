@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-24
+
 ### Fixed
 
 - **A cover key written as a list or a multi-line block no longer leaves its old lines behind.** Setting the cover path or the cover prompt replaces the whole entry; before, the continuation lines stayed under the new value and damaged the note. If the key is a block scalar (`cover: |`) or the front matter block is not closed, the note is left as it is instead of being rewritten.
