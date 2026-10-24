@@ -6,7 +6,17 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cover key written as a list or a multi-line block no longer leaves its old lines behind.** Setting the cover path or the cover prompt replaces the whole entry; before, the continuation lines stayed under the new value and damaged the note. If the key is a block scalar (`cover: |`) or the front matter block is not closed, the note is left as it is instead of being rewritten.
+- **A `cover:` indented inside another structure is left alone.** The plugin used to rewrite it as if it were the book's cover key; it now appends its own key to the block.
+- **A key written in another case (`Cover:`) is replaced, not duplicated.** The key found in the note is the one that is written; with both an English and a German key present the one the plugin reads is replaced.
+- **In a note with Windows line endings, the added cover line ends with a Windows line ending too.** (The line after the closing `---` still ends with a plain line break; that is not changed here.)
+
 ### Changed
+
+- **The cover path and the cover prompt in the book's front matter are no longer always put in quotation marks.** They are quoted only where YAML needs it (a wikilink, a colon, a `#`, a leading dash, text that looks like a number or `true`): `cover_prompt: a marsh at dusk` instead of `cover_prompt: "a marsh at dusk"`. A prompt that reads as a number to a YAML parser (such as `1e5`) is no longer kept as text.
+- **Line breaks in the cover prompt become blanks** before it is written into the front matter, so a multi-line prompt from the dialog stays one value.
 
 - Internal only, nothing changes for readers: the Kit pins move from obsidian-kit 0.60.2 to 0.67.1 and from code-kit 0.27.1 to 0.36.0. Of the modules this plugin uses, only the "Share" export changed: it now rejects a file name made of `.` or `..` with blanks around it (`.. `), which the plugin never produces because every export name ends in `.epub`. The vendored CRC-32, file-name template, language, settings and vault-path modules are unchanged apart from their origin header. The Kit's front matter modules (`frontmatter`, `frontmatter-patch`) and `rel-path` are vendored but not used yet.
 

@@ -1,3 +1,4 @@
+import { patchFrontmatter } from "../vendor/kit/frontmatter-patch";
 import { BookMetadata } from "./model";
 import { generateUrnUuid } from "./uuid";
 
@@ -146,30 +147,49 @@ export const BOOK_FRONTMATTER_TEMPLATE: Record<string, unknown> = {
  */
 export function setCoverPath(frontmatter: string, coverPath: string | null): string {
   if (!coverPath) return frontmatter;
-  return setQuotedKey(frontmatter, /^(\s*(?:cover|titelbild)\s*:).*$/mi, "cover", `[[${coverPath}]]`);
+  return setAliased(frontmatter, "cover", `[[${coverPath}]]`);
 }
 
 /**
  * Stores what the cover should depict, so the next run starts from it.
  *
- * The value is free text from a text area, so quotes are escaped: an unescaped
- * one would end the YAML string early and leave a note Obsidian can no longer
- * parse — which would silently stop it being a book note at all.
+ * The value is free text from a text area. A line break would end the YAML
+ * value early, so breaks become blanks before the write; the kit quotes
+ * whatever else needs it (a colon, a `#`, a leading dash), so the block stays
+ * one Obsidian can parse — an unparseable block would silently stop the note
+ * being a book note at all.
  */
 export function setCoverPrompt(frontmatter: string, prompt: string): string {
-  const value = prompt.trim();
+  const value = prompt.replace(/\s*[\r\n]+\s*/g, " ").trim();
   if (!value) return frontmatter;
-  return setQuotedKey(
-    frontmatter,
-    /^(\s*(?:cover_prompt|coverPrompt|titelbild_prompt)\s*:).*$/mi,
-    "cover_prompt",
-    value
-  );
+  return setAliased(frontmatter, "coverPrompt", value);
 }
 
-/** Replaces a key's value in place, or appends the key before the closing fence. */
-function setQuotedKey(frontmatter: string, line: RegExp, canonicalKey: string, value: string): string {
-  const quoted = `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  if (line.test(frontmatter)) return frontmatter.replace(line, `$1 ${quoted}`);
-  return frontmatter.replace(/\n---\s*$/, `\n${canonicalKey}: ${quoted}\n---`);
+/** The key as the block writes it: a line at column 0, as the kit's block reader finds it. */
+const KEY_LINE = /^([A-Za-z0-9_][\w .-]*?):/;
+
+/**
+ * Sets one canonical field in the head, under the alias the note already uses.
+ *
+ * The kit knows no aliases, so the key is looked up here: case-insensitive, and
+ * with several aliases present the first of `ALIASES` wins (the one `pick()` reads).
+ * The key found is written as found. With none present the canonical English key
+ * is appended. When the kit refuses (block scalar, unclosed fence, key or value it
+ * cannot write) the head comes back unchanged.
+ */
+function setAliased(frontmatter: string, canonical: string, value: string): string {
+  const present = new Set<string>();
+  for (const line of frontmatter.split(/\r?\n/)) {
+    const m = KEY_LINE.exec(line);
+    if (m) present.add((m[1] ?? "").trim());
+  }
+  const names = ALIASES[canonical] ?? [canonical];
+  const wanted = names.map((n) => n.toLowerCase());
+  let key: string | undefined;
+  for (const w of wanted) {
+    key = [...present].find((k) => k.toLowerCase() === w);
+    if (key !== undefined) break;
+  }
+  const r = patchFrontmatter(frontmatter, { set: { [key ?? names[0]]: value }, protect: [] });
+  return r.ok ? r.content : frontmatter;
 }
