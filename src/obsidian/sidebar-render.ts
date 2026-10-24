@@ -41,6 +41,9 @@ export function renderSidebar(
 
   if (model.context === "none") {
     root.createDiv({ cls: "epub-sb-empty", text: t("view.empty") });
+    // The way in for someone who has no book note yet: a sentence, not a button (UI-STANDARD § 8
+    // Empty-State). The command name is the palette's own string, so the two cannot drift apart.
+    root.createDiv({ cls: "epub-sb-empty epub-sb-empty-hint", text: t("view.emptyHint", t("cmd.insertFrontmatter")) });
     return;
   }
 

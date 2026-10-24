@@ -425,6 +425,28 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       `);
       if (sichtbar.kacheln === 0) return "Empty-State im DOM, aber ohne Kachel (unsichtbar)";
       if (!sichtbar.text) return "Empty-State ist sichtbar, aber ohne Text — der Hinweis fehlt";
+      // Der Satz mit dem Einstieg (view.emptyHint): ein zweites Element unter dem ersten, sichtbar, und er
+      // nennt den Befehl so, wie die Befehlspalette ihn fuehrt. Der Name kommt aus dem lebenden Befehlsregister
+      // (nicht aus dem Quelltext): sonst waere der Punkt gruen, auch wenn Satz und Befehl auseinanderlaufen.
+      // `befehl` leer heisst „Befehl nicht gefunden“, nie „enthaelt trivial“ (jeder Text enthaelt "").
+      const hinweis = await cdp.evaluate<{ anzahl: number; kacheln: number; text: string; befehl: string; rueckfall: boolean }>(`
+        const alle = document.querySelectorAll(".epub-sb-empty");
+        const el = document.querySelector(".epub-sb-empty-hint");
+        const cmd = app.commands.commands["epub-exporter:insert-book-frontmatter"];
+        const name = cmd ? String(cmd.name) : "";
+        return {
+          anzahl: alle.length,
+          kacheln: el ? el.getClientRects().length : 0,
+          text: el ? el.textContent.trim() : "",
+          befehl: name.includes(": ") ? name.slice(name.indexOf(": ") + 2) : name,
+          rueckfall: !!el && el.textContent.trim() === "view.emptyHint",
+        };
+      `);
+      if (!hinweis.befehl) return "Befehl insert-book-frontmatter nicht im Befehlsregister — der Hinweis laesst sich nicht gegenpruefen";
+      if (hinweis.anzahl < 2 || !hinweis.text) return "Der Satz mit dem Einstieg (.epub-sb-empty-hint) fehlt unter dem Empty-State";
+      if (hinweis.rueckfall) return "Der Hinweis zeigt den Schluessel statt des Textes (view.emptyHint nicht uebersetzt)";
+      if (hinweis.kacheln === 0) return "Der Hinweis ist im DOM, aber ohne Kachel (unsichtbar)";
+      if (!hinweis.text.includes(hinweis.befehl)) return `Der Hinweis nennt den Befehl nicht: „${hinweis.text}“ enthaelt nicht „${hinweis.befehl}“`;
       return null;
     },
   },

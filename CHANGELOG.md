@@ -13,6 +13,10 @@ versioning according to [Semantic Versioning](https://semver.org/).
 - **A key written in another case (`Cover:`) is replaced, not duplicated.** The key found in the note is the one that is written; with both an English and a German key present the one the plugin reads is replaced.
 - **In a note with Windows line endings, the added cover line ends with a Windows line ending too.** (The line after the closing `---` still ends with a plain line break; that is not changed here.)
 
+### Added
+
+- **The empty sidebar now says how to start a book.** With no note open, a second line under "Open a note to export it as EPUB." names the command to run: "Or turn a note into a book note: run the command “Insert book frontmatter into note”." (also in German). It is a sentence, not a button.
+
 ### Changed
 
 - **The cover path and the cover prompt in the book's front matter are no longer always put in quotation marks.** They are quoted only where YAML needs it (a wikilink, a colon, a `#`, a leading dash, text that looks like a number or `true`): `cover_prompt: a marsh at dusk` instead of `cover_prompt: "a marsh at dusk"`. A prompt that reads as a number to a YAML parser (such as `1e5`) is no longer kept as text.

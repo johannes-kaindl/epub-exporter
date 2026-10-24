@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { makeFakeEl, Platform } from "../mocks/obsidian";
 import { renderSidebar } from "../../src/obsidian/sidebar-render";
 import type { SidebarModel } from "../../src/core/sidebar-model";
-import { t } from "../../src/vendor/kit/i18n";
+import { t, setLang } from "../../src/vendor/kit/i18n";
+import { registerI18n } from "../../src/i18n/strings";
 
 const noop = {
   onExport: () => {},
@@ -78,6 +79,33 @@ describe("renderSidebar", () => {
 
     expect(r.find("epub-sb-empty")).not.toBeNull();
     expect(r.find("epub-sb-action-export")).toBeNull();
+  });
+
+  // UI-STANDARD § 8 Empty-State: kurzer Text, hoechstens ein CTA. Der Hinweis auf den Befehl ist ein
+  // zweites Element unter dem unveraenderten Satz, kein Knopf; der Befehlsname kommt aus `cmd.insertFrontmatter`,
+  // damit er nicht von der Befehlsliste wegdriftet.
+  it.each(["en", "de"] as const)("none context (%s): a second line names the command that starts a book note, with no button", (lang) => {
+    registerI18n();
+    setLang(lang);
+    try {
+      const root = makeFakeEl() as unknown as HTMLElement;
+      renderSidebar(root, { context: "none", title: "", chapters: [], missingCount: 0, canReorder: false }, noop);
+      const r = root as unknown as ReturnType<typeof makeFakeEl>;
+
+      const empties = r.findAll("epub-sb-empty");
+      expect(empties).toHaveLength(2);
+      expect(empties[0]!.text).toBe(t("view.empty"));
+      const hint = r.find("epub-sb-empty-hint")!;
+      expect(hint).toBe(empties[1]);
+      // The command name is the palette's own string, not a copy of it.
+      expect(t("cmd.insertFrontmatter")).not.toBe("cmd.insertFrontmatter");
+      expect(hint.text).toContain(t("cmd.insertFrontmatter"));
+      expect(hint.text).not.toContain("{0}");
+      expect(hint.text).not.toBe("view.emptyHint");
+      expect(r.findAll("epub-sb-btn")).toHaveLength(0);
+    } finally {
+      setLang("en");
+    }
   });
 
   it("re-render clears prior content (mount-once)", () => {
