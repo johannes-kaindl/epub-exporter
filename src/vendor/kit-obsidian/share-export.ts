@@ -1,6 +1,7 @@
-// vendored from obsidian-kit@0.60.2, src/obsidian/share-export.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.67.1, src/obsidian/share-export.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { Notice, type App } from "obsidian";
 import { confirmAction } from "./confirm";
+import { isPathSegment } from "../kit/rel-path";
 
 /** Eine erzeugte Datei (PDF, EPUB …) dem Nutzer übergeben: in einen versteckten Ordner im Vault schreiben und
  *  über das Teilen-Blatt des Systems anbieten, ersatzweise mit der Standard-App öffnen. Der „Teilen“-Weg der
@@ -107,7 +108,8 @@ function assertExportDir(dir: string, configDir: string | undefined): void {
 }
 
 function assertFileName(name: string): void {
-  if (name === "" || name === "." || name === ".." || /[\\/\0]/.test(name) || extOf(name) === "") {
+  // Die Segmentregeln (leer, `.`, `..`, auch mit Leerraum drumherum, `/`, `\`, NUL) kommen aus code-kit `rel-path`; die Endung ist hier fachlich.
+  if (!isPathSegment(name) || extOf(name) === "") {
     throw new Error(`share-export: ungültiger Dateiname „${name}“ (erwartet: ein Pfadsegment mit Endung)`);
   }
 }

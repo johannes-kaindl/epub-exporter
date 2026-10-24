@@ -6,6 +6,10 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Internal only, nothing changes for readers: the Kit pins move from obsidian-kit 0.60.2 to 0.67.1 and from code-kit 0.27.1 to 0.36.0. Of the modules this plugin uses, only the "Share" export changed: it now rejects a file name made of `.` or `..` with blanks around it (`.. `), which the plugin never produces because every export name ends in `.epub`. The vendored CRC-32, file-name template, language, settings and vault-path modules are unchanged apart from their origin header. The Kit's front matter modules (`frontmatter`, `frontmatter-patch`) and `rel-path` are vendored but not used yet.
+
 ## [0.6.0] — 2026-10-14
 
 ### Added
