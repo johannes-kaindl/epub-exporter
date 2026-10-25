@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-25
+
 ### Changed
 
 - **"Insert book frontmatter into note" no longer rewrites the whole front matter block.** It adds the missing book fields behind your own lines and leaves those as they are: a list written as `[a, b]` stays that way instead of turning into a block list, and comments in the block stay. A note with Windows line endings keeps them. Empty fields now appear as `title:` instead of `title: ""`; the plugin reads both the same. If the block is not closed, the note is left as it is and the plugin says so.
