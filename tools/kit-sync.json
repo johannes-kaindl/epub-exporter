@@ -1,7 +1,7 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.67.1" },
-    "code-kit": { "ref": "0.36.0" }
+    "obsidian-kit": { "ref": "0.70.0" },
+    "code-kit": { "ref": "0.37.5" }
   },
   "targets": [
     { "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/pure", "modules": ["crc32", "filename-template", "i18n", "rel-path", "settings"] },
