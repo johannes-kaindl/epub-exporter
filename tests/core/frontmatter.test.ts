@@ -295,8 +295,8 @@ describe("setCoverPrompt", () => {
   });
 });
 
-// The template's empty fields are written as `title: ""` today (processFrontMatter) and as `title:` (YAML null, the kit's
-// writer) after the switch to patchFrontmatter. `pick()` drops undefined, null and "" alike, so the metadata must not differ.
+// The template's empty fields were written as `title: ""` up to 0.7.0 (processFrontMatter) and are written as `title:` (YAML null,
+// the kit's writer) since the switch to patchFrontmatter. `pick()` drops undefined, null and "" alike, so the metadata must not differ.
 describe("empty template fields: null and \"\" read the same", () => {
   const emptied = (empty: unknown): Record<string, unknown> =>
     Object.fromEntries(
