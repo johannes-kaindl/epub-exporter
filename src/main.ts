@@ -20,11 +20,11 @@ import { ConsolidateModal } from "./obsidian/consolidate-modal";
 import { CoverModal } from "./obsidian/cover-modal";
 import { readImageApi } from "./obsidian/image-api";
 import { createCoverPort, generateCoverFor } from "./obsidian/cover";
+import { insertBookFrontmatter } from "./obsidian/book-frontmatter";
 import { buildCoverPrompt } from "./core/cover-prompt";
 import { ensureImageApiReady } from "./core/image-api";
 import { reorderSpine } from "./core/spine-reorder";
 import {
-  BOOK_FRONTMATTER_TEMPLATE,
   isBookNote,
   parseBookMetadata,
   setCoverPrompt,
@@ -197,15 +197,12 @@ export default class EpubExporterPlugin extends Plugin {
   private async insertFrontmatterFor(file: TFile | null): Promise<void> {
     if (!file || file.extension !== "md") { new Notice(t("notice.noActiveNote")); return; }
     try {
-      await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        // Add each template field only if absent — never overwrite user values.
-        for (const [key, value] of Object.entries(BOOK_FRONTMATTER_TEMPLATE)) {
-          // Array.isArray narrows via `arg is any[]` (lib.es5), which reintroduces
-          // `any` into the spread; the explicit cast keeps the copy but restores
-          // `unknown` so the assignment stays type-safe.
-          if (fm[key] === undefined) fm[key] = Array.isArray(value) ? [...(value as unknown[])] : value;
-        }
-      });
+      const result = await insertBookFrontmatter(this.app, file);
+      if (!result.ok) {
+        console.error("EPUB Exporter: frontmatter insert refused:", result.reason);
+        new Notice(t("notice.fmFailed"));
+        return;
+      }
       new Notice(t("notice.fmAdded"));
     } catch (e) {
       console.error("EPUB Exporter: frontmatter insert failed", e);

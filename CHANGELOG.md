@@ -6,6 +6,10 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **"Insert book frontmatter into note" no longer rewrites the whole front matter block.** It adds the missing book fields behind your own lines and leaves those as they are: a list written as `[a, b]` stays that way instead of turning into a block list, and comments in the block stay. A note with Windows line endings keeps them. Empty fields now appear as `title:` instead of `title: ""`; the plugin reads both the same. If the block is not closed, the note is left as it is and the plugin says so.
+
 ### Fixed
 
 - **A book note with Windows line endings keeps one line ending when the cover path or the cover prompt is written, and when notes are consolidated into a folder.** The line after the closing `---` used to end with a plain line break in the middle of a note that otherwise ends its lines with Windows line endings, and a consolidated folder note mixed both. This is an edge case (such notes come from Windows sync); notes with plain line breaks are unchanged.
