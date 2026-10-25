@@ -294,3 +294,32 @@ describe("setCoverPrompt", () => {
     expect(setCoverPrompt(fm, "\n \r\n")).toBe(fm);
   });
 });
+
+// The template's empty fields are written as `title: ""` today (processFrontMatter) and as `title:` (YAML null, the kit's
+// writer) after the switch to patchFrontmatter. `pick()` drops undefined, null and "" alike, so the metadata must not differ.
+describe("empty template fields: null and \"\" read the same", () => {
+  const emptied = (empty: unknown): Record<string, unknown> =>
+    Object.fromEntries(
+      Object.entries(BOOK_FRONTMATTER_TEMPLATE).map(([k, v]) => [k, v === "" ? empty : v])
+    );
+
+  it("gives the same metadata for a note with `key:` (null) as for `key: \"\"`", () => {
+    const withEmptyStrings = parseBookMetadata(emptied(""), { ...opts, fallbackTitle: "Basename" });
+    const withNulls = parseBookMetadata(emptied(null), { ...opts, fallbackTitle: "Basename" });
+    expect(withNulls).toEqual(withEmptyStrings);
+  });
+
+  it("falls back for an empty title, whichever way it is written", () => {
+    for (const empty of ["", null]) {
+      const m = parseBookMetadata({ ...emptied(empty), title: empty }, { ...opts, fallbackTitle: "Basename" });
+      expect(m.title).toBe("Basename");
+      expect(m.authors).toEqual([]);
+      expect(m.language).toBe("en");
+    }
+  });
+
+  it("the comparison can fail: a non-empty title is not the fallback", () => {
+    const m = parseBookMetadata({ ...emptied(null), title: "Real" }, { ...opts, fallbackTitle: "Basename" });
+    expect(m.title).toBe("Real");
+  });
+});
