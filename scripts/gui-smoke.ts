@@ -93,7 +93,7 @@ let PORT = 0;
 
 /** Soll-Liste (Nenner der Bilanz). C0 und C1 rahmen die Pruefpunkte (Rest-Stub / Aufraeumprotokoll). */
 const PUNKTE = [
-  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "X1", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "C1",
+  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "X1", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "F1", "C1",
 ] as const;
 type PunktId = (typeof PUNKTE)[number];
 
@@ -119,6 +119,14 @@ const SMOKE_EPUB = `${SMOKE_DIR}/Smoke Book.epub`;
 const SMOKE_BOOK_TITLE = "Smoke Book";
 const SMOKE_COVER = `${SMOKE_DIR}/Smoke Book cover.png`;
 const SMOKE_PROMPT = "a smoke test cover, plain red";
+/** F1: eine Notiz mit eigenem Block, der eine Flow-Liste und einen Kommentar enthaelt — beides verliert `processFrontMatter`. */
+const SMOKE_FM_NOTE = `${SMOKE_DIR}/Smoke Frontmatter.md`;
+const SMOKE_FM_EIGEN = "title: Mein Buch\nfoo: [a, b]\n# Hinweis\n";
+const SMOKE_FM_VORHER = `---\n${SMOKE_FM_EIGEN}---\nBody\n`;
+/** Die Felder der Buch-Vorlage, unabhaengig vom Plugin-Code aufgeschrieben (der Treiber ist nicht sein eigenes Orakel). */
+const SMOKE_FM_FELDER = [
+  "epub", "title", "author", "language", "cover", "description", "date", "publisher", "identifier", "series", "series_index", "subject", "rights",
+];
 /** Ein gueltiges 1x1-PNG (rot). Der Stub liefert es statt eines gerechneten Bildes —
  *  geprueft wird, DASS Bytes im Vault ankommen, nicht wie sie aussehen. */
 const STUB_PNG_BASE64 =
@@ -834,6 +842,47 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       return null;
     },
   },
+  {
+    id: "F1",
+    was: "„Insert book frontmatter“ ergaenzt die Vorlage, eigene Zeilen (Flow-Liste, Kommentar) bleiben byte-gleich, ein zweiter Lauf aendert nichts",
+    pruefe: async (cdp) => {
+      await schreibeDatei(cdp, SMOKE_FM_NOTE, SMOKE_FM_VORHER);
+      await oeffneUndWarte(cdp, SMOKE_FM_NOTE, `document.querySelector(".markdown-reading-view")`);
+      await leereNotices(cdp);
+      await cdp.evaluate(`app.commands.executeCommandById("epub-exporter:insert-book-frontmatter"); return true;`);
+      const nachher = await requireDateiWechsel(cdp, SMOKE_FM_NOTE, SMOKE_FM_VORHER);
+
+      if (!nachher.startsWith(`---\n${SMOKE_FM_EIGEN}`)) {
+        return `Die eigenen Zeilen blieben nicht byte-gleich am Anfang des Blocks. Block: ${JSON.stringify(nachher.split("---")[1] ?? nachher.slice(0, 200))}`;
+      }
+      if (!nachher.endsWith("---\nBody\n")) return `Der Rumpf der Notiz hat sich geaendert: ${JSON.stringify(nachher.slice(-40))}`;
+      const fehlt = SMOKE_FM_FELDER.filter((k) => !new RegExp(`^${k}:`, "m").test(nachher));
+      if (fehlt.length) return `Vorlagenfelder fehlen: ${fehlt.join(", ")}`;
+      if (!/^epub: true$/m.test(nachher)) return "epub: steht nicht als Boolean `true` in der Notiz";
+      if ((nachher.match(/^title:/gm) ?? []).length !== 1) return "title: steht nicht genau einmal im Block (ueberschrieben oder verdoppelt)";
+
+      // Obsidian selbst muss das Ergebnis so lesen, wie es dasteht: Boolean, die Flow-Liste als Liste.
+      await requireUntil(
+        cdp,
+        `(() => {
+          const f = app.vault.getAbstractFileByPath(${JSON.stringify(SMOKE_FM_NOTE)});
+          const fm = f && app.metadataCache.getFileCache(f)?.frontmatter;
+          return !!fm && fm.epub === true && JSON.stringify(fm.foo) === '["a","b"]' && fm.title === "Mein Buch";
+        })()`,
+        "Obsidians Metadaten-Cache liest die ergaenzte Notiz nicht als epub: true / foo: [a, b] / title: Mein Buch",
+      );
+
+      // Zweiter Lauf: nichts mehr zu ergaenzen, die Datei bleibt byte-gleich.
+      await cdp.evaluate(`
+        app.commands.executeCommandById("epub-exporter:insert-book-frontmatter");
+        await new Promise((r) => setTimeout(r, 800));
+        return true;
+      `);
+      const zweimal = (await leseDatei(cdp, SMOKE_FM_NOTE)) ?? "";
+      if (zweimal !== nachher) return "Ein zweiter Lauf hat die Notiz erneut veraendert (nicht idempotent)";
+      return null;
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1071,6 +1120,7 @@ async function lauf(nur?: string): Promise<void> {
         SMOKE_EPUB,
         SMOKE_COVER,
         SMOKE_BOOK,
+        SMOKE_FM_NOTE,
         ...SMOKE_CHAPTERS.map((k) => k.pfad),
         SMOKE_DIR,
       ]);

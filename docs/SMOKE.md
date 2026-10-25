@@ -87,6 +87,12 @@ Gegenstand nicht mehr berührt.
 **Was der Stub per Konstruktion nicht sehen kann, misst `npm run smoke:e2e`** (§ Ende-zu-Ende).
 T1–T3 bleiben, wie sie sind: sie sind die Hälfte, die in **jeden** Durchgang gehört.
 
+### Buch-Frontmatter einfügen
+
+| # | Prüfpunkt | Warum er existiert |
+|---|---|---|
+| **F1** | „Insert book frontmatter into note“ auf einer Wegwerf-Notiz mit eigenem Block (`title`, eine Flow-Liste `foo: [a, b]`, ein Kommentar `# Hinweis`) ergänzt die 13 Vorlagenfelder **hinter** den eigenen Zeilen, die byte-gleich bleiben; `epub` steht als Boolean `true`, `title` genau einmal, Obsidians Metadaten-Cache liest `epub === true` und `foo` als Liste, und ein **zweiter** Lauf ändert die Datei nicht | Bis 0.7.0 lief der Befehl über `processFrontMatter`, das den ganzen Block neu schreibt: aus `foo: [a, b]` wurde eine Blockliste, der Kommentar ging verloren (gemessen 2026-10-25). Der Punkt prüft die Datei, nicht die Meldung „ergänzt“: die stand auch dann da, wenn der Block zerlegt war. Gegenprobe: der alte Weg macht ihn rot |
+
 ### Aufräumen
 
 | # | Prüfpunkt | Warum er existiert |
