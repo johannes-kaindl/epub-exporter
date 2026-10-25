@@ -1,6 +1,14 @@
-import { describe, it, expect } from "vitest";
-import { generateCoverFor, type CoverPort } from "../src/obsidian/cover";
+import { describe, it, expect, vi } from "vitest";
+import { TFile, type App } from "obsidian";
+import { setCoverPath } from "../src/core/frontmatter";
+import { createCoverPort, generateCoverFor, type CoverPort } from "../src/obsidian/cover";
 import type { ImageApi, ImageApiStatus } from "../src/core/image-api";
+
+// The test mock of "obsidian" has no `normalizePath`; `createCoverPort` calls it on every path. Everything else stays the mock.
+vi.mock("obsidian", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("obsidian")>()),
+  normalizePath: (p: string) => p,
+}));
 
 const caps = {
   negativePrompt: false,
@@ -103,5 +111,47 @@ describe("generateCoverFor", () => {
 
     expect(res.ok).toBe(true);
     expect(port.binaries.has("Salt Marsh cover.png")).toBe(true);
+  });
+});
+
+// The seam between the block and the body is written by the adapter, not by the kit: `createCoverPort().updateFrontmatter` takes the
+// head apart, lets `fn` rewrite the block and puts the body back. A CRLF note must come out CRLF throughout.
+describe("createCoverPort().updateFrontmatter — line ending of the seam", () => {
+  const PATH = "Books/Salt Marsh.md";
+  function fakeApp(content: string): { app: App; read: () => string } {
+    const file = Object.assign(new TFile(), { path: PATH });
+    let text = content;
+    const vault = {
+      getAbstractFileByPath: (p: string) => (p === PATH ? file : null),
+      process: async (_f: TFile, fn: (data: string) => string) => {
+        text = fn(text);
+        return text;
+      },
+    };
+    return { app: { vault } as unknown as App, read: () => text };
+  }
+  const lone = (s: string): number => (s.match(/(?<!\r)\n/g) ?? []).length;
+  const run = async (content: string) => {
+    const { app, read } = fakeApp(content);
+    await createCoverPort(app).updateFrontmatter(PATH, (fm) => setCoverPath(fm, "Books/c.png"));
+    return read();
+  };
+
+  it("a CRLF note (block and body) stays CRLF throughout", async () => {
+    const out = await run("---\r\nepub: true\r\ntitle: Salt Marsh\r\n---\r\n# Salt\r\n![[01 - A]]\r\n");
+    expect(out).toContain('cover: "[[Books/c.png]]"');
+    expect(lone(out)).toBe(0);
+    expect(out.endsWith("---\r\n# Salt\r\n![[01 - A]]\r\n")).toBe(true);
+  });
+
+  it("an LF note stays LF (counter-sample: the fix must not turn LF into CRLF)", async () => {
+    const out = await run("---\nepub: true\ntitle: Salt Marsh\n---\n# Salt\n![[01 - A]]\n");
+    expect(out).toContain('cover: "[[Books/c.png]]"');
+    expect(out).not.toContain("\r");
+    expect(out.endsWith("---\n# Salt\n![[01 - A]]\n")).toBe(true);
+  });
+
+  it("a note without a block is not touched", async () => {
+    expect(await run("# Salt\r\ntext\r\n")).toBe("# Salt\r\ntext\r\n");
   });
 });

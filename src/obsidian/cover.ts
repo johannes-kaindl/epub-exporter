@@ -99,7 +99,9 @@ export function createCoverPort(app: App): CoverPort {
         // A note without frontmatter is not a book note and cannot reach this
         // flow — but if it ever did, inventing a block here would be a surprise.
         if (!head) return content;
-        return fn(head.trimEnd()) + "\n" + body;
+        // The seam takes the line ending of the note: a hard-coded "\n" would leave one LF between a CRLF block and a CRLF body.
+        const eol = head.includes("\r\n") ? "\r\n" : "\n";
+        return fn(head.trimEnd()) + eol + body;
       });
     },
   };

@@ -64,7 +64,10 @@ export async function executeConsolidatePlan(
 
   await run("folder note", async () => {
     const fm = setCoverPath(ctx.bookNoteFrontmatter, plan.coverTarget);
-    const content = fm ? `${fm}\n${plan.bookNoteBody}` : plan.bookNoteBody;
+    // The planner builds the body with LF. A CRLF book note keeps CRLF: the seam and the body follow the head (an LF note is left as it is).
+    const eol = fm.includes("\r\n") ? "\r\n" : "\n";
+    const body = eol === "\r\n" ? plan.bookNoteBody.replace(/\r?\n/g, eol) : plan.bookNoteBody;
+    const content = fm ? `${fm}${eol}${body}` : body;
     const target = `${folder}/${plan.bookNoteName}`;
     if (ctx.mode === "move") await port.moveFile(ctx.bookNoteSourcePath, target);
     await port.writeFile(target, content);

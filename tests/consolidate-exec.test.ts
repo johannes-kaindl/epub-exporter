@@ -87,4 +87,30 @@ describe("executeConsolidatePlan", () => {
     expect(res.errors.length).toBe(1);
     expect(port.files.has("Book/Book.md")).toBe(true); // still wrote the folder note
   });
+
+  // The folder note joins the head (the user's note, possibly CRLF) and the body the planner built (always LF).
+  describe("line ending of the folder note", () => {
+    const lone = (t: string): number => (t.match(/(?<!\r)\n/g) ?? []).length;
+
+    it("a CRLF book note becomes a CRLF folder note, body included", async () => {
+      const port = new FakePort({ "notes/A.md": "x" });
+      await executeConsolidatePlan(
+        port,
+        plan({ bookNoteBody: "Intro text\n\n![[01 - A]]\n![[02 - B]]", coverTarget: "_assets/cover.png" }),
+        ctx({ bookNoteFrontmatter: "---\r\nepub: true\r\ncover: \"[[cover.png]]\"\r\n---" })
+      );
+      const out = port.files.get("Book/Book.md") ?? "";
+      expect(out).toContain('cover: "[[_assets/cover.png]]"');
+      expect(out).toContain("Intro text\r\n\r\n![[01 - A]]\r\n![[02 - B]]");
+      expect(lone(out)).toBe(0);
+    });
+
+    it("an LF book note stays LF (counter-sample)", async () => {
+      const port = new FakePort({ "notes/A.md": "x" });
+      await executeConsolidatePlan(port, plan({ bookNoteBody: "Intro text\n\n![[01 - A]]\n![[02 - B]]" }), ctx());
+      const out = port.files.get("Book/Book.md") ?? "";
+      expect(out).toBe("---\nepub: true\n---\nIntro text\n\n![[01 - A]]\n![[02 - B]]");
+      expect(out).not.toContain("\r");
+    });
+  });
 });

@@ -6,6 +6,10 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A book note with Windows line endings keeps one line ending when the cover path or the cover prompt is written, and when notes are consolidated into a folder.** The line after the closing `---` used to end with a plain line break in the middle of a note that otherwise ends its lines with Windows line endings, and a consolidated folder note mixed both. This is an edge case (such notes come from Windows sync); notes with plain line breaks are unchanged.
+
 ## [0.7.0] — 2026-10-24
 
 ### Fixed
