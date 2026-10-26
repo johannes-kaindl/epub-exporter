@@ -77,6 +77,7 @@ import {
   istAbgebrochen,
   ladePluginNeu,
   openExisting,
+  pollUntil,
   requireUntil,
   requireVisible,
   schliesseDialog,
@@ -253,6 +254,16 @@ async function schliesseUeberlagerungen(cdp: Cdp): Promise<void> {
  *  Pruefpunkt **gruen am Falschen**. */
 async function leereNotices(cdp: Cdp): Promise<void> {
   await clearNotices(cdp);
+}
+
+/** Ob irgendein `.notice` in einem der Dokumente (Hauptfenster, `activeDocument`) den Text traegt. */
+function noticeEnthaelt(text: string): string {
+  return `(() => {
+    const docs = new Set([document]);
+    if (typeof activeDocument !== "undefined" && activeDocument) docs.add(activeDocument);
+    for (const d of docs) for (const n of d.querySelectorAll(".notice")) if (n.textContent.includes(${JSON.stringify(text)})) return true;
+    return false;
+  })()`;
 }
 
 /** Auf eine Datei im Vault warten und ihren Pfad im Dateisystem liefern. */
@@ -850,6 +861,9 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       await oeffneUndWarte(cdp, SMOKE_FM_NOTE, `document.querySelector(".markdown-reading-view")`);
       await leereNotices(cdp);
       await cdp.evaluate(`app.commands.executeCommandById("epub-exporter:insert-book-frontmatter"); return true;`);
+      // Die Meldung verschwindet nach rund 5 s: gleich nach dem Befehl lesen, nicht erst nach der Cache-Pruefung.
+      const ergaenztDa = await pollUntil<boolean>(cdp, `return ${noticeEnthaelt("Book frontmatter added.")};`, 5_000, 200);
+      if (!ergaenztDa) return "Die Meldung „Book frontmatter added.“ erschien nach dem ersten Lauf nicht";
       const nachher = await requireDateiWechsel(cdp, SMOKE_FM_NOTE, SMOKE_FM_VORHER);
 
       if (!nachher.startsWith(`---\n${SMOKE_FM_EIGEN}`)) {
@@ -872,12 +886,13 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
         "Obsidians Metadaten-Cache liest die ergaenzte Notiz nicht als epub: true / foo: [a, b] / title: Mein Buch",
       );
 
-      // Zweiter Lauf: nichts mehr zu ergaenzen, die Datei bleibt byte-gleich.
-      await cdp.evaluate(`
-        app.commands.executeCommandById("epub-exporter:insert-book-frontmatter");
-        await new Promise((r) => setTimeout(r, 800));
-        return true;
-      `);
+      // Zweiter Lauf: nichts mehr zu ergaenzen, die Datei bleibt byte-gleich, und die Meldung sagt das.
+      await leereNotices(cdp);
+      await cdp.evaluate(`app.commands.executeCommandById("epub-exporter:insert-book-frontmatter"); return true;`);
+      const vollstaendigDa = await pollUntil<boolean>(cdp, `return ${noticeEnthaelt("Book frontmatter is already complete.")};`, 5_000, 200);
+      if (!vollstaendigDa) return "Die Meldung „Book frontmatter is already complete.“ erschien nach dem zweiten Lauf nicht";
+      const stehtNoch = await cdp.evaluate<boolean>(`return ${noticeEnthaelt("Book frontmatter added.")};`);
+      if (stehtNoch) return "Nach dem zweiten Lauf steht „Book frontmatter added.“ noch (oder wieder) da";
       const zweimal = (await leseDatei(cdp, SMOKE_FM_NOTE)) ?? "";
       if (zweimal !== nachher) return "Ein zweiter Lauf hat die Notiz erneut veraendert (nicht idempotent)";
       return null;
