@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-10-26
+
 ### Changed
 
 - **"Insert book frontmatter into note" now says so when there was nothing to add.** On a note that already has every book field, the message reads "Book frontmatter is already complete." instead of "Book frontmatter added."; the note is not touched either way. The same message appears when you press "Edit metadata" or "Make book" in the sidebar.
