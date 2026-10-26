@@ -203,7 +203,7 @@ export default class EpubExporterPlugin extends Plugin {
         new Notice(t("notice.fmFailed"));
         return;
       }
-      new Notice(t("notice.fmAdded"));
+      new Notice(t(result.changed ? "notice.fmAdded" : "notice.fmUnchanged"));
     } catch (e) {
       console.error("EPUB Exporter: frontmatter insert failed", e);
       new Notice(t("notice.fmFailed"));
