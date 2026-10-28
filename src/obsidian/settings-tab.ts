@@ -98,6 +98,34 @@ export class EpubSettingTab extends PluginSettingTab {
           },
         },
       },
+      {
+        // The rule sits in the desc: the rows are static (no visible predicate), so context goes into the hint.
+        name: t("settings.folderNumberPrefix.name"),
+        desc: t("settings.folderNumberPrefix.desc"),
+        control: { type: "toggle", key: "folderNumberPrefix" },
+      },
+      {
+        name: t("settings.workDir.name"),
+        desc: t("settings.workDir.desc"),
+        control: { type: "folder", key: "workDir" },
+      },
+      {
+        name: t("settings.folderIntroNames.name"),
+        desc: t("settings.folderIntroNames.desc"),
+        control: { type: "text", key: "folderIntroNames" },
+      },
+      {
+        name: t("settings.folderPageTitle.name"),
+        desc: t("settings.folderPageTitle.desc"),
+        control: {
+          type: "dropdown",
+          key: "folderPageTitle",
+          options: {
+            heading: t("settings.folderPageTitle.heading"),
+            filename: t("settings.folderPageTitle.filename"),
+          },
+        },
+      },
     ];
   }
 
@@ -110,7 +138,7 @@ export class EpubSettingTab extends PluginSettingTab {
 
   async setControlValue(key: string, value: unknown): Promise<void> {
     const s = this.plugin.settings as unknown as Record<string, unknown>;
-    s[key] = key === "customFolder" ? String(value).trim() : value;
+    s[key] = key === "customFolder" || key === "workDir" || key === "folderIntroNames" ? String(value).trim() : value;
     await this.plugin.saveSettings();
   }
 

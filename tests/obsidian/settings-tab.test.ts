@@ -44,6 +44,10 @@ describe("EpubSettingTab.getSettingDefinitions", () => {
       "openSidebarOnStartup",
       "consolidateChapterMode",
       "consolidateAssetMode",
+      "folderNumberPrefix",
+      "workDir",
+      "folderIntroNames",
+      "folderPageTitle",
     ]);
   });
 
@@ -56,6 +60,21 @@ describe("EpubSettingTab.getSettingDefinitions", () => {
     expect(byKey(tab, "openSidebarOnStartup").control?.type).toBe("toggle");
     expect(byKey(tab, "consolidateChapterMode").control?.type).toBe("dropdown");
     expect(byKey(tab, "consolidateAssetMode").control?.type).toBe("dropdown");
+    expect(byKey(tab, "folderNumberPrefix").control?.type).toBe("toggle");
+    expect(byKey(tab, "workDir").control?.type).toBe("folder");
+    expect(byKey(tab, "folderIntroNames").control?.type).toBe("text");
+    expect(byKey(tab, "folderPageTitle").control?.type).toBe("dropdown");
+    expect(Object.keys(byKey(tab, "folderPageTitle").control?.options ?? {})).toEqual(["heading", "filename"]);
+  });
+
+  test("the number-rule row carries the rule in its desc: a number sorts, 0 hides", () => {
+    const desc = (lang: "en" | "de") => { registerI18n(); setLang(lang); return byKey(makeTab().tab, "folderNumberPrefix").desc ?? ""; };
+    expect(desc("en")).toMatch(/01 - Intro/);
+    expect(desc("en")).toMatch(/0 - Notes/);
+    expect(desc("en")).toMatch(/hides/);
+    expect(desc("de")).toMatch(/01 - Einleitung/);
+    expect(desc("de")).toMatch(/ausgeblendet/);
+    setLang("en");
   });
 
   test("explains the output destination, including what Share leaves behind", () => {
@@ -106,6 +125,12 @@ describe("EpubSettingTab.getSettingDefinitions", () => {
 });
 
 describe("EpubSettingTab.getControlValue", () => {
+  test("returns the folder book values", () => {
+    const tab = makeTab({ folderIntroNames: "README", folderNumberPrefix: true }).tab;
+    expect(tab.getControlValue("folderIntroNames")).toBe("README");
+    expect(tab.getControlValue("folderNumberPrefix")).toBe(true);
+  });
+
   test("returns the stored value for a plain key", () => {
     expect(makeTab({ outputDestination: "share" }).tab.getControlValue("outputDestination")).toBe("share");
   });
@@ -125,6 +150,15 @@ describe("EpubSettingTab.setControlValue", () => {
     await tab.setControlValue("customFolder", "  Books/EPUB  ");
     expect(settings.customFolder).toBe("Books/EPUB");
     expect(state.saves).toBe(1);
+  });
+
+  test("trims and persists workDir and folderIntroNames", async () => {
+    const { tab, settings, state } = makeTab();
+    await tab.setControlValue("workDir", "  Arbeit/Kopien ");
+    await tab.setControlValue("folderIntroNames", " README, {{folder_name}} ");
+    expect(settings.workDir).toBe("Arbeit/Kopien");
+    expect(settings.folderIntroNames).toBe("README, {{folder_name}}");
+    expect(state.saves).toBe(2);
   });
 
   test("persists a plain key verbatim", async () => {
