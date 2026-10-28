@@ -94,6 +94,58 @@
   outline-offset: -1px;
 }
 
+/* Ordnermodus: Baum-Vorschau. Die Einrückung steht in Attributregeln (data-depth), nie in einem JS-Style;
+   ab Tiefe 6 bleibt sie stehen (das Panel ist schmal). Der Zustand der Arbeitskopie steckt im Text, in
+   aria-pressed und in der Schriftstärke, nie in der Farbe allein. */
+.epub-sb-action-close {
+  margin-inline-start: auto;
+}
+.epub-sb-source,
+.epub-sb-hint,
+.epub-sb-copy-note {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow-wrap: break-word;
+}
+.epub-sb-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.epub-sb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--font-ui-small);
+}
+.epub-sb-row-icon,
+.epub-sb-hidden-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.epub-sb-row-title {
+  overflow-wrap: anywhere;
+}
+.epub-sb-row[data-depth="1"] { padding-inline-start: calc(var(--size-4-4) * 1); }
+.epub-sb-row[data-depth="2"] { padding-inline-start: calc(var(--size-4-4) * 2); }
+.epub-sb-row[data-depth="3"] { padding-inline-start: calc(var(--size-4-4) * 3); }
+.epub-sb-row[data-depth="4"] { padding-inline-start: calc(var(--size-4-4) * 4); }
+.epub-sb-row[data-depth="5"] { padding-inline-start: calc(var(--size-4-4) * 5); }
+.epub-sb-row[data-depth="6"] { padding-inline-start: calc(var(--size-4-4) * 6); }
+.epub-sb-hidden {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.epub-sb-action-copy-toggle[aria-pressed="true"] {
+  font-weight: var(--font-semibold);
+}
+
 /* Cover-Dialog. Der Status folgt UI-STANDARD §8: der Zustand steckt in Klasse,
    Icon UND Farbe — nie in der Farbe allein (WCAG 1.4.1). */
 .epub-cover-modal .epub-cover-warning { color: var(--text-warning); }

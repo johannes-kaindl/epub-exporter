@@ -462,6 +462,7 @@ describe("EpubHubView · Live-Refresh (M2)", () => {
       metadataCache: {
         on: (ev: string, fn: (arg: unknown) => void) => { registered[`mc:${ev}`] = fn; return {}; },
       },
+      vault: { on: () => ({}) }, // the folder preview listens here; this fixture has no folder selection
     };
 
     let renders = 0;
@@ -499,5 +500,134 @@ describe("EpubHubView · Live-Refresh (M2)", () => {
     await Promise.resolve();
 
     expect(renders()).toBe(before);
+  });
+});
+
+describe("EpubHubView · Ordnermodus folgt dem Vault", () => {
+  type Cb = (...args: unknown[]) => void;
+  // A fake app that records the callbacks the view registers, per event source and name.
+  function mount(opts: { affects?: (path: string) => boolean; snaps?: SidebarSnapshot[] } = {}) {
+    const listeners = new Map<string, Cb[]>();
+    const source = (name: string) => ({
+      on: (ev: string, cb: Cb) => {
+        const key = `${name}:${ev}`;
+        listeners.set(key, [...(listeners.get(key) ?? []), cb]);
+        return { key };
+      },
+    });
+    const app = {
+      workspace: { ...source("workspace"), rootSplit: {}, getMostRecentLeaf: () => null },
+      vault: source("vault"),
+      metadataCache: source("metadataCache"),
+    };
+    let calls = 0;
+    const snaps: SidebarSnapshot[] = opts.snaps ?? [{ kind: "folder", title: "docs", chapters: [] }];
+    const bridge = {
+      snapshot: async () => snaps[Math.min(calls++, snaps.length - 1)],
+      ...(opts.affects ? { affectsFolder: opts.affects } : {}),
+      handlers: { onExport: () => {}, onInsertFrontmatter: () => {}, onConsolidate: () => {}, onReorder: () => {} },
+    };
+    const view = new EpubHubView(new WorkspaceLeaf() as never, bridge);
+    (view as unknown as { app: unknown }).app = app;
+    const fire = async (key: string, ...args: unknown[]) => {
+      for (const cb of listeners.get(key) ?? []) cb(...args);
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    return { view, fire, snapshotCalls: () => calls, listeners };
+  }
+  const under = (path: string) => path.startsWith("docs/");
+
+  it.each(["create", "delete"])("re-reads the preview when a file is %sd under the folder", async (ev) => {
+    const { view, fire, snapshotCalls } = mount({ affects: under });
+    await view.onOpen();
+    const before = snapshotCalls();
+    await fire(`vault:${ev}`, { path: "docs/a.md" });
+    expect(snapshotCalls()).toBe(before + 1);
+  });
+
+  it("re-reads on a rename into, out of, or inside the folder, judged by the old and the new path", async () => {
+    const { view, fire, snapshotCalls } = mount({ affects: under });
+    await view.onOpen();
+    let n = snapshotCalls();
+    await fire("vault:rename", { path: "docs/neu.md" }, "docs/alt.md"); // inside
+    expect(snapshotCalls()).toBe(++n);
+    await fire("vault:rename", { path: "docs/neu.md" }, "anderswo/alt.md"); // moved in
+    expect(snapshotCalls()).toBe(++n);
+    await fire("vault:rename", { path: "anderswo/neu.md" }, "docs/alt.md"); // moved out
+    expect(snapshotCalls()).toBe(++n);
+  });
+
+  it("ignores events outside the folder", async () => {
+    const { view, fire, snapshotCalls } = mount({ affects: under });
+    await view.onOpen();
+    const before = snapshotCalls();
+    await fire("vault:create", { path: "anderswo/a.md" });
+    await fire("vault:delete", { path: "anderswo/a.md" });
+    await fire("vault:rename", { path: "anderswo/b.md" }, "anderswo/a.md");
+    expect(snapshotCalls()).toBe(before);
+  });
+
+  it("re-reads when a note under the folder changes (a heading or a chapter_title is a page title)", async () => {
+    const { view, fire, snapshotCalls } = mount({ affects: under });
+    await view.onOpen();
+    const before = snapshotCalls();
+    await fire("metadataCache:changed", { path: "docs/a.md" });
+    expect(snapshotCalls()).toBe(before + 1);
+    await fire("metadataCache:changed", { path: "anderswo/a.md" });
+    expect(snapshotCalls()).toBe(before + 1);
+  });
+
+  it("is deaf to vault events when the bridge has no folder selection to ask", async () => {
+    const { view, fire, snapshotCalls } = mount(); // no affectsFolder
+    await view.onOpen();
+    const before = snapshotCalls();
+    await fire("vault:create", { path: "docs/a.md" });
+    await fire("vault:rename", { path: "docs/b.md" }, "docs/a.md");
+    expect(snapshotCalls()).toBe(before);
+  });
+
+  it("an unchanged model does not rebuild the DOM after a vault event (a button keeps its one click)", async () => {
+    const { view, fire } = mount({ affects: under }); // the same snapshot every time
+    await view.onOpen();
+    const first = (view.contentEl as unknown as { children: unknown[] }).children;
+    await fire("vault:create", { path: "docs/a.md" });
+    expect((view.contentEl as unknown as { children: unknown[] }).children).toBe(first);
+  });
+
+  it("a changed preview does rebuild it", async () => {
+    const row = (title: string) => ({ title, depth: 0, kind: "page" as const });
+    const preview = (rows: ReturnType<typeof row>[]) => ({
+      rows,
+      hiddenCount: 0,
+      sourcePath: "docs",
+      workCopy: { available: false, reason: "no-workdir" } as const,
+    });
+    const { view, fire } = mount({
+      affects: under,
+      snaps: [
+        { kind: "folder", title: "docs", chapters: [], folder: preview([row("Alt")]) },
+        { kind: "folder", title: "docs", chapters: [], folder: preview([row("Neu")]) },
+      ],
+    });
+    await view.onOpen();
+    const first = (view.contentEl as unknown as { children: unknown[] }).children;
+    await fire("vault:rename", { path: "docs/neu.md" }, "docs/alt.md");
+    expect((view.contentEl as unknown as { children: unknown[] }).children).not.toBe(first);
+    expect((view.contentEl as unknown as { findAll(c: string): { allText: string }[] }).findAll("epub-sb-row-title").map((e) => e.allText)).toEqual(["Neu"]);
+  });
+
+  it("refresh() asks the bridge again and redraws a changed model", async () => {
+    const { view, snapshotCalls } = mount({
+      snaps: [
+        { kind: "note", title: "A", chapters: [] },
+        { kind: "note", title: "B", chapters: [] },
+      ],
+    });
+    await view.onOpen();
+    const before = snapshotCalls();
+    const first = (view.contentEl as unknown as { children: unknown[] }).children;
+    await view.refresh();
+    expect(snapshotCalls()).toBe(before + 1);
+    expect((view.contentEl as unknown as { children: unknown[] }).children).not.toBe(first);
   });
 });

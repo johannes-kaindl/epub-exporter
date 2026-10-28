@@ -378,3 +378,178 @@ describe("renderSidebar — generated cover", () => {
     expect(fired).toBe(1);
   });
 });
+
+describe("renderSidebar · Ordnermodus", () => {
+  type Folder = NonNullable<SidebarModel["folder"]>;
+  const folderModel = (over: Partial<Folder> = {}, title = "docs"): SidebarModel => ({
+    context: "folder",
+    title,
+    chapters: [],
+    missingCount: 0,
+    canReorder: false,
+    canGenerateCover: false,
+    folder: {
+      rows: [
+        { title: "Überblick", depth: 0, kind: "page" },
+        { title: "Tutorials", depth: 0, kind: "chapter" },
+        { title: "Lektion 1", depth: 1, kind: "page" },
+      ],
+      hiddenCount: 0,
+      sourcePath: "Projekte/docs",
+      workCopy: { available: true, enabled: false, path: "Arbeit/Projekte/docs", exists: false },
+      ...over,
+    },
+  });
+  const draw = (model: SidebarModel, handlers = {}) => {
+    const root = makeFakeEl();
+    renderSidebar(root as unknown as HTMLElement, model, { ...noop, ...handlers });
+    return root;
+  };
+
+  it("shows a header for the folder, its name, and the hint on the number rule", () => {
+    registerI18n();
+    setLang("en");
+    const r = draw(folderModel());
+    expect(r.find("epub-sb-title")!.allText).toBe(t("view.context.folder"));
+    expect(r.find("epub-sb-subtitle")!.allText).toBe("docs");
+    expect(r.find("epub-sb-hint")!.allText).toBe(t("view.folder.hint"));
+    expect(t("view.folder.hint")).toContain("01 - Intro");
+    expect(t("view.folder.hint")).toContain("0 hides");
+  });
+
+  it("shows one row per entry with its depth, a folder or file icon, and its title", () => {
+    const r = draw(folderModel());
+    const rows = r.findAll("epub-sb-row");
+    expect(rows.map((row) => row.getAttribute("data-depth"))).toEqual(["0", "0", "1"]);
+    expect(rows.map((row) => row.find("epub-sb-row-title")!.allText)).toEqual(["Überblick", "Tutorials", "Lektion 1"]);
+    expect(rows.map((row) => row.find("epub-sb-row-icon")!.getAttribute("data-icon"))).toEqual(["file-text", "folder", "file-text"]);
+    expect(r.find("epub-sb-empty")).toBeNull();
+  });
+
+  it("caps the indentation at depth 6, the text keeps its real order", () => {
+    const rows = [0, 1, 6, 7, 12].map((depth) => ({ title: `T${depth}`, depth, kind: "page" as const }));
+    const r = draw(folderModel({ rows }));
+    expect(r.findAll("epub-sb-row").map((row) => row.getAttribute("data-depth"))).toEqual(["0", "1", "6", "6", "6"]);
+  });
+
+  it("names what it works on: the original, or the working copy once that is on and exists", () => {
+    registerI18n();
+    setLang("en");
+    expect(draw(folderModel()).find("epub-sb-source")!.allText).toBe("Original: Projekte/docs");
+    const onCopy = folderModel({
+      sourcePath: "Arbeit/Projekte/docs",
+      workCopy: { available: true, enabled: true, path: "Arbeit/Projekte/docs", exists: true },
+    });
+    expect(draw(onCopy).find("epub-sb-source")!.allText).toBe("Working copy: Arbeit/Projekte/docs");
+  });
+
+  it("shows the hidden line only when something is hidden, with a text and an icon", () => {
+    registerI18n();
+    setLang("en");
+    expect(draw(folderModel()).find("epub-sb-hidden")).toBeNull();
+    const hidden = draw(folderModel({ hiddenCount: 3 })).find("epub-sb-hidden")!;
+    expect(hidden.allText).toBe("3 hidden");
+    expect(hidden.find("epub-sb-hidden-icon")!.getAttribute("data-icon")).toBe("eye-off");
+  });
+
+  it("shows the empty state, not an empty list, when there are no rows", () => {
+    const r = draw(folderModel({ rows: [] }));
+    expect(r.find("epub-sb-empty")).not.toBeNull();
+    expect(r.find("epub-sb-empty")!.allText).toBe(t("view.folder.empty"));
+    expect(r.find("epub-sb-tree")).toBeNull();
+    expect(r.findAll("epub-sb-row")).toHaveLength(0);
+  });
+
+  describe("working copy switch (state button)", () => {
+    it.each(["en", "de"] as const)("states the actual state in its label, in %s, and in aria-pressed", (lang) => {
+      registerI18n();
+      setLang(lang);
+      const off = draw(folderModel()).find("epub-sb-action-copy-toggle")!;
+      expect(off.getAttribute("aria-pressed")).toBe("false");
+      expect(off.allText).toContain(t("view.folder.copyOff"));
+      expect(off.allText).not.toContain(t("view.folder.copyOn"));
+      expect(off.getAttribute("title")).toBe(`${t("view.folder.copyOff")} — ${t("view.folder.copyClickOn")}`);
+
+      const on = draw(
+        folderModel({ workCopy: { available: true, enabled: true, path: "Arbeit/Projekte/docs", exists: true } })
+      ).find("epub-sb-action-copy-toggle")!;
+      expect(on.getAttribute("aria-pressed")).toBe("true");
+      expect(on.allText).toContain(t("view.folder.copyOn"));
+      expect(on.getAttribute("title")).toBe(`${t("view.folder.copyOn")} — ${t("view.folder.copyClickOff")}`);
+    });
+
+    it("fires onFolderToggleWorkCopy exactly once per click", () => {
+      let toggled = 0;
+      const r = draw(folderModel(), { onFolderToggleWorkCopy: () => { toggled++; } });
+      r.find("epub-sb-action-copy-toggle")!.click();
+      expect(toggled).toBe(1);
+    });
+
+    it.each([
+      ["no-workdir", "view.folder.copyNo.noWorkdir"],
+      ["invalid-workdir", "view.folder.copyNo.invalidWorkdir"],
+      ["inside-workdir", "view.folder.copyNo.insideWorkdir"],
+      ["contains-workdir", "view.folder.copyNo.containsWorkdir"],
+    ] as const)("replaces the switch with an explanation when it is not available (%s)", (reason, key) => {
+      registerI18n();
+      setLang("en");
+      const r = draw(folderModel({ workCopy: { available: false, reason } }));
+      expect(r.find("epub-sb-action-copy-toggle")).toBeNull();
+      expect(r.find("epub-sb-action-copy-create")).toBeNull();
+      expect(r.find("epub-sb-copy-note")!.allText).toBe(t(key));
+    });
+
+    it("offers to create the copy only while the switch is on and the copy is missing", () => {
+      const copy = (enabled: boolean, exists: boolean): Partial<Folder> => ({
+        workCopy: { available: true, enabled, path: "Arbeit/Projekte/docs", exists },
+      });
+      expect(draw(folderModel(copy(false, false))).find("epub-sb-action-copy-create")).toBeNull();
+      expect(draw(folderModel(copy(false, true))).find("epub-sb-action-copy-create")).toBeNull();
+      expect(draw(folderModel(copy(true, true))).find("epub-sb-action-copy-create")).toBeNull();
+      const r = draw(folderModel(copy(true, false)));
+      expect(r.find("epub-sb-action-copy-create")).not.toBeNull();
+      expect(r.find("epub-sb-copy-note")!.allText).toContain("Arbeit/Projekte/docs");
+    });
+
+    it("fires onFolderCreateWorkCopy exactly once per click", () => {
+      let created = 0;
+      const r = draw(
+        folderModel({ workCopy: { available: true, enabled: true, path: "Arbeit/Projekte/docs", exists: false } }),
+        { onFolderCreateWorkCopy: () => { created++; } }
+      );
+      r.find("epub-sb-action-copy-create")!.click();
+      expect(created).toBe(1);
+    });
+  });
+
+  it("wires export, import and close to their handlers, once each, and nothing else", () => {
+    const calls: string[] = [];
+    const r = draw(folderModel(), {
+      onFolderExport: () => calls.push("export"),
+      onFolderImport: () => calls.push("import"),
+      onFolderClose: () => calls.push("close"),
+      onExport: () => calls.push("note-export"),
+    });
+    r.find("epub-sb-action-export")!.click();
+    r.find("epub-sb-action-import")!.click();
+    r.find("epub-sb-action-close")!.click();
+    expect(calls).toEqual(["export", "import", "close"]);
+    expect(r.find("epub-sb-action-consolidate")).toBeNull();
+    expect(r.find("epub-sb-action-meta")).toBeNull();
+    expect(r.find("epub-sb-action-cover")).toBeNull();
+  });
+
+  it("gives the close button an accessible name and a button element", () => {
+    registerI18n();
+    setLang("de");
+    const close = draw(folderModel()).find("epub-sb-action-close")!;
+    expect(close.tag).toBe("button");
+    expect(close.getAttribute("aria-label")).toBe(t("view.folder.close"));
+  });
+
+  it("offers no drag handles: a folder preview cannot be reordered", () => {
+    const r = draw(folderModel());
+    expect(r.findAll("epub-sb-chapter-grip")).toHaveLength(0);
+    expect(r.findAll("epub-sb-row").every((row) => !row.draggable)).toBe(true);
+  });
+});

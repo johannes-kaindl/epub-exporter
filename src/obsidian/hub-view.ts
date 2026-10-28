@@ -21,6 +21,9 @@ export interface SidebarBridge {
   // plugin the user can disable mid-session, and the answer is a lookup.
   // Optional so a bridge that predates the cover feature stays valid.
   canGenerateCover?(): boolean;
+  // Whether a vault path belongs to the folder the panel previews (the folder or its working copy).
+  // Optional: without a folder selection there is nothing to follow.
+  affectsFolder?(path: string): boolean;
   // The gesture handlers are supplied by the view, not by the plugin: the drag
   // lock is view state, so main.ts has no business knowing about it.
   handlers: Omit<SidebarHandlers, "onDragStart" | "onDragEnd">;
@@ -82,9 +85,28 @@ export class EpubHubView extends ItemView {
     // the model-key memoisation keeps it free when nothing really changed.
     this.registerEvent(
       this.app.metadataCache.on("changed", (file: TFile) => {
-        if (file.path === resolveTargetFile(this.app)?.path) void this.rerender();
+        if (file.path === resolveTargetFile(this.app)?.path || this.followsFolder(file.path)) void this.rerender();
       })
     );
+    // The folder preview follows the folder while the user renames and files things in the file explorer. Created and
+    // deleted entries change the rows; a rename also counts when the old path was inside (a move out). Through the same
+    // rerender() as everything else, so the model-key memoisation still keeps an unchanged preview from rebuilding the DOM.
+    this.registerEvent(this.app.vault.on("create", (file) => { if (this.followsFolder(file.path)) void this.rerender(); }));
+    this.registerEvent(this.app.vault.on("delete", (file) => { if (this.followsFolder(file.path)) void this.rerender(); }));
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath: string) => {
+        if (this.followsFolder(file.path) || this.followsFolder(oldPath)) void this.rerender();
+      })
+    );
+  }
+
+  private followsFolder(path: string): boolean {
+    return this.bridge.affectsFolder?.(path) ?? false;
+  }
+
+  /** Reads the bridge again and redraws if the model changed: for state the view cannot see change itself (a setting, the folder selection). */
+  async refresh(): Promise<void> {
+    await this.rerender();
   }
 
   async onClose(): Promise<void> {

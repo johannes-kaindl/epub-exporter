@@ -1,5 +1,5 @@
 // src/obsidian/work-copy.ts
-import { App, TFile } from "obsidian";
+import { App, TFile, TFolder } from "obsidian";
 import { CopyPlan } from "../core/work-copy";
 
 export interface WorkCopyPort {
@@ -22,6 +22,11 @@ export function createWorkCopyPort(app: App): WorkCopyPort {
       await app.vault.copy(file, to);
     },
   };
+}
+
+/** Every entry the vault has loaded, folders flagged: the input of `planWorkCopy`, which picks the ones below the folder to copy. */
+export function collectVaultEntries(app: App): Array<{ path: string; isFolder: boolean }> {
+  return app.vault.getAllLoadedFiles().map((entry) => ({ path: entry.path, isFolder: entry instanceof TFolder }));
 }
 
 /** Carries out the plan. A copy that exists already (`to`) is never touched: its owner has renamed things there. */

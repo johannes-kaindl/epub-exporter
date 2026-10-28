@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { executeWorkCopy, WorkCopyPort } from "../src/obsidian/work-copy";
+import type { App } from "obsidian";
+import { TFile, TFolder } from "./mocks/obsidian";
+import { collectVaultEntries, executeWorkCopy, WorkCopyPort } from "../src/obsidian/work-copy";
 import { planWorkCopy } from "../src/core/work-copy";
 
 class FakeWorkCopyPort implements WorkCopyPort {
@@ -44,5 +46,32 @@ describe("executeWorkCopy", () => {
     const res = await executeWorkCopy(port, plan, "Arbeit/P/docs");
     expect(res).toEqual({ created: false });
     expect(port.calls).toEqual([]);
+  });
+});
+
+describe("collectVaultEntries", () => {
+  const folder = (path: string): TFolder => Object.assign(new TFolder(), { path });
+  const file = (path: string): TFile => Object.assign(new TFile(), { path });
+
+  it("turns what the vault has loaded into the entries planWorkCopy reads: folders flagged, files not", () => {
+    const app = {
+      vault: { getAllLoadedFiles: () => [folder("/"), folder("P"), folder("P/docs"), file("P/docs/a.md"), file("P/docs/img.png")] },
+    } as unknown as App;
+    expect(collectVaultEntries(app)).toEqual([
+      { path: "/", isFolder: true },
+      { path: "P", isFolder: true },
+      { path: "P/docs", isFolder: true },
+      { path: "P/docs/a.md", isFolder: false },
+      { path: "P/docs/img.png", isFolder: false },
+    ]);
+  });
+
+  it("plans the same copy as the hand-written entries do (the vault root and entries elsewhere are ignored)", () => {
+    const app = {
+      vault: {
+        getAllLoadedFiles: () => [folder("/"), folder("P"), folder("P/docs"), file("P/docs/a.md"), folder("P/docs/img"), file("P/docs/img/x.png"), file("P/other.md")],
+      },
+    } as unknown as App;
+    expect(planWorkCopy(collectVaultEntries(app), "P/docs", "Arbeit/P/docs")).toEqual(plan);
   });
 });
