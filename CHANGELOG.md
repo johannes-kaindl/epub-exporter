@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-28
+
 ### Added
 
 - **Folder as book.** Right-click a folder and choose "Create EPUB": the sidebar shows the folder as a book (subfolders are chapters, their pages are sub-chapters, to any depth) and exports it with a nested table of contents in `nav.xhtml` and `toc.ncx`. Links between pages are resolved by the full path of the page, so `README.md` leads to the `README.md` next to it; an anchor (`#section`) is dropped and the link leads to the start of the page.
