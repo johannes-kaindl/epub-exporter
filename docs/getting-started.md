@@ -30,6 +30,12 @@ Click the ribbon icon **Open EPUB Exporter sidebar** (the book icon). The panel 
 
 A notice says **EPUB saved to …** and the file `My First Book.epub` — named after the `title` field — lies next to the note. Open it in any e-reader app to check the result.
 
+## A folder as a book
+
+If your notes already live in a folder, you do not need a book note. Right-click the folder in the file explorer and choose **Create EPUB**: the sidebar shows the folder as a book, with each subfolder as a chapter, and **Export as EPUB** writes it next to the folder.
+
+To set the order by name, turn on *Use numbers at the start of a name for order* under *Settings* → *EPUB Exporter*; then `01 - Arrival` comes before `02 - The Road`, and a name that starts with `0` (`0 - Drafts`) stays out of the book. To work on a copy instead of the original, set a *Working directory* there and switch *Working copy* on in the panel. The README describes the [folder mode](https://github.com/johannes-kaindl/epub-exporter/blob/main/README.md#folder-as-book) in full.
+
 ## Where next
 
 - Reorder chapters by dragging in the panel or with `Alt+↑/↓`; the embed lines in the note move with them.

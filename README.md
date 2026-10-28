@@ -16,6 +16,7 @@ Export notes as EPUB3 — a single note, or a whole book assembled from embedded
 - **A book is a note.** Frontmatter carries the metadata, the embedded chapters form
   the spine — no separate project file that drifts out of sync.
 - Export a single note, a book note, or an entire **folder** as EPUB3.
+- **Folder as book.** Right-click a folder, choose *Create EPUB*, and its subfolders become chapters with a nested table of contents; a number in front of a name sets the order, a `0` hides, and a working copy lets you rename and reorder without touching the original.
 - **Sidebar** with the chapter list; reordering by drag or `Alt+↑/↓` writes the new
   order straight back into the book note's embed spine.
 - **Import a folder as a book** and **consolidate a book note into a folder**
@@ -85,8 +86,7 @@ frontmatter into note"** lays out the scaffold.
   goes straight into the book note's embed spine, so the book reorders itself in
   reading view immediately.
 - **Command** "Export as EPUB" — exports the active note.
-- **A folder's context menu** — exports the folder as a book **or** imports it as a book
-  note (embed spine from the file name order).
+- **A folder's context menu** — one entry, **Create EPUB**, opens the sidebar in folder mode (see [Folder as book](#folder-as-book)).
 - **Book note → "Consolidate book to folder"** (command, sidebar or context menu) —
   moves the book into a folder of its own: book note + numbered chapter files +
   `_assets/`. A dialog picks whether chapters are copied or moved, and how many images
@@ -102,6 +102,18 @@ frontmatter into note"** lays out the scaffold.
 Per chapter: `chapter_title` overrides the title in the table of contents,
 `epub_exclude: true` leaves a chapter out.
 
+### Folder as book
+
+Right-click a folder in the file explorer and choose **Create EPUB**. The sidebar switches to the folder mode: it shows the book as it will be exported (subfolders are chapters, their pages are sub-chapters, to any depth), a hint on the number rule, the working copy switch and the **Export as EPUB** button. The preview follows renaming, adding and deleting in the folder. The folder mode ends when you close it (the × in the panel header) or right-click another folder; switching the active note does not end it, and renaming or moving the folder in the file explorer is followed.
+
+- **Order and names.** By default pages and subfolders sort by name, numbers compared as numbers (`2` before `10`). With *Use numbers at the start of a name for order* on, a number in front sorts the item (`01 - Intro`, `2. Next`; `1.10 Foo` comes after `1.2 Foo`) and is dropped from the title. A number that is `0` (`0 - Notes`, `000_Draft`) hides the item, a folder with everything in it; `01` does not hide. Digits that run straight into a letter belong to the name (`3D Grafik`). The panel says how many items are hidden.
+- **Intro pages.** *Intro pages* lists page names, for example `README, {{folder_name}}` (`{{folder_name}}` is the name of the folder). A page with such a name opens its chapter and is the chapter's entry in the table of contents; the intro page of the chosen folder comes first in the book. A chapter without an intro page links to its first page.
+- **Titles.** `chapter_title` in a note always wins. Otherwise *Page titles in a folder book* decides: the first heading (the file name if there is none), or the file name.
+- **Links between pages** are resolved by the full path of the page, so `[next](README.md)` leads to the `README.md` next to it even when many pages carry that name. An anchor (`#section`) is dropped: the link leads to the start of the page. A link to a page outside the book (hidden, excluded, in another folder) becomes plain text.
+- **Table of contents.** Nested in both `nav.xhtml` and `toc.ncx`, so a reader can jump to any chapter.
+- **Working copy.** Set a *Working directory* (a vault folder) in the settings. The panel's *Working copy* switch then offers *Create working copy*: the whole folder tree, images and attachments included, is copied to `<working directory>/<vault path of the folder>`. Preview and export read the copy, and the EPUB is written next to the copy. An existing copy is never overwritten, because you renamed things there, and nothing is copied back to the original. The copy is built in a helper folder next to the target and renamed at the end, so an interrupted copy never leaves a half copy under the target name; a leftover helper folder goes to the trash on the next try.
+- **Create book note from folder.** The panel also keeps the earlier import: it writes a book note with one embed per file of the folder (flat, in file name order). It used to be an entry in the folder's context menu.
+
 ## Configuration
 
 *Settings* → *Community plugins* → **EPUB Exporter**:
@@ -114,11 +126,15 @@ Per chapter: `chapter_title` overrides the title in the table of contents,
 | Open sidebar on startup | off | Reveals the EPUB Exporter panel when Obsidian starts |
 | Consolidate: chapter files | Copy | Copy (keep originals) or move |
 | Consolidate: images | Full | Cover + all chapter images, cover only, or none |
+| Use numbers at the start of a name for order | off | Folder as book: a number in front of a name sets the order and is dropped from the title; a number that is 0 hides the item |
+| Working directory | *(empty)* | Folder as book: vault folder that holds the working copies; empty means no working copy |
+| Intro pages | *(empty)* | Folder as book: names of the page that opens a chapter, separated by commas, with `{{folder_name}}` for the folder's name |
+| Page titles in a folder book | First heading | Or the file name; `chapter_title` in a note always wins |
 
 The two consolidate settings are only the **default** in the dialog — it lets you
 deviate per run.
 
-<a href="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/thumbs/settings.png" width="380" alt="The EPUB Exporter settings tab with all six settings"></a><br><sub>Click the preview for the full-size settings tab</sub>
+<a href="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/thumbs/settings.png" width="380" alt="The EPUB Exporter settings tab with its first six settings"></a><br><sub>Click the preview for the full-size settings tab</sub>
 
 ## How it works
 

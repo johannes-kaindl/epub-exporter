@@ -6,6 +6,19 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Folder as book.** Right-click a folder and choose "Create EPUB": the sidebar shows the folder as a book (subfolders are chapters, their pages are sub-chapters, to any depth) and exports it with a nested table of contents in `nav.xhtml` and `toc.ncx`. Links between pages are resolved by the full path of the page, so `README.md` leads to the `README.md` next to it; an anchor (`#section`) is dropped and the link leads to the start of the page.
+- **Order by name.** The new setting "Use numbers at the start of a name for order" (off by default) sorts by a number in front of a name (`01 - Intro`, `1.10` after `1.2`) and drops it from the title; a number that is 0 (`0 - Notes`, `000_Draft`) hides the item, `01` does not.
+- **Intro pages and titles.** The setting "Intro pages" (for example `README, {{folder_name}}`) makes a page the entry of its chapter; "Page titles in a folder book" takes a page's title from its first heading (the default) or from its file name. `chapter_title` in a note always wins.
+- **Working copy.** The setting "Working directory" and a switch in the sidebar let you work on a copy of the folder in the working directory instead of the original. The copy is built in a helper folder and renamed at the end, so an interrupted copy leaves nothing under the target name; an existing copy is never overwritten and never copied back. The EPUB is written next to the copy.
+
+### Changed
+
+- **The folder's context menu has one entry, "Create EPUB",** instead of "Export folder as book" and "Import folder as book note". The import is now the button "Create book note from folder" in the sidebar; it works as before.
+- **A folder export now reads the whole folder tree.** It used to take only the files directly in the folder, in file name order, with the file name as the chapter title and a flat table of contents.
+- **While the folder mode is open, renaming or moving the chosen folder (or one above it) keeps the sidebar on it** instead of falling back to the active note.
+
 ## [0.8.1] — 2026-10-26
 
 ### Changed

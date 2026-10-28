@@ -15,6 +15,12 @@ EPUB ist XHTML+CSS im ZIP; Obsidian rendert Markdown selbst zu HTML. Kern ist `d
 
 `frontmatter.ts` (DE/EN-Aliase, `isBookNote`, `BOOK_FRONTMATTER_TEMPLATE`) und `spine-parser.ts` (`parseEmbedSpine`/`sortFolderChapters`). Der **Entry-Point** bestimmt den Modus (Buch-Note / Einzelnote / Ordner), es gibt **keinen** globalen Modus-Schalter. `chapter_title` und `epub_exclude` sind je-Kapitel-Verfeinerung, keine Auswahl.
 
+## Ordner als Buch
+
+`src/core/folder-tree.ts` baut aus der flachen Pfadliste aller `.md`-Dateien unter dem Ordner den Baum (`buildBookTree`, `flattenPages`, `fileInputFromNote`): Namensregel, Einleitungsseiten, Titel, Ausblenden. Die Namens- und Überschriftsfunktionen kommen vendort aus dem code-kit (`name-order`, `heading-title`, `split-list`, `folder-scope`), ebenso die Linkauflösung `link-resolver` (voller Pfad statt Dateiname; `rel-path` und `vault-path` tragen sie). `Book.toc` (`TocEntry`, `src/core/model.ts`) ist das verschachtelte Inhaltsverzeichnis, das `epub-builder.ts` als verschachtelte `<ol>` in `nav.xhtml` und als verschachtelte `navPoint` in `toc.ncx` schreibt; fehlt es, bleibt das Verzeichnis flach wie zuvor. `book-assembler.ts` hat zwei Quellen: Notiz (Buch-Notiz oder Einzelnote) und Ordner (`BookSource.kind`); `listFolderNotes` in `deps.ts` läuft rekursiv.
+
+Die Arbeitskopie teilt sich: `src/core/work-copy.ts` ist pur (`workCopyPath` mit den Verweigerungsgründen, `planWorkCopy`), `src/obsidian/work-copy.ts` trägt den Vault-Zugriff über einen Port (`executeWorkCopy` mit Hilfsordner und Umbenennen, `collectVaultEntries`). `src/main.ts` hält die Ordner-Auswahl (`folderSelection`), registriert den einen Menüeintrag und das `rename`-Ereignis und verdrahtet die Handler des Ordnermodus; die Sidebar zeichnet ihn in `sidebar-render.ts` (Kontext `folder`, `FolderPreview` aus `sidebar-model.ts`), die Vorschau liest `buildFolderSnapshot` in `sidebar-bridge.ts` mit denselben Lesungen wie der Export.
+
 ## Sidebar
 
 Ein kontextsensitives Panel: pure Render-Funktion (`sidebar-render.ts`, `sidebar-model.ts`) getrennt vom `ItemView`-Mount (`hub-view.ts`), Brücke zur Obsidian-Schicht in `sidebar-bridge.ts`. Gotchas: `.claude/rules/sidebar.md`.

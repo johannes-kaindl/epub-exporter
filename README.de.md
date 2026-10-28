@@ -18,6 +18,7 @@ Exportiert Notizen als EPUB3 — eine einzelne Notiz oder ein ganzes Buch aus ei
 - **Ein Buch ist eine Notiz.** Frontmatter trägt die Metadaten, die eingebetteten
   Kapitel bilden den Spine — keine separate Projektdatei, die aus dem Tritt gerät.
 - Einzelne Notiz, Buch-Notiz oder ganzer **Ordner** als EPUB3 exportieren.
+- **Ordner als Buch.** Rechtsklick auf einen Ordner, *EPUB erstellen*, und seine Unterordner werden Kapitel mit verschachteltem Inhaltsverzeichnis; eine Zahl vor dem Namen legt die Reihenfolge fest, eine `0` blendet aus, und eine Arbeitskopie erlaubt Umbenennen und Umsortieren, ohne das Original anzufassen.
 - **Seitenleiste** mit Kapitelliste; Umsortieren per Ziehen oder `Alt+↑/↓` schreibt
   die neue Reihenfolge direkt in den Embed-Spine der Buch-Notiz zurück.
 - **Ordner als Buch importieren** und Buch-Notizen **in einen Ordner konsolidieren**
@@ -84,8 +85,7 @@ Der Befehl **„Buch-Frontmatter in Notiz einfügen"** legt das Gerüst an.
 - **Kapitel umsortieren** — in der Seitenleiste per Ziehen oder `Alt+↑/↓`; die neue Reihenfolge wandert
   sofort in den Embed-Spine der Buch-Notiz, sodass das Buch in der Leseansicht direkt neu sortiert erscheint.
 - **Befehl** „Als EPUB exportieren" — exportiert die aktive Notiz.
-- **Kontextmenü eines Ordners** — exportiert den Ordner als Buch **oder** importiert ihn als Buch-Notiz
-  (Embed-Spine aus der Dateinamen-Reihenfolge).
+- **Kontextmenü eines Ordners** — ein Eintrag, **EPUB erstellen**, öffnet die Seitenleiste im Ordnermodus (siehe [Ordner als Buch](#ordner-als-buch)).
 - **Buch-Notiz → „In Ordner konsolidieren"** (Befehl, Seitenleiste oder Kontextmenü) — überführt das Buch
   in einen eigenständigen Ordner: Buch-Notiz + nummerierte Kapiteldateien + `_assets/`. Ein Dialog wählt,
   ob die Kapitel kopiert oder verschoben werden und wie viele Bilder mitkommen.
@@ -94,6 +94,18 @@ Der Befehl **„Buch-Frontmatter in Notiz einfügen"** legt das Gerüst an.
 
 Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeichnis,
 `epub_exclude: true` lässt ein Kapitel aus.
+
+### Ordner als Buch
+
+Rechtsklick auf einen Ordner im Datei-Explorer, dann **EPUB erstellen**. Die Seitenleiste wechselt in den Ordnermodus: Sie zeigt das Buch so, wie es exportiert wird (Unterordner sind Kapitel, ihre Seiten Unterkapitel, beliebig tief), einen Hinweis zur Zahlenregel, den Schalter für die Arbeitskopie und die Schaltfläche **Als EPUB exportieren**. Die Vorschau folgt dem Umbenennen, Anlegen und Löschen im Ordner. Der Ordnermodus endet, wenn du ihn schließt (das × in der Kopfzeile) oder einen anderen Ordner mit der rechten Maustaste wählst; ein Wechsel der aktiven Notiz beendet ihn nicht, und ein Umbenennen oder Verschieben des Ordners im Datei-Explorer wird mitgemacht.
+
+- **Reihenfolge und Namen.** Ohne weitere Einstellung sortieren Seiten und Unterordner nach dem Namen, Zahlen werden als Zahlen verglichen (`2` vor `10`). Ist *Zahlen am Namensanfang für die Reihenfolge nutzen* an, sortiert eine vorangestellte Zahl den Eintrag (`01 - Einleitung`, `2. Weiter`; `1.10 Foo` kommt nach `1.2 Foo`) und fällt aus dem Titel weg. Eine Zahl, die `0` ist (`0 - Notizen`, `000_Entwurf`), blendet den Eintrag aus, einen Ordner samt allem darin; `01` blendet nicht aus. Ziffern, die unmittelbar in einen Buchstaben übergehen, gehören zum Namen (`3D Grafik`). Das Panel nennt, wie viele Einträge ausgeblendet sind.
+- **Einleitungsseiten.** *Einleitungsseiten* nennt Seitennamen, zum Beispiel `README, {{folder_name}}` (`{{folder_name}}` steht für den Namen des Ordners). Eine Seite mit so einem Namen eröffnet ihr Kapitel und ist dessen Eintrag im Inhaltsverzeichnis; die Einleitungsseite des gewählten Ordners steht als Erstes im Buch. Ein Kapitel ohne Einleitungsseite führt auf seine erste Seite.
+- **Titel.** `chapter_title` in einer Notiz gilt immer. Sonst entscheidet *Seitentitel im Ordner-Buch*: die erste Überschrift (ohne Überschrift der Dateiname) oder der Dateiname.
+- **Links zwischen Seiten** werden über den vollen Pfad der Seite aufgelöst: `[weiter](README.md)` führt zur `README.md` im selben Ordner, auch wenn viele Seiten so heißen. Ein Anker (`#abschnitt`) entfällt, der Link führt an den Anfang der Seite. Ein Link auf eine Seite außerhalb des Buchs (ausgeblendet, ausgeschlossen, in einem anderen Ordner) wird zu Text ohne Link.
+- **Inhaltsverzeichnis.** Verschachtelt in `nav.xhtml` und in `toc.ncx`, sodass ein Reader zu jedem Kapitel springen kann.
+- **Arbeitskopie.** Lege in den Einstellungen ein *Arbeitsverzeichnis* fest (ein Ordner im Vault). Der Schalter *Arbeitskopie* im Panel bietet dann *Arbeitskopie anlegen*: Der ganze Ordnerbaum, mit Bildern und Anhängen, wird nach `<Arbeitsverzeichnis>/<Vault-Pfad des Ordners>` kopiert. Vorschau und Export lesen die Kopie, und das EPUB landet neben der Kopie. Eine vorhandene Kopie wird nie überschrieben, weil du dort umbenannt hast, und nichts geht ins Original zurück. Die Kopie entsteht in einem Hilfsordner neben dem Ziel und wird am Ende umbenannt; ein Abbruch hinterlässt so nie eine halbe Kopie unter dem Zielnamen, und ein liegen gebliebener Hilfsordner geht beim nächsten Versuch in den Papierkorb.
+- **Buch-Notiz aus Ordner anlegen.** Das Panel behält auch den früheren Import: Er schreibt eine Buch-Notiz mit einem Embed je Datei des Ordners (flach, in Dateinamen-Reihenfolge). Er war früher ein Eintrag im Kontextmenü des Ordners.
 
 ## Konfiguration
 
@@ -107,11 +119,15 @@ Pro Kapitel steuerbar: `chapter_title` überschreibt den Titel im Inhaltsverzeic
 | Seitenleiste beim Start öffnen | aus | Blendet das EPUB-Exporter-Panel beim Start von Obsidian ein |
 | Konsolidieren: Kapiteldateien | Kopieren | Kopieren (Originale bleiben) oder Verschieben |
 | Konsolidieren: Bilder | Vollständig | Cover + alle Kapitelbilder, nur Cover, oder keine |
+| Zahlen am Namensanfang für die Reihenfolge nutzen | aus | Ordner als Buch: Eine Zahl vor dem Namen legt die Reihenfolge fest und fällt aus dem Titel weg; eine Zahl, die 0 ist, blendet den Eintrag aus |
+| Arbeitsverzeichnis | *(leer)* | Ordner als Buch: Vault-Ordner, in dem die Arbeitskopien liegen; leer heißt keine Arbeitskopie |
+| Einleitungsseiten | *(leer)* | Ordner als Buch: Namen der Seite, die ein Kapitel eröffnet, durch Kommas getrennt, mit `{{folder_name}}` für den Namen des Ordners |
+| Seitentitel im Ordner-Buch | Erste Überschrift | Oder der Dateiname; `chapter_title` in einer Notiz gilt immer |
 
 Die beiden Konsolidieren-Einstellungen sind nur der **Vorschlag** im Dialog — dort lässt
 sich je Vorgang abweichen.
 
-<a href="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/thumbs/settings.png" width="380" alt="Der Einstellungen-Tab von EPUB Exporter mit allen sechs Einstellungen"></a><br><sub>Vorschau anklicken für den vollständigen Einstellungen-Tab</sub>
+<a href="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/thumbs/settings.png" width="380" alt="Der Einstellungen-Tab von EPUB Exporter mit den ersten sechs Einstellungen"></a><br><sub>Vorschau anklicken für den vollständigen Einstellungen-Tab</sub>
 
 ## Funktionsweise
 
