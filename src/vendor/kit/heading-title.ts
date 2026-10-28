@@ -1,4 +1,4 @@
-// vendored from code-kit@0.41.1, src/ts/pure/heading-title.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.42.0, src/ts/pure/heading-title.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** The text of the first Markdown heading of a note, as plain text: the title a note gets when its file name is not wanted
  *  (`# 🎓 Lektion 1 — Überleben` → "🎓 Lektion 1 — Überleben"). Works on the raw text, so a preview and an export read the same
  *  title without rendering anything. String logic only, no I/O; linear in the length of the text.

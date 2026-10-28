@@ -1,8 +1,8 @@
 {
   "source": "code-kit",
-  "version": "0.41.1",
-  "sha": "5350a3d",
-  "vendored": "crc32.ts, filename-template.ts, heading-title.ts, i18n.ts, name-order.ts, rel-path.ts, settings.ts",
+  "version": "0.42.0",
+  "sha": "8fc030c",
+  "vendored": "crc32.ts, filename-template.ts, heading-title.ts, i18n.ts, name-order.ts, rel-path.ts, settings.ts, split-list.ts",
   "note": "Verbatim snapshot aus den Git-Refs code-kit 0.36.0 und obsidian-kit 0.67.1 (CORE-META-22: feste Ref, nicht Arbeitsstand). Never hand-edit. Re-vendor via tools/sync-kit.sh. kit-obsidian/ steht auf demselben Kit-Stand (obsidian-kit 0.67.1) — siehe dortige VENDOR.json.",
   "obsidian_kit_version": "0.70.0",
   "obsidian_kit_sha": "86a2d2d",

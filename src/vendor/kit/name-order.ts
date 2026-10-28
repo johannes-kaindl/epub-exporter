@@ -1,4 +1,4 @@
-// vendored from code-kit@0.41.1, src/ts/pure/name-order.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.42.0, src/ts/pure/name-order.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** The naming rule that turns a file or folder name into an order, a title and a hidden flag: `01 - Intro` is chapter 1 titled
  *  "Intro", `1.10 Foo` sorts behind `1.2 Foo`, `0 - Notes` is hidden. String logic only; the caller strips the extension and
  *  decides whether the rule is on at all (a setting) — with it off, the full name is the title and the order is the caller's own.
