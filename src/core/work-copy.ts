@@ -1,4 +1,5 @@
 import { isInFolder } from "../vendor/kit/folder-scope";
+import { checkRelPath } from "../vendor/kit/rel-path";
 import { joinVaultPath, normalizeVaultDir } from "../vendor/kit/vault-path";
 
 export interface CopyPlan {
@@ -12,13 +13,15 @@ const GUARD = { self: true, reading: "filesystem" } as const;
 
 /** Where the working copy of `originalPath` lives: the vault path of the original, mirrored under `workDir`, so equally named
  *  folders (`docs` from many repos) do not collide and the target follows from the original alone. Refuses when there is no
- *  working directory, when the original is the working directory or lies in it, and when the original holds the working
- *  directory (or is the vault root): a folder cannot be copied into itself. Names compare as the file system reads them
+ *  working directory, when it is no folder inside the vault (a `..` or `.` segment, a NUL byte: `invalid-workdir`; outer
+ *  slashes are noise, not a path from the file system root), when the original is the working directory or lies in it, and when the original
+ *  holds the working directory (or is the vault root): a folder cannot be copied into itself. Names compare as the file system reads them
  *  (`isInFolder`, reading `filesystem`): without case, and `Arbeit.` is `Arbeit`. */
-export function workCopyPath(workDir: string, originalPath: string): { ok: true; path: string } | { ok: false; reason: "no-workdir" | "inside-workdir" | "contains-workdir" } {
+export function workCopyPath(workDir: string, originalPath: string): { ok: true; path: string } | { ok: false; reason: "no-workdir" | "invalid-workdir" | "inside-workdir" | "contains-workdir" } {
   const work = normalizeVaultDir(workDir);
   const original = normalizeVaultDir(originalPath);
   if (work === "") return { ok: false, reason: "no-workdir" };
+  if (!checkRelPath(work).ok) return { ok: false, reason: "invalid-workdir" };
   if (original === "") return { ok: false, reason: "contains-workdir" };
   if (isInFolder(original, work, GUARD)) return { ok: false, reason: "inside-workdir" };
   if (isInFolder(work, original, GUARD)) return { ok: false, reason: "contains-workdir" };

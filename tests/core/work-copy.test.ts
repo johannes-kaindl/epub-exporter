@@ -15,6 +15,19 @@ describe("workCopyPath", () => {
     expect(workCopyPath("/", "Projekte/docs")).toEqual({ ok: false, reason: "no-workdir" });
   });
 
+  it("refuses a working directory that is no usable vault folder: a climb out of the vault, a dot segment, a NUL byte", () => {
+    expect(workCopyPath("../x", "Projekte/docs")).toEqual({ ok: false, reason: "invalid-workdir" });
+    expect(workCopyPath("Arbeit/../../x", "Projekte/docs")).toEqual({ ok: false, reason: "invalid-workdir" });
+    expect(workCopyPath("..\\x", "Projekte/docs")).toEqual({ ok: false, reason: "invalid-workdir" });
+    expect(workCopyPath("Arbeit/./x", "Projekte/docs")).toEqual({ ok: false, reason: "invalid-workdir" });
+    expect(workCopyPath("Arb\0eit", "Projekte/docs")).toEqual({ ok: false, reason: "invalid-workdir" });
+  });
+
+  it("refuses an invalid working directory before it asks whether the original lies inside it", () => {
+    expect(workCopyPath("../x", "../x/docs")).toEqual({ ok: false, reason: "invalid-workdir" });
+    expect(workCopyPath("..", "")).toEqual({ ok: false, reason: "invalid-workdir" });
+  });
+
   it("refuses an original that is the working directory or lies inside it", () => {
     expect(workCopyPath("Arbeit", "Arbeit")).toEqual({ ok: false, reason: "inside-workdir" });
     expect(workCopyPath("Arbeit", "Arbeit/Projekte/docs")).toEqual({ ok: false, reason: "inside-workdir" });
