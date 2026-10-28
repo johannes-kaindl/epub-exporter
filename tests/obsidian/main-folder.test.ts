@@ -15,6 +15,7 @@ interface PluginStore { data: unknown; saveCalls: number }
 function makeVault(initial: { folders: string[]; files: string[] }) {
   const entries = new Map<string, TFile | TFolder>();
   const calls: string[] = [];
+  const vaultListeners = new Map<string, (...a: unknown[]) => void>();
   const folderAt = (path: string): TFolder => {
     let f = entries.get(path);
     if (f instanceof TFolder) return f;
@@ -34,6 +35,7 @@ function makeVault(initial: { folders: string[]; files: string[] }) {
   return {
     calls,
     entries,
+    vaultListeners,
     remove: (path: string) => entries.delete(path),
     vault: {
       getAbstractFileByPath: (p: string) => entries.get(p) ?? null,
@@ -51,7 +53,7 @@ function makeVault(initial: { folders: string[]; files: string[] }) {
           entries.set(e.path, e);
         }
       },
-      on: () => ({}),
+      on: (name: string, cb: (...a: unknown[]) => void) => { vaultListeners.set(name, cb); return {}; },
     },
   };
 }
@@ -379,5 +381,66 @@ describe("Sidebar im Ordnermodus: Snapshot und Ereignisse", () => {
     refresh.mockClear();
     await plugin.saveSettings();
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Sidebar im Ordnermodus: Umbenennen und Verschieben", () => {
+  // What Obsidian does on a rename in the explorer: the entries move, then the vault announces it.
+  const rename = (fake: Awaited<ReturnType<typeof setup>>["fake"], from: string, to: string) => {
+    const moved = fake.vault.getAbstractFileByPath(from) as TFolder;
+    for (const [path, e] of [...fake.entries]) {
+      if (path !== from && !path.startsWith(`${from}/`)) continue;
+      fake.entries.delete(path);
+      (e as TFolder).path = `${to}${path.slice(from.length)}`;
+      fake.entries.set((e as TFolder).path, e);
+    }
+    fake.vaultListeners.get("rename")!(moved, from);
+  };
+
+  it("the selection follows a rename of the chosen folder, and the sidebar stays in the folder mode", async () => {
+    const { plugin, bridge, openMenu, folderOf, fake } = await setup();
+    openMenu(folderOf("P/docs"))[0].click();
+    rename(fake, "P/docs", "P/handbuch");
+    expect(plugin.folderSelection).toBe("P/handbuch");
+    const snap = await bridge.snapshot();
+    expect(snap?.kind).toBe("folder");
+    expect(snap?.title).toBe("handbuch");
+  });
+
+  it("the selection follows a rename or move of a folder above it", async () => {
+    const { plugin, openMenu, folderOf, fake } = await setup();
+    openMenu(folderOf("P/docs"))[0].click();
+    rename(fake, "P", "Q/R");
+    expect(plugin.folderSelection).toBe("Q/R/docs");
+  });
+
+  it("leaves the selection alone for a rename elsewhere, also one whose name only starts the same", async () => {
+    const { plugin, openMenu, folderOf, fake } = await setup({ folders: ["P", "P/docs", "P/docs2", "P/docs/img"] });
+    openMenu(folderOf("P/docs"))[0].click();
+    rename(fake, "P/docs2", "P/neu");
+    rename(fake, "P/docs/img", "P/docs/bilder");
+    expect(plugin.folderSelection).toBe("P/docs");
+  });
+
+  it("does nothing without a selection", async () => {
+    const { plugin, fake } = await setup();
+    rename(fake, "P/docs", "P/handbuch");
+    expect(plugin.folderSelection).toBeNull();
+  });
+
+  it("without the rename handler the old path is gone and the mode ends (the case this guards)", async () => {
+    const { plugin, bridge, openMenu, folderOf, fake } = await setup();
+    openMenu(folderOf("P/docs"))[0].click();
+    fake.vaultListeners.delete("rename"); // nobody follows
+    const moved = folderOf("P/docs");
+    for (const [path, e] of [...fake.entries]) {
+      if (path !== "P/docs" && !path.startsWith("P/docs/")) continue;
+      fake.entries.delete(path);
+      (e as TFolder).path = `P/handbuch${path.slice("P/docs".length)}`;
+      fake.entries.set((e as TFolder).path, e);
+    }
+    expect(moved.path).toBe("P/handbuch");
+    expect((await bridge.snapshot())?.kind ?? "normal").toBe("normal");
+    expect(plugin.folderSelection).toBeNull();
   });
 });

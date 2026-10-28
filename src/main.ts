@@ -116,6 +116,10 @@ export default class EpubExporterPlugin extends Plugin {
       })
     );
 
+    // The explorer is where the user renames: the folder mode follows a rename or move of the chosen folder or of any folder above it.
+    // Registered here, before the sidebar's own listeners, so the selection is already the new path when the sidebar redraws.
+    this.registerEvent(this.app.vault.on("rename", (file, oldPath: string) => { this.followRename(oldPath, file.path); }));
+
     // Gotcha Z.37: never auto-open unconditionally — gated on the setting and onLayoutReady.
     this.app.workspace.onLayoutReady(() => {
       if (this.settings.openSidebarOnStartup) void this.openHub();
@@ -198,6 +202,15 @@ export default class EpubExporterPlugin extends Plugin {
     if (within(selection)) return true;
     const copy = workCopyPath(this.settings.workDir, selection);
     return copy.ok && within(copy.path);
+  }
+
+  // The selection is a vault path, and a rename or move of the folder (or of one above it) changes it: carry it over, not clear it.
+  private followRename(oldPath: string, newPath: string): void {
+    const selection = this.folderSelection;
+    if (selection === null) return;
+    if (selection === oldPath || selection.startsWith(`${oldPath}/`)) {
+      this.folderSelection = `${newPath}${selection.slice(oldPath.length)}`;
+    }
   }
 
   private async snapshotForSidebar(): ReturnType<SidebarBridge["snapshot"]> {
