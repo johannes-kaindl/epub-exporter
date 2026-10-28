@@ -62,8 +62,9 @@
  *    Fixture, und der Fehlschlag des einen beschaedigt still das andere.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { strFromU8, unzipSync } from "fflate";
 import { argv, cwd, env } from "node:process";
 
 import {
@@ -83,6 +84,8 @@ import {
   schliesseDialog,
 } from "../../tools/obsidian-cdp/cdp.js";
 import { createBilanz, parseArgs, runDriver, Vorbedingung } from "../../tools/obsidian-cdp/bilanz.js";
+import { messeErreichbarkeit } from "../../tools/obsidian-cdp/pflichtpunkte.js";
+import { capture } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const REPO_NAME = "epub-exporter";
@@ -94,7 +97,7 @@ let PORT = 0;
 
 /** Soll-Liste (Nenner der Bilanz). C0 und C1 rahmen die Pruefpunkte (Rest-Stub / Aufraeumprotokoll). */
 const PUNKTE = [
-  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "X1", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "F1", "C1",
+  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "X1", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "F1", "O1", "O2", "O3", "O4", "O5", "C1",
 ] as const;
 type PunktId = (typeof PUNKTE)[number];
 
@@ -309,6 +312,326 @@ function liesZip(buf: Buffer): ZipEintrag[] {
     p = start + groesse;
   }
   return eintraege;
+}
+
+// ---------------------------------------------------------------------------
+// Ordnermodus (O1–O5): Wegwerf-Baum, Menue und Zustand des Plugins
+// ---------------------------------------------------------------------------
+
+/** Wurzel des Wegwerf-Materials fuer O1–O5. Bewusst NICHT `_smoke`: dort liegen die Notizen der Buch-Punkte,
+ *  und ein Ordner-Export von `_smoke` wuerde sie als Kapitel einsammeln. */
+const O_DIR = "_smoke-ordner";
+const O_ROOT = `${O_DIR}/Handbuch`;
+const O_TIEF = `${O_DIR}/Tief`;
+const O_PROBE = `${O_DIR}/O5`;
+/** Arbeitsverzeichnis der Arbeitskopie (O4); die Kopie spiegelt den Vault-Pfad des Originals darunter. */
+const O_ARBEIT = "_smoke-arbeit";
+const O_KOPIE = `${O_ARBEIT}/${O_ROOT}`;
+const O_EPUB = `${O_DIR}/Handbuch.epub`;
+const O_HILFSORDNER = `${O_KOPIE}.epub-exporter-tmp`;
+/** Die Einstellungen, unter denen O1–O4 messen: Zahlenregel an, README als Einleitungsseite, Seitentitel aus der Ueberschrift. */
+const O_EINSTELLUNGEN = {
+  folderNumberPrefix: true,
+  folderIntroNames: "README",
+  folderPageTitle: "heading",
+  outputDestination: "besideNote",
+  workDir: "",
+  useWorkCopy: false,
+};
+
+/** Der Baum, wie ein Doku-Ordner aussieht: zwei `README.md` in verschiedenen Ordnern, ein Name ohne Ueberschrift,
+ *  ein ausgeblendeter Ordner (`0 - …`) und eine ausgeblendete Seite (`000_…`), ein Teilbaum mit Tiefe 3.
+ *  Die MARKER stehen im Text, damit ein Kapitel im Archiv an seinem Inhalt erkannt wird, nicht an seiner Nummer. */
+const O_BAUM: Array<{ pfad: string; body: string }> = [
+  { pfad: `${O_ROOT}/README.md`, body: "# Handbuch Start\n\nMARKER-WURZEL-INTRO\n" },
+  { pfad: `${O_ROOT}/01 - Anfang/README.md`, body: "# Anfang\n\nMARKER-ANFANG-INTRO\n" },
+  {
+    pfad: `${O_ROOT}/01 - Anfang/01 - Erste Schritte.md`,
+    body: "# Erste Schritte\n\nMARKER-ERSTE\n\nNachbar: [Einleitung](README.md). Wurzel: [Start](../README.md#start). Draussen: [weg](../../Ausserhalb.md).\n",
+  },
+  { pfad: `${O_ROOT}/01 - Anfang/02 - Zweites.md`, body: "# Zweite Seite\n\nMARKER-ZWEITE\n" },
+  { pfad: `${O_ROOT}/01 - Anfang/03 - Namenstitel.md`, body: "Nur Text, keine Ueberschrift. MARKER-NAMENSTITEL\n" },
+  { pfad: `${O_ROOT}/02 - Vertiefung/README.md`, body: "# Vertiefung\n\nMARKER-VERTIEFUNG-INTRO\n" },
+  {
+    pfad: `${O_ROOT}/02 - Vertiefung/01 - Details.md`,
+    body: "# Details\n\nMARKER-DETAILS\n\nHier: [README](README.md). Anfang: [A](../01%20-%20Anfang/README.md#a).\n",
+  },
+  { pfad: `${O_ROOT}/02 - Vertiefung/Tiefer/Noch tiefer/01 - Ganz unten.md`, body: "# Ganz unten\n\nMARKER-UNTEN\n" },
+  { pfad: `${O_ROOT}/0 - Entwurf/geheim.md`, body: "# Geheim\n\nMARKER-GEHEIM\n" },
+  { pfad: `${O_ROOT}/000_Notiz.md`, body: "# Notiz\n\nMARKER-GEHEIM-SEITE\n" },
+  { pfad: `${O_ROOT}/Lose Seite.md`, body: "# Lose Seite\n\nMARKER-LOSE\n" },
+];
+const O_PNG = `${O_ROOT}/img/x.png`;
+/** Die Vorschau, die dieser Baum ergeben muss — von Hand aus der Regel gelesen (Design § 5.1–5.4), nicht aus dem Plugin. */
+const O_ZEILEN: Array<{ titel: string; tiefe: number; art: "chapter" | "page" }> = [
+  { titel: "Handbuch Start", tiefe: 0, art: "page" },
+  { titel: "Anfang", tiefe: 0, art: "chapter" },
+  { titel: "Erste Schritte", tiefe: 1, art: "page" },
+  { titel: "Zweite Seite", tiefe: 1, art: "page" },
+  { titel: "Namenstitel", tiefe: 1, art: "page" },
+  { titel: "Vertiefung", tiefe: 0, art: "chapter" },
+  { titel: "Details", tiefe: 1, art: "page" },
+  { titel: "Tiefer", tiefe: 1, art: "chapter" },
+  { titel: "Noch tiefer", tiefe: 2, art: "chapter" },
+  { titel: "Ganz unten", tiefe: 3, art: "page" },
+  { titel: "Lose Seite", tiefe: 0, art: "page" },
+];
+const O_AUSGEBLENDET = 2;
+
+/** Der Einstellungsstand vor dem ersten O-Punkt; `cleanupState` stellt ihn wieder her. */
+let oEinstellungenVorher: string | null = null;
+/** `nativeMenus` vor dem ersten O-Punkt (`null` = Obsidians Standard, unter macOS das native Menue). */
+let oNativeMenusVorher: { wert: unknown } | null = null;
+
+/** Warten auf ein Verhalten des Plugins: laeuft die Frist ab, ist das ein Befund (rot, mit Grund), kein Abbruch des Treibers.
+ *  `requireUntil` bleibt fuer den Aufbau (Material herstellen, Fenster oeffnen), dessen Scheitern „nichts gemessen“ heisst. */
+async function erwarte(cdp: Cdp, ausdruck: string, grund: string, fristMs = 10_000): Promise<string | null> {
+  const ok = await pollUntil<boolean>(cdp, `return (${ausdruck});`, fristMs, 200);
+  return ok ? null : `${grund} (nach ${fristMs / 1000} s)`;
+}
+
+const warteMs = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+async function schreibeBinaer(cdp: Cdp, pfad: string, base64: string): Promise<void> {
+  await cdp.evaluate(`
+    const pfad = ${JSON.stringify(pfad)};
+    const ordner = pfad.split("/").slice(0, -1).join("/");
+    if (ordner && !app.vault.getAbstractFileByPath(ordner)) await app.vault.createFolder(ordner);
+    const bin = atob(${JSON.stringify(base64)});
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    if (!app.vault.getAbstractFileByPath(pfad)) await app.vault.createBinary(pfad, bytes.buffer);
+    return true;
+  `);
+}
+
+async function ordnerEinstellungen(cdp: Cdp, patch: Record<string, unknown>): Promise<void> {
+  await cdp.evaluate(`
+    const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+    Object.assign(p.settings, ${JSON.stringify(patch)});
+    await p.saveSettings();
+    const native = ${JSON.stringify(oNativeMenusVorher?.wert ?? null)};
+    if (${JSON.stringify(oNativeMenusVorher !== null)}) app.vault.setConfig("nativeMenus", native === null ? undefined : native);
+    return true;
+  `);
+}
+
+/** Wegwerf-Material frisch herstellen: jeder O-Punkt beginnt hier, damit `--only` dasselbe misst wie der Gesamtlauf. */
+async function legeOrdnerBaumAn(cdp: Cdp, mitTief = false): Promise<void> {
+  if (oEinstellungenVorher === null) {
+    oEinstellungenVorher = await cdp.evaluate<string>(`return JSON.stringify(app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings);`);
+  }
+  if (oNativeMenusVorher === null) {
+    // Unter macOS zeichnet Obsidian Menues nativ (NSMenu), nicht als `.menu` im DOM: der Rechtsklick wirkte, das Menue blieb unlesbar.
+    // Im Wegwerf-Vault auf DOM-Menues stellen; der Wert vorher geht in die Aufraeumarbeit.
+    oNativeMenusVorher = { wert: await cdp.evaluate<unknown>(`return app.vault.getConfig("nativeMenus") ?? null;`) };
+  }
+  await cdp.evaluate(`
+    const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+    p.folderSelection = null;
+    await p.refreshHub();
+    return true;
+  `);
+  await inDenPapierkorb(cdp, [O_DIR, O_ARBEIT]);
+  await requireUntil(
+    cdp,
+    `!app.vault.getAbstractFileByPath(${JSON.stringify(O_DIR)}) && !app.vault.getAbstractFileByPath(${JSON.stringify(O_ARBEIT)})`,
+    "Wegwerf-Ordner liessen sich nicht in den Papierkorb legen",
+  );
+  await ordnerEinstellungen(cdp, O_EINSTELLUNGEN);
+  for (const k of O_BAUM) await schreibeDatei(cdp, k.pfad, k.body);
+  await schreibeBinaer(cdp, O_PNG, STUB_PNG_BASE64);
+  if (mitTief) {
+    const tief = Array.from({ length: 8 }, (_, i) => `e${i + 1}`).join("/");
+    await schreibeDatei(cdp, `${O_TIEF}/${tief}/seite.md`, "# Tiefe Seite\n\nMARKER-TIEF\n");
+  }
+  // Obsidians Metadaten-Cache braucht einen Atemzug, bevor die Frontmatter-Lesung der neuen Dateien stimmt.
+  await warteMs(500);
+}
+
+/** Den Ordner im Datei-Explorer zeigen und mit der echten rechten Maustaste anklicken; das Menue bleibt offen. */
+async function rechtsklickOrdner(cdp: Cdp, pfad: string): Promise<void> {
+  // Unmittelbar vor dem Klick und mit Rueckfrage: ein frueher gesetzter Wert hielt in einem frischen Prozess nicht bis hierher (gemessen).
+  const native = await cdp.evaluate<unknown>(`app.vault.setConfig("nativeMenus", false); return app.vault.getConfig("nativeMenus");`);
+  if (native !== false) throw new Error(`nativeMenus liess sich nicht auf false stellen (liest ${JSON.stringify(native)}): das Menue wuerde nativ gezeichnet`);
+  await cdp.evaluate(`
+    app.workspace.leftSplit.expand();
+    let leaf = app.workspace.getLeavesOfType("file-explorer")[0];
+    if (!leaf) { leaf = app.workspace.getLeftLeaf(false); await leaf.setViewState({ type: "file-explorer" }); }
+    app.workspace.revealLeaf(leaf);
+    const ordner = app.vault.getAbstractFileByPath(${JSON.stringify(pfad)});
+    if (!ordner) throw new Error("Ordner fehlt: " + ${JSON.stringify(pfad)});
+    leaf.view.revealInFolder(ordner);
+    return true;
+  `);
+  const titel = `[...document.querySelectorAll(".nav-folder-title")].find((e) => e.getAttribute("data-path") === ${JSON.stringify(pfad)})`;
+  await requireUntil(
+    cdp,
+    `(() => { const e = ${titel}; return !!e && e.getBoundingClientRect().width > 0; })()`,
+    `Der Ordner ${pfad} erschien nicht im Datei-Explorer`,
+  );
+  // Die Seitenleiste faehrt beim ersten Oeffnen aus: erst klicken, wenn die Lage des Ordners zweimal hintereinander gleich gemessen ist,
+  // sonst trifft der Rechtsklick die Stelle, an der der Ordner eben noch stand (gemessen an einem frischen Prozess: kein Menue).
+  const lage = `
+    const e = ${titel};
+    e.scrollIntoView({ block: "center" });
+    const r = e.getBoundingClientRect();
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+  `;
+  let box = await cdp.evaluate<{ x: number; y: number }>(lage);
+  for (let i = 0; i < 20; i++) {
+    await warteMs(150);
+    const jetzt = await cdp.evaluate<{ x: number; y: number }>(lage);
+    const stabil = jetzt.x === box.x && jetzt.y === box.y;
+    box = jetzt;
+    if (stabil) break;
+  }
+  const rechts = { x: box.x, y: box.y, button: "right", clickCount: 1 };
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...rechts, buttons: 0 });
+  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", ...rechts, buttons: 2 });
+  await warteMs(60);
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", ...rechts, buttons: 0 });
+  const da = await pollUntil<boolean>(cdp, `return !!document.querySelector(".menu .menu-item");`, 8_000, 200);
+  if (!da) {
+    // Was der Klick traf, gehoert in die Meldung: ein Menue, das ausbleibt, hat selten nur eine Ursache.
+    const lage = await cdp.evaluate<string>(`
+      return JSON.stringify({
+        modal: document.querySelectorAll(".modal-container").length, menus: document.querySelectorAll(".menu").length,
+        aktiv: document.querySelectorAll(".has-active-menu").length, native: app.vault.getConfig("nativeMenus"), fokus: document.hasFocus(), sichtbar: document.visibilityState,
+        links: app.workspace.leftSplit.collapsed,
+      });
+    `);
+    throw new Error(`Das Kontextmenue des Ordners ${pfad} oeffnete sich nicht: ${lage}`);
+  }
+}
+
+/** Die Eintraege des offenen Menues: Titel und ob ein Icon (svg) gezeichnet wurde. */
+async function menueEintraege(cdp: Cdp): Promise<Array<{ titel: string; icon: boolean }>> {
+  return cdp.evaluate(`
+    return [...document.querySelectorAll(".menu .menu-item")].map((i) => ({
+      titel: i.querySelector(".menu-item-title")?.textContent ?? "",
+      icon: !!i.querySelector(".menu-item-icon svg"),
+    }));
+  `);
+}
+
+const MENUE_EINTRAG = (titel: string): string =>
+  `[...document.querySelectorAll(".menu .menu-item")].find((i) => i.querySelector(".menu-item-title")?.textContent === ${JSON.stringify(titel)})`;
+
+/** Ordnermodus wie im Gebrauch betreten: Rechtsklick, Klick auf „Create EPUB“, warten bis die Sidebar den Ordner zeigt. */
+async function waehleOrdner(cdp: Cdp, pfad: string): Promise<void> {
+  await rechtsklickOrdner(cdp, pfad);
+  const getroffen = await clickReal(cdp, MENUE_EINTRAG("Create EPUB"), 80);
+  if (!getroffen) throw new Error("Der Menue-Eintrag „Create EPUB“ liess sich nicht klicken");
+  await requireUntil(
+    cdp,
+    `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].folderSelection === ${JSON.stringify(pfad)} && !!document.querySelector(".epub-exporter-sidebar .epub-sb-source")`,
+    `Die Sidebar zeigte den Ordner ${pfad} nicht`,
+  );
+}
+
+interface VorschauZeile { titel: string; tiefe: number; art: string; icon: string }
+
+/** Die Zeilen der Ordner-Vorschau, wie das DOM sie fuehrt. `art` kommt aus dem gezeichneten Icon, nicht aus dem Modell. */
+async function leseVorschau(cdp: Cdp): Promise<VorschauZeile[]> {
+  return cdp.evaluate(`
+    return [...document.querySelectorAll(".epub-exporter-sidebar .epub-sb-tree > li.epub-sb-row")].map((li) => {
+      const svg = li.querySelector(".epub-sb-row-icon svg");
+      const icon = svg ? [...svg.classList].find((c) => c.startsWith("lucide-")) ?? "svg" : "";
+      return {
+        titel: li.querySelector(".epub-sb-row-title")?.textContent ?? "",
+        tiefe: Number(li.getAttribute("data-depth")),
+        art: icon.startsWith("lucide-folder") ? "chapter" : icon === "lucide-file-text" ? "page" : "?",
+        icon,
+      };
+    });
+  `);
+}
+
+function vergleicheZeilen(ist: VorschauZeile[], soll: typeof O_ZEILEN): string | null {
+  const zeigIst = JSON.stringify(ist.map((z) => `${z.tiefe}:${z.art}:${z.titel}`));
+  if (ist.length !== soll.length) return `${ist.length} Zeilen in der Vorschau, erwartet ${soll.length}: ${zeigIst}`;
+  for (let i = 0; i < soll.length; i++) {
+    const s = soll[i]!;
+    const z = ist[i]!;
+    if (z.titel !== s.titel || z.tiefe !== s.tiefe || z.art !== s.art) {
+      return `Zeile ${i + 1}: ist ${z.tiefe}:${z.art}:${JSON.stringify(z.titel)}, soll ${s.tiefe}:${s.art}:${JSON.stringify(s.titel)} — alle: ${zeigIst}`;
+    }
+  }
+  return null;
+}
+
+/** Den Export-Knopf einmal mit Haltedauer klicken und die entstandene Datei als Bytes lesen (Groesse stabil, dann gelesen). */
+async function exportiereOrdnerRoh(cdp: Cdp, ziel: string): Promise<Buffer> {
+  await inDenPapierkorb(cdp, [ziel]);
+  await requireUntil(cdp, `!app.vault.getAbstractFileByPath(${JSON.stringify(ziel)})`, `${ziel} liess sich nicht entfernen`);
+  await leereNotices(cdp);
+  const getroffen = await clickReal(cdp, `document.querySelector(".epub-sb-action-export")`, 200);
+  if (!getroffen) throw new Error("Export-Knopf im Ordnermodus nicht klickbar");
+  const fsPfad = await warteAufDatei(cdp, ziel);
+  let letzte = -1;
+  for (let i = 0; i < 25; i++) {
+    const groesse = existsSync(fsPfad) ? readFileSync(fsPfad).length : -1;
+    if (groesse > 0 && groesse === letzte) break;
+    letzte = groesse;
+    await warteMs(200);
+  }
+  return readFileSync(fsPfad);
+}
+
+/** Wie `exportiereOrdnerRoh`, aber entpackt; ein Export ohne lesbare Datei ist ein Befund (Text), kein Abbruch des Treibers. */
+async function exportiereOrdner(cdp: Cdp, ziel: string): Promise<Map<string, string> | string> {
+  try {
+    return entpacke(await exportiereOrdnerRoh(cdp, ziel));
+  } catch (e) {
+    return `Der Export lieferte kein lesbares EPUB (${ziel}): ${(e as Error).message}`;
+  }
+}
+
+/** Ein EPUB entpacken: Name → Text. */
+function entpacke(buf: Buffer): Map<string, string> {
+  const alle = unzipSync(new Uint8Array(buf));
+  return new Map(Object.entries(alle).map(([name, daten]) => [name, strFromU8(daten)]));
+}
+
+/** Die Eintraege des Inhaltsverzeichnisses in `nav.xhtml` (nur `epub:type="toc"`), mit Tiefe ab 0. */
+function navEintraege(nav: string): Array<{ tiefe: number; titel: string; href: string }> {
+  const ab = nav.search(/<nav\b[^>]*epub:type="toc"/);
+  const bis = ab < 0 ? -1 : nav.indexOf("</nav>", ab);
+  if (ab < 0 || bis < 0) return [];
+  const teil = nav.slice(ab, bis);
+  const aus: Array<{ tiefe: number; titel: string; href: string }> = [];
+  let tiefe = 0;
+  for (const m of teil.matchAll(/<(\/?)ol\b[^>]*>|<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)) {
+    if (m[0].startsWith("<ol") || m[0].startsWith("</ol")) tiefe += m[1] === "/" ? -1 : 1;
+    else aus.push({ tiefe: tiefe - 1, titel: (m[3] ?? "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&"), href: m[2] ?? "" });
+  }
+  return aus;
+}
+
+/** Die `navPoint`-Knoten aus `toc.ncx`: Tiefe und `playOrder` in Dokumentreihenfolge. */
+function ncxPunkte(ncx: string): Array<{ tiefe: number; playOrder: number }> {
+  const aus: Array<{ tiefe: number; playOrder: number }> = [];
+  let tiefe = 0;
+  for (const m of ncx.matchAll(/<navPoint\b[^>]*playOrder="(\d+)"[^>]*>|<\/navPoint>/g)) {
+    if (m[0] === "</navPoint>") tiefe -= 1;
+    else { aus.push({ tiefe, playOrder: Number(m[1]) }); tiefe += 1; }
+  }
+  return aus;
+}
+
+/** Alles, was die O-Punkte am Plugin aendern, zurueck: Einstellungen wie vorgefunden, kein Ordnermodus, kein Eingriff an vault.copy. */
+async function stelleOrdnerZustandWiederHer(cdp: Cdp): Promise<void> {
+  await cdp.evaluate(`
+    delete app.vault.copy;
+    const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+    if (!p) return true;
+    p.folderSelection = null;
+    const vorher = ${JSON.stringify(oEinstellungenVorher)};
+    if (vorher !== null) Object.assign(p.settings, JSON.parse(vorher));
+    await p.saveSettings();
+    return true;
+  `);
 }
 
 // ---------------------------------------------------------------------------
@@ -898,6 +1221,312 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       return null;
     },
   },
+  {
+    id: "O1",
+    was: "Ordner-Rechtsklick: genau ein Eintrag „Create EPUB“, der Klick oeffnet die Sidebar im Ordnermodus mit der erwarteten Zeilenzahl; Icons und Schliessen-Knopf stehen am echten DOM",
+    pruefe: async (cdp) => {
+      await legeOrdnerBaumAn(cdp, true);
+      await rechtsklickOrdner(cdp, O_ROOT);
+      const eintraege = await menueEintraege(cdp);
+      const epub = eintraege.filter((e) => /epub|folder as book/i.test(e.titel));
+      if (epub.length !== 1 || epub[0]!.titel !== "Create EPUB") {
+        return `Das Ordner-Menue fuehrt ${epub.length} EPUB-Eintraege statt genau eines „Create EPUB“: ${JSON.stringify(eintraege.map((e) => e.titel))}`;
+      }
+      if (!epub[0]!.icon) return "Der Menue-Eintrag „Create EPUB“ hat kein gezeichnetes Icon (kein svg in .menu-item-icon)";
+      if (!(await clickReal(cdp, MENUE_EINTRAG("Create EPUB"), 80))) return "Der Menue-Eintrag „Create EPUB“ liess sich nicht klicken";
+      { const w = await erwarte(cdp, `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].folderSelection === ${JSON.stringify(O_ROOT)} && !!document.querySelector(".epub-exporter-sidebar .epub-sb-tree")`, "Der Klick auf „Create EPUB“ zeigte keine Ordner-Vorschau in der Sidebar"); if (w) return w; }
+
+      const zeilen = await leseVorschau(cdp);
+      const abweichung = vergleicheZeilen(zeilen, O_ZEILEN);
+      if (abweichung) return abweichung;
+      const ausgeblendet = await cdp.evaluate<string | null>(`return document.querySelector(".epub-exporter-sidebar .epub-sb-hidden")?.textContent?.trim() ?? null;`);
+      if (ausgeblendet !== `${O_AUSGEBLENDET} hidden`) return `Die Zeile der ausgeblendeten Eintraege lautet ${JSON.stringify(ausgeblendet)}, erwartet "${O_AUSGEBLENDET} hidden"`;
+
+      // Icons: ein Name ist erst ein Icon, wenn setIcon etwas zeichnet (UI-STANDARD § 8). Die Kontrolle zeichnet denselben Weg mit einem
+      // erfundenen Namen — bleibt der leer und der echte nicht, kann die Messung rot werden.
+      const kontrolle = await cdp.evaluate<{ echt: number; erfunden: number }>(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        const a = p.addRibbonIcon("folder", "smoke", () => {});
+        const b = p.addRibbonIcon("epub-smoke-kein-icon", "smoke", () => {});
+        const r = { echt: a.innerHTML.length, erfunden: b.innerHTML.length };
+        a.remove(); b.remove();
+        return r;
+      `);
+      if (!(kontrolle.echt > 0 && kontrolle.erfunden === 0)) {
+        return `Die Icon-Kontrolle taugt nicht: echter Name ${kontrolle.echt} Zeichen, erfundener ${kontrolle.erfunden} (erwartet > 0 und 0)`;
+      }
+      const icons = await cdp.evaluate<Record<string, { laenge: number; klasse: string } | null>>(`
+        const mass = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const svg = el.querySelector("svg");
+          return { laenge: el.innerHTML.length, klasse: svg ? [...svg.classList].find((c) => c.startsWith("lucide-")) ?? "svg" : "" };
+        };
+        return {
+          kopf: mass(".epub-exporter-sidebar .epub-sb-icon"),
+          ausgeblendet: mass(".epub-exporter-sidebar .epub-sb-hidden-icon"),
+          schliessen: mass(".epub-exporter-sidebar .epub-sb-action-close"),
+        };
+      `);
+      const sollIcons: Record<string, string> = { kopf: "lucide-folder", ausgeblendet: "lucide-eye-off", schliessen: "lucide-x" };
+      for (const [name, soll] of Object.entries(sollIcons)) {
+        const ist = icons[name];
+        // „folder“ zeichnet Obsidian 1.15 als lucide-folder-open: gemessen wird der Name als Praefix, nicht eine feste Klasse.
+        if (!ist || ist.laenge === 0 || !ist.klasse.startsWith(soll)) return `Icon „${name}“: ${JSON.stringify(ist)}, erwartet ein gezeichnetes ${soll}*`;
+      }
+      const leer = zeilen.filter((z) => z.icon === "" || z.art === "?");
+      if (leer.length) return `Zeilen ohne gezeichnetes folder/file-text-Icon: ${JSON.stringify(leer)}`;
+
+      // Schliessen-Knopf: ein Knopf mit Namen, in der Kopfzeile, neben dem Titel, mit der Tastatur erreichbar.
+      // Eine echte Tastengeste vorab: `:focus-visible` gilt nach Tastatur, nicht nach Maus — ohne sie misst ein Skript-Fokus keinen Ring.
+      await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16 });
+      await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16 });
+      const knopf = await cdp.evaluate<{ tag: string; label: string | null; tabIndex: number; breite: number; innen: boolean; frei: boolean; fokus: boolean; sichtbar: boolean; ring: string }>(`
+        const c = document.querySelector(".epub-exporter-sidebar .epub-sb-action-close");
+        const h = document.querySelector(".epub-exporter-sidebar .epub-sb-header");
+        const t = document.querySelector(".epub-exporter-sidebar .epub-sb-title");
+        const rc = c.getBoundingClientRect(), rh = h.getBoundingClientRect(), rt = t.getBoundingClientRect();
+        c.focus();
+        return {
+          tag: c.tagName, label: c.getAttribute("aria-label"), tabIndex: c.tabIndex, breite: Math.round(rc.width),
+          innen: rc.left >= rh.left && rc.right <= rh.right + 0.5 && rc.top >= rh.top - 0.5 && rc.bottom <= rh.bottom + 0.5,
+          frei: rt.right <= rc.left + 0.5,
+          fokus: document.activeElement === c,
+          sichtbar: c.matches(":focus-visible"),
+          ring: (() => { const cs = getComputedStyle(c); return (cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0 ? "outline " + cs.outlineWidth + " " + cs.outlineStyle : "") + (cs.boxShadow !== "none" ? " shadow " + cs.boxShadow : ""); })(),
+        };
+      `);
+      if (knopf.tag !== "BUTTON" || knopf.label !== "Close folder view" || knopf.tabIndex < 0) return `Schliessen-Knopf: ${JSON.stringify(knopf)}, erwartet ein BUTTON mit aria-label „Close folder view“, per Tab erreichbar`;
+      if (knopf.breite <= 0 || !knopf.innen || !knopf.frei) return `Schliessen-Knopf ohne Platz in der Kopfzeile: ${JSON.stringify(knopf)}`;
+      if (!knopf.fokus) return "Der Schliessen-Knopf nimmt keinen Fokus an";
+      if (!knopf.sichtbar || knopf.ring.trim() === "") return `Der Schliessen-Knopf hat nach einer Tastengeste keinen sichtbaren Fokus: ${JSON.stringify(knopf)}`;
+      // Typografie, Einrueckung und Fokusring sieht kein Check: mit EPUB_SMOKE_SHOT=<datei.png> entsteht ein Bild zum Ansehen (kein Teil der Bilanz).
+      if (env.EPUB_SMOKE_SHOT) writeFileSync(env.EPUB_SMOKE_SHOT, await capture(cdp));
+
+      // Einrueckung: Klassen und Attribute, nie ein JS-Style; ab Tiefe 6 bleibt sie stehen (Baum mit 9 Ebenen).
+      await waehleOrdner(cdp, O_TIEF);
+      const tiefe = await cdp.evaluate<Array<{ tiefe: string | null; einzug: number; style: string | null }>>(`
+        return [...document.querySelectorAll(".epub-exporter-sidebar .epub-sb-tree > li.epub-sb-row")].map((li) => ({
+          tiefe: li.getAttribute("data-depth"),
+          einzug: parseFloat(getComputedStyle(li).paddingInlineStart),
+          style: li.getAttribute("style"),
+        }));
+      `);
+      if (tiefe.length !== 9) return `Baum mit acht Ordnern und einer Seite: ${tiefe.length} Zeilen, erwartet 9`;
+      if (tiefe.some((z) => z.style !== null)) return `Eine Zeile traegt ein style-Attribut: ${JSON.stringify(tiefe.find((z) => z.style !== null))}`;
+      const tiefenSoll = ["0", "1", "2", "3", "4", "5", "6", "6", "6"];
+      if (JSON.stringify(tiefe.map((z) => z.tiefe)) !== JSON.stringify(tiefenSoll)) return `data-depth ${JSON.stringify(tiefe.map((z) => z.tiefe))}, erwartet ${JSON.stringify(tiefenSoll)}`;
+      for (let i = 1; i <= 6; i++) if (!(tiefe[i]!.einzug > tiefe[i - 1]!.einzug)) return `Einzug waechst nicht von Tiefe ${i - 1} zu ${i}: ${JSON.stringify(tiefe.map((z) => z.einzug))}`;
+      if (tiefe[7]!.einzug !== tiefe[6]!.einzug || tiefe[8]!.einzug !== tiefe[6]!.einzug) return `Ab Tiefe 6 soll der Einzug stehen bleiben: ${JSON.stringify(tiefe.map((z) => z.einzug))}`;
+
+      // Der Schliessen-Knopf wirkt: echter Klick beendet den Ordnermodus.
+      // Erreichbarkeit mit der Bruecke: trifft ein Klick in die Mitte den Knopf selbst? Sie raeumt vorher die Toasts weg, die ein frueherer
+      // Punkt hinterlaesst und die sonst ueber dem Knopf liegen (gemessen im Gesamtlauf: das Element unter dem Cursor war eine .notice).
+      const schliessen = ".epub-exporter-sidebar .epub-sb-action-close";
+      const erreichbar = await messeErreichbarkeit(cdp, { selektoren: [schliessen], erforderlich: [schliessen], scrollen: false, ohneUeberlauf: "die Kopfzeile des Panels hat keinen wachsenden Bereich" });
+      if (erreichbar.urteil !== "gruen") return `Der Schliessen-Knopf ist nicht erreichbar (${erreichbar.urteil}): ${erreichbar.detail}`;
+      if (!(await clickReal(cdp, `document.querySelector(".epub-exporter-sidebar .epub-sb-action-close")`, 80))) return "Der Schliessen-Knopf liess sich nicht klicken";
+      { const w = await erwarte(cdp, `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].folderSelection === null && !document.querySelector(".epub-exporter-sidebar .epub-sb-source")`, "Der Schliessen-Knopf beendete den Ordnermodus nicht"); if (w) return w; }
+      return null;
+    },
+  },
+  {
+    id: "O2",
+    was: "Eine umbenannte Datei aendert die Vorschau, danach genuegt EIN Klick auf „Export“; die Auswahl folgt dem Umbenennen des Ordners selbst",
+    pruefe: async (cdp) => {
+      await legeOrdnerBaumAn(cdp);
+      await waehleOrdner(cdp, O_ROOT);
+      const vorher = await leseVorschau(cdp);
+      if (!vorher.some((z) => z.titel === "Namenstitel") || vorher.some((z) => z.titel === "Umbenannt")) {
+        return `Vor dem Umbenennen stimmt die Vorschau nicht: ${JSON.stringify(vorher.map((z) => z.titel))}`;
+      }
+      const alt = `${O_ROOT}/01 - Anfang/03 - Namenstitel.md`;
+      const neu = `${O_ROOT}/01 - Anfang/03 - Umbenannt.md`;
+      await cdp.evaluate(`await app.fileManager.renameFile(app.vault.getAbstractFileByPath(${JSON.stringify(alt)}), ${JSON.stringify(neu)}); return true;`);
+      { const w = await erwarte(cdp, `(() => { const t = [...document.querySelectorAll(".epub-exporter-sidebar .epub-sb-row-title")].map((e) => e.textContent); return t.includes("Umbenannt") && !t.includes("Namenstitel"); })()`, "Die Vorschau folgte dem Umbenennen der Datei nicht"); if (w) return w; }
+      const nachher = O_ZEILEN.map((z) => (z.titel === "Namenstitel" ? { ...z, titel: "Umbenannt" } : z));
+      const abweichung = vergleicheZeilen(await leseVorschau(cdp), nachher);
+      if (abweichung) return `Nach dem Umbenennen: ${abweichung}`;
+
+      // Ein einziger Klick (200 ms Haltedauer, wie S4): ein Rerender, der den Knopf unter dem Cursor zerstoert, liesse ihn ins Leere laufen.
+      const dateien = await exportiereOrdner(cdp, O_EPUB);
+      if (typeof dateien === "string") return dateien;
+      const nav = dateien.get("OEBPS/nav.xhtml") ?? "";
+      if (!nav.includes(">Umbenannt<") || nav.includes("Namenstitel")) return "Das EPUB nach dem Umbenennen fuehrt den neuen Titel „Umbenannt“ nicht (oder noch den alten)";
+
+      // Der Ordner selbst wird im Explorer umbenannt: die Auswahl folgt, der Ordnermodus bleibt.
+      const neuerOrdner = `${O_DIR}/Handbuch-neu`;
+      await cdp.evaluate(`await app.fileManager.renameFile(app.vault.getAbstractFileByPath(${JSON.stringify(O_ROOT)}), ${JSON.stringify(neuerOrdner)}); return true;`);
+      { const w = await erwarte(cdp, `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].folderSelection === ${JSON.stringify(neuerOrdner)} && document.querySelector(".epub-exporter-sidebar .epub-sb-subtitle")?.textContent === "Handbuch-neu" && document.querySelectorAll(".epub-exporter-sidebar .epub-sb-tree > li").length === ${O_ZEILEN.length}`, "Nach dem Umbenennen des Ordners blieb die Sidebar nicht im Ordnermodus des neuen Pfads"); if (w) return w; }
+      await cdp.evaluate(`await app.fileManager.renameFile(app.vault.getAbstractFileByPath(${JSON.stringify(neuerOrdner)}), ${JSON.stringify(O_ROOT)}); return true;`);
+      { const w = await erwarte(cdp, `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].folderSelection === ${JSON.stringify(O_ROOT)} && document.querySelector(".epub-exporter-sidebar .epub-sb-subtitle")?.textContent === "Handbuch"`, "Die Auswahl folgte dem Zurueckbenennen des Ordners nicht"); if (w) return w; }
+      return null;
+    },
+  },
+  {
+    id: "O3",
+    was: "Ordner-Export als ZIP: nav.xhtml und toc.ncx verschachtelt, „0 - …“ fehlt, Einleitungsseite vorn, `README.md` fuehrt zur Nachbarseite im selben Ordner",
+    pruefe: async (cdp) => {
+      await legeOrdnerBaumAn(cdp);
+      await waehleOrdner(cdp, O_ROOT);
+      const dateien = await exportiereOrdner(cdp, O_EPUB);
+      if (typeof dateien === "string") return dateien;
+      const nav = dateien.get("OEBPS/nav.xhtml");
+      const ncx = dateien.get("OEBPS/toc.ncx");
+      if (!nav || !ncx) return `nav.xhtml oder toc.ncx fehlt im Archiv: ${JSON.stringify([...dateien.keys()])}`;
+
+      const eintraege = navEintraege(nav);
+      const sollNav = O_ZEILEN.map((z) => `${z.tiefe}:${z.titel}`);
+      const istNav = eintraege.map((e) => `${e.tiefe}:${e.titel}`);
+      if (JSON.stringify(istNav) !== JSON.stringify(sollNav)) return `nav.xhtml ist ${JSON.stringify(istNav)}, erwartet ${JSON.stringify(sollNav)}`;
+      const punkte = ncxPunkte(ncx);
+      if (JSON.stringify(punkte.map((p) => p.tiefe)) !== JSON.stringify(O_ZEILEN.map((z) => z.tiefe))) return `toc.ncx: Tiefen ${JSON.stringify(punkte.map((p) => p.tiefe))}, erwartet ${JSON.stringify(O_ZEILEN.map((z) => z.tiefe))}`;
+      if (JSON.stringify(punkte.map((p) => p.playOrder)) !== JSON.stringify(O_ZEILEN.map((_, i) => i + 1))) return `toc.ncx: playOrder ${JSON.stringify(punkte.map((p) => p.playOrder))}, erwartet 1 bis ${O_ZEILEN.length} ohne Luecke`;
+
+      const kapitel = [...dateien.keys()].filter((n) => /^OEBPS\/chapter-\d+\.xhtml$/.test(n)).sort();
+      if (kapitel.length !== 9) return `${kapitel.length} Kapiteldateien, erwartet 9 (Wurzel-README, Anfang mit 4, Vertiefung mit 3, Lose Seite): ${JSON.stringify(kapitel)}`;
+      const dateiMit = (marker: string): string | null => kapitel.find((n) => (dateien.get(n) ?? "").includes(marker))?.replace("OEBPS/", "") ?? null;
+      if (!(dateien.get(kapitel[0]!) ?? "").includes("MARKER-WURZEL-INTRO")) return "Die Einleitungsseite der Wurzel steht nicht vorn (chapter-01.xhtml)";
+      if (eintraege[0]!.href.split("#")[0] !== kapitel[0]!.replace("OEBPS/", "")) return `Der erste Eintrag zeigt auf ${eintraege[0]!.href}, nicht auf die Einleitungsseite`;
+      const verborgen = kapitel.filter((n) => (dateien.get(n) ?? "").includes("MARKER-GEHEIM"));
+      if (verborgen.length) return `Ausgeblendetes steht im Buch: ${JSON.stringify(verborgen)}`;
+      if (/Entwurf|Geheim|>Notiz</.test(nav)) return "Ausgeblendetes steht im Inhaltsverzeichnis";
+      const ziel = (titel: string): string => (eintraege.find((e) => e.titel === titel)?.href ?? "").split("#")[0]!;
+      if (!ziel("Tiefer") || ziel("Tiefer") !== ziel("Noch tiefer") || ziel("Tiefer") !== ziel("Ganz unten")) {
+        return `Kapitel ohne Einleitungsseite sollen auf ihre erste Seite zeigen: Tiefer ${ziel("Tiefer")}, Noch tiefer ${ziel("Noch tiefer")}, Ganz unten ${ziel("Ganz unten")}`;
+      }
+
+      // Die Kernprobe: zwei README.md, ein Link „README.md“ — er gehoert zur Nachbarseite im selben Ordner.
+      const anfang = dateiMit("MARKER-ANFANG-INTRO");
+      const vertiefung = dateiMit("MARKER-VERTIEFUNG-INTRO");
+      const wurzel = dateiMit("MARKER-WURZEL-INTRO");
+      if (!anfang || !vertiefung || !wurzel || new Set([anfang, vertiefung, wurzel]).size !== 3) return `Die drei Einleitungsseiten sind nicht drei Dateien: ${anfang}, ${vertiefung}, ${wurzel}`;
+      // Der bisherige Weg (Dateiname → zuletzt eingetragene Seite) saehe fuer „README.md“ die letzte README der Lesereihenfolge.
+      const letzteReadme = [anfang, vertiefung, wurzel].sort().at(-1)!;
+      if (letzteReadme === anfang) return "Der Aufbau taugt nicht als Gegenprobe: der alte Weg liesse „README.md“ auf der Anfang-Seite zufaellig richtig laufen";
+      const links = (datei: string | null): Array<{ text: string; href: string }> =>
+        [...(dateien.get(`OEBPS/${datei}`) ?? "").matchAll(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({ text: (m[2] ?? "").replace(/<[^>]+>/g, ""), href: m[1] ?? "" }));
+      const erste = links(dateiMit("MARKER-ERSTE"));
+      const details = links(dateiMit("MARKER-DETAILS"));
+      const hrefVon = (liste: typeof erste, text: string): string | undefined => liste.find((l) => l.text === text)?.href;
+      if (hrefVon(erste, "Einleitung") !== anfang) return `„Erste Schritte“: [Einleitung](README.md) zeigt auf ${hrefVon(erste, "Einleitung")}, erwartet ${anfang} (der alte Weg haette ${letzteReadme} gewaehlt)`;
+      if (hrefVon(erste, "Start") !== wurzel) return `„Erste Schritte“: [Start](../README.md#start) zeigt auf ${hrefVon(erste, "Start")}, erwartet ${wurzel}`;
+      if (hrefVon(erste, "weg") !== undefined) return "„Erste Schritte“: der Link aus dem Buch heraus ([weg](../../Ausserhalb.md)) ist ein Link geblieben";
+      if (!(dateien.get(`OEBPS/${dateiMit("MARKER-ERSTE")}`) ?? "").includes("weg")) return "„Erste Schritte“: der Text des Links aus dem Buch heraus ging verloren";
+      if (hrefVon(details, "README") !== vertiefung) return `„Details“: [README](README.md) zeigt auf ${hrefVon(details, "README")}, erwartet ${vertiefung}`;
+      if (hrefVon(details, "A") !== anfang) return `„Details“: [A](../01%20-%20Anfang/README.md#a) zeigt auf ${hrefVon(details, "A")}, erwartet ${anfang}`;
+      return null;
+    },
+  },
+  {
+    id: "O4",
+    was: "Arbeitskopie: Zustands-Knopf, Abbruch mittendrin hinterlaesst kein Ziel und der zweite Versuch laeuft durch, eine vorhandene Kopie bleibt unberuehrt, Export liest die Kopie, Arbeitsverzeichnis im Ordner meldet den Grund",
+    pruefe: async (cdp) => {
+      await legeOrdnerBaumAn(cdp);
+      await ordnerEinstellungen(cdp, { workDir: O_ARBEIT, useWorkCopy: true });
+      await waehleOrdner(cdp, O_ROOT);
+      const knopf = (): Promise<{ text: string; gedrueckt: string | null } | null> =>
+        cdp.evaluate(`const b = document.querySelector(".epub-exporter-sidebar .epub-sb-action-copy-toggle"); return b ? { text: b.textContent, gedrueckt: b.getAttribute("aria-pressed") } : null;`);
+      const anlegen = `document.querySelector(".epub-exporter-sidebar .epub-sb-action-copy-create")`;
+
+      // Zustands-Knopf: der Text nennt den Ist-Zustand, aria-pressed folgt, der Anlegen-Knopf gibt es nur bei „an“.
+      let k = await knopf();
+      if (!k || k.text !== "Working copy: on" || k.gedrueckt !== "true") return `Zustands-Knopf vor dem Klick: ${JSON.stringify(k)}, erwartet „Working copy: on“ / aria-pressed true`;
+      if (!(await cdp.evaluate<boolean>(`return !!${anlegen};`))) return "„Create working copy“ fehlt bei eingeschalteter, noch nicht angelegter Kopie";
+      if (!(await clickReal(cdp, `document.querySelector(".epub-exporter-sidebar .epub-sb-action-copy-toggle")`, 200))) return "Der Zustands-Knopf liess sich nicht klicken";
+      { const w = await erwarte(cdp, `document.querySelector(".epub-exporter-sidebar .epub-sb-action-copy-toggle")?.getAttribute("aria-pressed") === "false"`, "Ein Klick schaltete die Arbeitskopie nicht aus"); if (w) return w; }
+      k = await knopf();
+      if (k?.text !== "Working copy: off" || (await cdp.evaluate<boolean>(`return !!${anlegen};`))) return `Nach dem Ausschalten: ${JSON.stringify(k)} (erwartet „Working copy: off“, kein Anlegen-Knopf)`;
+      if (!(await clickReal(cdp, `document.querySelector(".epub-exporter-sidebar .epub-sb-action-copy-toggle")`, 200))) return "Der Zustands-Knopf liess sich nicht ein zweites Mal klicken";
+      { const w = await erwarte(cdp, `document.querySelector(".epub-exporter-sidebar .epub-sb-action-copy-toggle")?.getAttribute("aria-pressed") === "true" && !!${anlegen}`, "Der zweite Klick schaltete die Arbeitskopie nicht wieder ein"); if (w) return w; }
+
+      // Abbruch mitten im Kopieren (der dritte copy-Aufruf wirft). Der Eingriff ist eine Eigenschaft am vault-Objekt und wird mit `delete`
+      // wieder entfernt — danach gilt wieder die Methode des Prototyps, und das wird gemessen.
+      await cdp.evaluate(`
+        let n = 0;
+        const echt = Object.getPrototypeOf(app.vault).copy;
+        app.vault.copy = async function (...a) { if (++n === 3) throw new Error("smoke: disk full"); return echt.apply(this, a); };
+        return true;
+      `);
+      let abbruch: string | null = null;
+      try {
+        await leereNotices(cdp);
+        if (!(await clickReal(cdp, anlegen, 150))) abbruch = "„Create working copy“ liess sich nicht klicken";
+        else {
+          const meldung = await pollUntil<boolean>(cdp, `return ${noticeEnthaelt("Could not create the working copy")};`, 10_000, 200);
+          if (!meldung) abbruch = "Der Abbruch mitten im Kopieren wurde nicht gemeldet";
+        }
+      } finally {
+        const noch = await cdp.evaluate<boolean>(`delete app.vault.copy; return Object.prototype.hasOwnProperty.call(app.vault, "copy");`);
+        if (noch) abbruch = abbruch ?? "Der Eingriff an vault.copy liess sich nicht zuruecknehmen";
+      }
+      if (abbruch) return abbruch;
+      const nachAbbruch = await cdp.evaluate<{ ziel: boolean; hilfsordner: boolean }>(`return { ziel: !!app.vault.getAbstractFileByPath(${JSON.stringify(O_KOPIE)}), hilfsordner: !!app.vault.getAbstractFileByPath(${JSON.stringify(O_HILFSORDNER)}) };`);
+      if (nachAbbruch.ziel) return "Nach dem Abbruch existiert das Ziel der Arbeitskopie (halb angelegt): der naechste Klick fasste sie nicht mehr an";
+      if (!nachAbbruch.hilfsordner) return "Nach dem Abbruch fehlt der Hilfsordner — der Abbruch hat den Kopierweg nicht erreicht";
+      if (!(await cdp.evaluate<boolean>(`return !!${anlegen};`))) return "Nach dem Abbruch bietet die Sidebar „Create working copy“ nicht wieder an";
+
+      // Zweiter Versuch laeuft durch: Ziel mit allem, kein Hilfsordner mehr.
+      await leereNotices(cdp);
+      if (!(await clickReal(cdp, anlegen, 150))) return "„Create working copy“ liess sich beim zweiten Versuch nicht klicken";
+      if (!(await pollUntil<boolean>(cdp, `return ${noticeEnthaelt("Working copy created")};`, 10_000, 200))) return "Der zweite Versuch meldete keine angelegte Arbeitskopie";
+      const erwartet = [...O_BAUM.map((b) => b.pfad), O_PNG].map((p) => `${O_ARBEIT}/${p}`);
+      const fehlt = await cdp.evaluate<string[]>(`return ${JSON.stringify(erwartet)}.filter((p) => !app.vault.getAbstractFileByPath(p));`);
+      if (fehlt.length) return `Dateien fehlen in der Arbeitskopie: ${JSON.stringify(fehlt)}`;
+      if (await cdp.evaluate<boolean>(`return !!app.vault.getAbstractFileByPath(${JSON.stringify(O_HILFSORDNER)});`)) return "Der Hilfsordner des Abbruchs steht nach dem zweiten Versuch noch im Vault";
+
+      // Eine vorhandene Kopie bleibt unberuehrt: geaenderte Seite und eigene neue Seite ueberleben einen weiteren Anlegen-Aufruf.
+      const eigene = `${O_KOPIE}/Eigene Seite.md`;
+      const geaendert = `${O_KOPIE}/README.md`;
+      await schreibeDatei(cdp, geaendert, "# Handbuch Start\n\nGEAENDERT-IN-KOPIE\n");
+      await schreibeDatei(cdp, eigene, "# Eigene Seite\n\nMARKER-EIGENE\n");
+      await leereNotices(cdp);
+      await cdp.evaluate(`await app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].makeBridge().handlers.onFolderCreateWorkCopy(); return true;`);
+      if (!(await pollUntil<boolean>(cdp, `return ${noticeEnthaelt("left as it is")};`, 10_000, 200))) return "Ein weiterer Anlegen-Aufruf meldete nicht, dass die Kopie bleibt";
+      if ((await leseDatei(cdp, geaendert)) !== "# Handbuch Start\n\nGEAENDERT-IN-KOPIE\n") return "Die vorhandene Arbeitskopie wurde ueberschrieben";
+      if ((await leseDatei(cdp, eigene)) === null) return "Die eigene Seite in der Arbeitskopie ging verloren";
+
+      // Vorschau und Export beziehen sich auf die Kopie; das EPUB liegt neben der Kopie (Entscheidung Johannes 2026-10-28).
+      const quelle = await cdp.evaluate<string | null>(`return document.querySelector(".epub-exporter-sidebar .epub-sb-source")?.textContent ?? null;`);
+      if (quelle !== `Working copy: ${O_KOPIE}`) return `Die Quellzeile lautet ${JSON.stringify(quelle)}, erwartet „Working copy: ${O_KOPIE}“`;
+      { const w = await erwarte(cdp, `[...document.querySelectorAll(".epub-exporter-sidebar .epub-sb-row-title")].some((e) => e.textContent === "Eigene Seite")`, "Die Vorschau zeigt die eigene Seite der Arbeitskopie nicht"); if (w) return w; }
+      const kopieEpub = `${O_ARBEIT}/${O_DIR}/Handbuch.epub`;
+      const dateien = await exportiereOrdner(cdp, kopieEpub);
+      if (typeof dateien === "string") return dateien;
+      const text = [...dateien.entries()].filter(([n]) => n.startsWith("OEBPS/chapter-")).map(([, t]) => t).join("\n");
+      if (!text.includes("GEAENDERT-IN-KOPIE") || text.includes("MARKER-WURZEL-INTRO")) return "Der Export liest nicht die Arbeitskopie (geaenderte Seite fehlt oder die alte steht noch im Buch)";
+      if (await cdp.evaluate<boolean>(`return !!app.vault.getAbstractFileByPath(${JSON.stringify(O_EPUB)});`)) return "Das EPUB landete neben dem Original, entschieden ist: neben der Kopie";
+
+      // Arbeitsverzeichnis im Ordner: kein Kopieren in sich selbst, die Sidebar nennt den Grund.
+      await ordnerEinstellungen(cdp, { workDir: `${O_ROOT}/Arbeit` });
+      { const w = await erwarte(cdp, `!document.querySelector(".epub-exporter-sidebar .epub-sb-action-copy-toggle") && (document.querySelector(".epub-exporter-sidebar .epub-sb-copy-note")?.textContent ?? "").includes("contains the working directory")`, "Mit dem Arbeitsverzeichnis im Ordner nennt die Sidebar den Grund nicht (oder zeigt noch den Schalter)"); if (w) return w; }
+      return null;
+    },
+  },
+  {
+    id: "O5",
+    was: "Form von data-href im gerenderten DOM fuer einen relativen Markdown-Link (../x.md#a): gleich dem Rohtext, den die Linkaufloesung erwartet",
+    pruefe: async (cdp) => {
+      await legeOrdnerBaumAn(cdp);
+      await schreibeDatei(cdp, `${O_PROBE}/x.md`, "# X\n");
+      await schreibeDatei(cdp, `${O_PROBE}/my page.md`, "# My page\n");
+      const quelle = `${O_PROBE}/a/Quelle.md`;
+      await schreibeDatei(cdp, quelle, "[x](../x.md#a)\n\n[y](../my%20page.md)\n\n[z](<../my page.md#h>)\n\n[[x|Alias]]\n");
+      if (!(await openExisting(cdp, quelle, "preview"))) return `${quelle} liess sich nicht in der Leseansicht oeffnen`;
+      { const w = await erwarte(cdp, `(app.workspace.activeLeaf?.view?.containerEl?.querySelectorAll(".markdown-reading-view a.internal-link").length ?? 0) >= 4`, "Die Leseansicht zeigte nicht vier interne Links"); if (w) return w; }
+      const links = await cdp.evaluate<Array<{ text: string; dataHref: string | null; href: string | null }>>(`
+        return [...app.workspace.activeLeaf.view.containerEl.querySelectorAll(".markdown-reading-view a.internal-link")].map((a) => ({
+          text: a.textContent, dataHref: a.getAttribute("data-href"), href: a.getAttribute("href"),
+        }));
+      `);
+      for (const l of links) console.log(`    O5 ${JSON.stringify(l.text)}: data-href=${JSON.stringify(l.dataHref)} href=${JSON.stringify(l.href)}`);
+      const von = (text: string) => links.find((l) => l.text === text);
+      if (von("x")?.dataHref !== "../x.md#a") return `BEFUND: data-href von [x](../x.md#a) ist ${JSON.stringify(von("x")?.dataHref)}, nicht der Rohtext — die Linkaufloesung (Aufgabe 4) muss vor dem Weitermachen angepasst werden`;
+      // Kontrolle: die Messung unterscheidet Formen — ein Wikilink traegt den Namen ohne Pfad und Anker.
+      if (von("Alias")?.dataHref !== "x") return `Kontrolle: der Wikilink [[x|Alias]] hat data-href ${JSON.stringify(von("Alias")?.dataHref)}, erwartet "x"`;
+      return null;
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1138,7 +1767,10 @@ async function lauf(nur?: string): Promise<void> {
         SMOKE_FM_NOTE,
         ...SMOKE_CHAPTERS.map((k) => k.pfad),
         SMOKE_DIR,
+        O_DIR,
+        O_ARBEIT,
       ]);
+      await stelleOrdnerZustandWiederHer(cdp);
       await stelleAnbieterWiederHer(cdp);
       if (buchVorher !== null) {
         const jetzt = await leseDatei(cdp, BOOK);
