@@ -1,4 +1,4 @@
-import { Book } from "./model";
+import { Book, TocEntry } from "./model";
 import { createZip, ZipEntry } from "./zip-writer";
 
 const MIMETYPE = "application/epub+zip";
@@ -102,31 +102,65 @@ function buildOpf(book: Book): string {
 </package>`;
 }
 
+/** The entries to render: `book.toc`, or one flat entry per chapter. Refuses an entry whose chapter does not exist. */
+function tocEntries(book: Book): TocEntry[] {
+  if (!book.toc || book.toc.length === 0) {
+    return book.chapters.map((c, i) => ({ title: c.title, chapterIndex: i, children: [] }));
+  }
+  const check = (entries: readonly TocEntry[]): void => {
+    for (const e of entries) {
+      if (!Number.isInteger(e.chapterIndex) || e.chapterIndex < 0 || e.chapterIndex >= book.chapters.length) {
+        throw new Error(`toc entry "${e.title}" points at chapter ${e.chapterIndex}, which does not exist`);
+      }
+      check(e.children);
+    }
+  };
+  check(book.toc);
+  return book.toc;
+}
+
+// `depth` counts two spaces; the flat output (depth 4 in nav, 2 in ncx) is the layout the builder always had.
+function navItems(entries: readonly TocEntry[], depth: number): string {
+  const pad = "  ".repeat(depth);
+  return entries
+    .map((e) => {
+      const link = `<a href="${chapterFileName(e.chapterIndex)}">${xmlEscape(e.title)}</a>`;
+      if (e.children.length === 0) return `${pad}<li>${link}</li>`;
+      return `${pad}<li>${link}\n${pad}  <ol>\n${navItems(e.children, depth + 2)}\n${pad}  </ol>\n${pad}</li>`;
+    })
+    .join("\n");
+}
+
+function ncxPoints(entries: readonly TocEntry[], depth: number, counter: { n: number }): string {
+  const pad = "  ".repeat(depth);
+  return entries
+    .map((e) => {
+      const n = ++counter.n; // document order: a parent before its children
+      const children = e.children.length === 0 ? "" : `\n${ncxPoints(e.children, depth + 1, counter)}`;
+      return `${pad}<navPoint id="navpoint-${n}" playOrder="${n}">
+${pad}  <navLabel><text>${xmlEscape(e.title)}</text></navLabel>
+${pad}  <content src="${chapterFileName(e.chapterIndex)}"/>${children}
+${pad}</navPoint>`;
+    })
+    .join("\n");
+}
+
 function buildNav(book: Book): string {
-  const items = book.chapters
-    .map((c, i) => `<li><a href="${chapterFileName(i)}">${xmlEscape(c.title)}</a></li>`)
-    .join("\n        ");
+  const items = navItems(tocEntries(book), 4);
   return wrapXhtml(
     "Contents",
     book.metadata.language,
     `    <nav epub:type="toc" id="toc" xmlns:epub="http://www.idpf.org/2007/ops">
       <h1>Contents</h1>
       <ol>
-        ${items}
+${items}
       </ol>
     </nav>`
   );
 }
 
 function buildNcx(book: Book): string {
-  const navPoints = book.chapters
-    .map(
-      (c, i) => `<navPoint id="navpoint-${i + 1}" playOrder="${i + 1}">
-      <navLabel><text>${xmlEscape(c.title)}</text></navLabel>
-      <content src="${chapterFileName(i)}"/>
-    </navPoint>`
-    )
-    .join("\n    ");
+  const navPoints = ncxPoints(tocEntries(book), 2, { n: 0 });
   return `<?xml version="1.0" encoding="UTF-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <head>
@@ -134,7 +168,7 @@ function buildNcx(book: Book): string {
   </head>
   <docTitle><text>${xmlEscape(book.metadata.title)}</text></docTitle>
   <navMap>
-    ${navPoints}
+${navPoints}
   </navMap>
 </ncx>`;
 }

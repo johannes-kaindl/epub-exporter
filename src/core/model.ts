@@ -28,9 +28,17 @@ export interface ImageAsset {
   data: Uint8Array;
 }
 
+/** One entry of the table of contents. Points at a chapter by index; several entries may point at the same one. */
+export interface TocEntry {
+  title: string;
+  chapterIndex: number; // index into Book.chapters
+  children: TocEntry[];
+}
+
 export interface Book {
   metadata: BookMetadata;
   chapters: Chapter[];
+  toc?: TocEntry[]; // nested table of contents; absent or empty = one flat entry per chapter
   images: ImageAsset[];
   coverImageId?: string; // ImageAsset.id of the cover, if any
   css: string;
