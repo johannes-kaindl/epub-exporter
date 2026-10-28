@@ -5,6 +5,7 @@ import EpubExporterPlugin from "../../src/main";
 import { EpubHubView, VIEW_TYPE_EPUB_HUB, type SidebarBridge } from "../../src/obsidian/hub-view";
 import { coerceSettings, toFolderBookOptions } from "../../src/obsidian/settings";
 import { t } from "../../src/vendor/kit/i18n";
+import { WORK_COPY_TEMP_SUFFIX } from "../../src/obsidian/work-copy";
 
 type Cb = (...args: unknown[]) => void;
 // What the Plugin stand-in in tests/mocks/obsidian.ts keeps; the real Plugin type does not have it.
@@ -32,6 +33,7 @@ function makeVault(initial: { folders: string[]; files: string[] }) {
   for (const f of initial.files) fileAt(f);
   return {
     calls,
+    entries,
     remove: (path: string) => entries.delete(path),
     vault: {
       getAbstractFileByPath: (p: string) => entries.get(p) ?? null,
@@ -39,6 +41,16 @@ function makeVault(initial: { folders: string[]; files: string[] }) {
       cachedRead: async () => "# Titel\n",
       createFolder: async (p: string) => { calls.push(`folder ${p}`); folderAt(p); },
       copy: async (file: TFile, to: string) => { calls.push(`copy ${file.path} -> ${to}`); fileAt(to); },
+      rename: async (entry: TFile | TFolder, to: string) => {
+        calls.push(`rename ${entry.path} -> ${to}`);
+        const from = entry.path;
+        for (const [path, e] of [...entries]) {
+          if (path !== from && !path.startsWith(`${from}/`)) continue;
+          entries.delete(path);
+          e.path = `${to}${path.slice(from.length)}`;
+          entries.set(e.path, e);
+        }
+      },
       on: () => ({}),
     },
   };
@@ -55,7 +67,12 @@ async function setup(opts: { folders?: string[]; files?: string[]; settings?: Re
   const app = {
     vault: fake.vault,
     metadataCache: { getFileCache: (_file?: unknown): { frontmatter: Record<string, unknown> } => ({ frontmatter: {} }) },
-    fileManager: {},
+    fileManager: {
+      trashFile: async (entry: TFile | TFolder) => {
+        fake.calls.push(`trash ${entry.path}`);
+        for (const path of [...fake.entries.keys()]) if (path === entry.path || path.startsWith(`${entry.path}/`)) fake.entries.delete(path);
+      },
+    },
     workspace: {
       on: (name: string, cb: Cb) => { listeners.set(name, cb); return {}; },
       onLayoutReady: () => {},
@@ -224,14 +241,16 @@ describe("Sidebar im Ordnermodus: Arbeitskopie", () => {
     openMenu(folderOf("P/docs"))[0].click();
     refresh.mockClear();
     handlers().onFolderCreateWorkCopy(); await tick();
+    const tmp = `Arbeit/P/docs${WORK_COPY_TEMP_SUFFIX}`;
     expect(fake.calls).toEqual([
       "folder Arbeit",
       "folder Arbeit/P",
-      "folder Arbeit/P/docs",
-      "folder Arbeit/P/docs/img",
-      "copy P/docs/README.md -> Arbeit/P/docs/README.md",
-      "copy P/docs/a.md -> Arbeit/P/docs/a.md",
-      "copy P/docs/img/x.png -> Arbeit/P/docs/img/x.png",
+      `folder ${tmp}`,
+      `folder ${tmp}/img`,
+      `copy P/docs/README.md -> ${tmp}/README.md`,
+      `copy P/docs/a.md -> ${tmp}/a.md`,
+      `copy P/docs/img/x.png -> ${tmp}/img/x.png`,
+      `rename ${tmp} -> Arbeit/P/docs`,
     ]);
     expect(Notice.shown).toEqual([t("notice.workCopyCreated", "Arbeit/P/docs")]);
     expect(refresh).toHaveBeenCalled();
@@ -264,6 +283,7 @@ describe("Sidebar im Ordnermodus: Arbeitskopie", () => {
 
   it("reports a copy that fails half-way instead of leaving the click unanswered", async () => {
     const { openMenu, folderOf, handlers, fake } = await setup({ settings: { workDir: "Arbeit" } });
+    const copyOk = fake.vault.copy;
     fake.vault.copy = async () => { throw new Error("disk full"); };
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     openMenu(folderOf("P/docs"))[0].click();
@@ -271,6 +291,15 @@ describe("Sidebar im Ordnermodus: Arbeitskopie", () => {
     expect(Notice.shown).toEqual([t("notice.workCopyFailed")]);
     expect(errors).toHaveBeenCalled();
     errors.mockRestore();
+    // The abort leaves no target behind, so the next click does not meet a "finished" copy ...
+    expect(fake.vault.getAbstractFileByPath("Arbeit/P/docs")).toBeNull();
+    // ... and runs through once the disk has room again.
+    fake.vault.copy = copyOk;
+    Notice.shown.length = 0;
+    handlers().onFolderCreateWorkCopy(); await tick();
+    expect(Notice.shown).toEqual([t("notice.workCopyCreated", "Arbeit/P/docs")]);
+    expect(fake.vault.getAbstractFileByPath("Arbeit/P/docs/a.md")).not.toBeNull();
+    expect(fake.calls).toContain(`trash Arbeit/P/docs${WORK_COPY_TEMP_SUFFIX}`); // the leftover helper folder went the trash way
   });
 });
 
