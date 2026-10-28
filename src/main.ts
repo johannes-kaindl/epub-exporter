@@ -2,6 +2,7 @@
 import { Plugin, Notice, TFile, TFolder, Menu, getLanguage, normalizePath, WorkspaceLeaf } from "obsidian";
 import { assembleBook, BookSource } from "./obsidian/book-assembler";
 import { buildEpub } from "./core/epub-builder";
+import { DEFAULT_FOLDER_OPTIONS } from "./core/folder-tree";
 import { createAssemblerDeps } from "./obsidian/deps";
 import { writeEpub } from "./obsidian/output";
 import { sanitizeBase } from "./core/output-path";
@@ -96,7 +97,7 @@ export default class EpubExporterPlugin extends Plugin {
         if (file instanceof TFolder) {
           menu.addItem((item) =>
             item.setTitle(t("cmd.exportFolder")).setIcon("book").onClick(() => {
-              void this.exportSource({ kind: "folder", path: file.path });
+              void this.exportSource({ kind: "folder", path: file.path, options: DEFAULT_FOLDER_OPTIONS });
             })
           );
           menu.addItem((item) =>

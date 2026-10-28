@@ -58,9 +58,15 @@ export function createAssemblerDeps(app: App): AssemblerDeps {
     async listFolderNotes(folderPath) {
       const folder = app.vault.getAbstractFileByPath(folderPath);
       if (!(folder instanceof TFolder)) return [];
-      return folder.children
-        .filter((c): c is TFile => c instanceof TFile && c.extension === "md")
-        .map((f) => f.path);
+      const paths: string[] = [];
+      const walk = (dir: TFolder): void => {
+        for (const child of dir.children) {
+          if (child instanceof TFolder) walk(child);
+          else if (child instanceof TFile && child.extension === "md") paths.push(child.path);
+        }
+      };
+      walk(folder);
+      return paths;
     },
   };
 }

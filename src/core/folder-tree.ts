@@ -10,6 +10,9 @@ export interface FolderBookOptions {
   titleFromHeading: boolean;
 }
 
+/** What a folder export does without any setting: natural order of the full names, no intro page, title from the first heading. */
+export const DEFAULT_FOLDER_OPTIONS: FolderBookOptions = { numberPrefix: false, introNames: [], titleFromHeading: true };
+
 export interface FolderFileInput {
   path: string;
   /** `chapter_title` from the frontmatter, if a non-empty string. */

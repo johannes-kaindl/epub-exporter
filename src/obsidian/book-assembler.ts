@@ -1,7 +1,8 @@
-import { Book, Chapter } from "../core/model";
+import { Book, Chapter, TocEntry } from "../core/model";
 import { parseBookMetadata, isBookNote } from "../core/frontmatter";
 import { parseEmbedSpine } from "../core/spine-parser";
-import { sortFolderChapters } from "../core/spine-parser";
+import { buildBookTree, fileInputFromNote, flattenPages, type BookNode, type BookTree, type FolderBookOptions } from "../core/folder-tree";
+import { createLinkResolver } from "../vendor/kit/link-resolver";
 import { domToXhtml, RenderContext } from "../core/dom-to-xhtml";
 import { ImageRegistry, ImageSource } from "../core/image-registry";
 import { DEFAULT_BOOK_CSS } from "../core/epub-builder";
@@ -31,7 +32,7 @@ export interface AssemblerDeps {
 
 export type BookSource =
   | { kind: "note"; path: string }
-  | { kind: "folder"; path: string };
+  | { kind: "folder"; path: string; options: FolderBookOptions };
 
 export interface AssembledBook {
   book: Book;
@@ -43,6 +44,25 @@ interface ChapterPlan {
   title: string;
   body: string; // markdown to render
   sourcePath: string;
+}
+
+/** The nested table of contents of a folder tree. `indexOf` gives the chapter index of a page path.
+ *  A chapter's entry points at its intro page, or at its first page when it has none; the intro is not listed again as a child. */
+function tocFromTree(tree: BookTree, indexOf: (path: string) => number): TocEntry[] {
+  const firstPath = (node: BookNode): string => {
+    if (node.kind === "page") return node.path;
+    if (node.intro) return node.intro.path;
+    return firstPath(node.children[0]);
+  };
+  const entry = (node: BookNode): TocEntry => ({
+    title: node.title,
+    chapterIndex: indexOf(firstPath(node)),
+    children: node.kind === "chapter" ? node.children.map(entry) : [],
+  });
+  const toc: TocEntry[] = [];
+  if (tree.intro) toc.push({ title: tree.intro.title, chapterIndex: indexOf(tree.intro.path), children: [] });
+  for (const node of tree.children) toc.push(entry(node));
+  return toc;
 }
 
 function basenameNoExt(path: string): string {
@@ -87,18 +107,25 @@ export async function assembleBook(
   const plans: ChapterPlan[] = [];
   let metadataSourcePath = source.path;
 
+  let toc: TocEntry[] | undefined;
+  let folderResolver: ((target: string, fromPath: string) => number | null) | null = null;
+
   if (source.kind === "folder") {
-    fallbackTitle = source.path.split("/").pop() || source.path;
-    const files = sortFolderChapters(await deps.listFolderNotes(source.path));
-    for (const path of files) {
+    const notes = new Map<string, NoteData>();
+    for (const path of await deps.listFolderNotes(source.path)) {
       const note = await deps.readNote(path);
-      if (!note) {
-        missing.push(path);
-        continue;
-      }
-      if (note.frontmatter["epub_exclude"] === true) continue;
-      plans.push({ title: chapterTitle(note), body: note.body, sourcePath: note.path });
+      if (note) notes.set(note.path, note);
+      else missing.push(path);
     }
+    const tree = buildBookTree(source.path, [...notes.values()].map(fileInputFromNote), source.options);
+    const pages = flattenPages(tree);
+    const indexByPath = new Map(pages.map((page, i) => [page.path, i]));
+    fallbackTitle = tree.title;
+    for (const page of pages) {
+      plans.push({ title: page.title, body: notes.get(page.path)?.body ?? "", sourcePath: page.path });
+    }
+    toc = tocFromTree(tree, (path) => indexByPath.get(path) ?? 0);
+    folderResolver = createLinkResolver(pages);
   } else {
     const root = await deps.readNote(source.path);
     if (!root) {
@@ -161,7 +188,13 @@ export async function assembleBook(
       }
       const ctx: RenderContext = {
         resolveImage: (src) => srcToHref.get(src) ?? null,
-        resolveInternalLink: (target) => linkMap.get(normalizeLinkTarget(target)) ?? null,
+        resolveInternalLink: (target) => {
+          if (folderResolver) {
+            const hit = folderResolver(target, plan.sourcePath);
+            return hit === null ? null : chapterFileName(hit);
+          }
+          return linkMap.get(normalizeLinkTarget(target)) ?? null;
+        },
         onUnsupported: () => {
           simplifiedCount++;
         },
@@ -190,6 +223,7 @@ export async function assembleBook(
   const book: Book = {
     metadata,
     chapters,
+    ...(toc ? { toc } : {}),
     images: registry.images(),
     coverImageId,
     css: DEFAULT_BOOK_CSS,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { assembleBook, AssemblerDeps, NoteData } from "../../src/obsidian/book-assembler";
+import { DEFAULT_FOLDER_OPTIONS, type FolderBookOptions } from "../../src/core/folder-tree";
 
 // A fake vault: notes keyed by path, images keyed by src, plus a rendered-DOM
 // stand-in. renderMarkdown returns a jsdom-free fake root whose querySelectorAll
@@ -34,7 +35,7 @@ function makeDeps(
       return hit ? { data: new Uint8Array([hit.n, hit.n]), path: hit.path } : null;
     },
     async listFolderNotes(folderPath) {
-      return Object.keys(notes).filter((p) => p.startsWith(folderPath + "/") && !p.slice(folderPath.length + 1).includes("/"));
+      return Object.keys(notes).filter((p) => p.startsWith(folderPath + "/"));
     },
   };
 }
@@ -112,9 +113,97 @@ describe("assembleBook — folder", () => {
       "Bk/01 One.md": note("Bk/01 One.md", "<p>one</p>"),
       "Bk/10 Ten.md": note("Bk/10 Ten.md", "<p>ten</p>"),
     };
-    const { book } = await assembleBook(makeDeps(notes, {}), { kind: "folder", path: "Bk" }, opts);
+    const { book } = await assembleBook(makeDeps(notes, {}), { kind: "folder", path: "Bk", options: DEFAULT_FOLDER_OPTIONS }, opts);
     expect(book.chapters.map((c) => c.title)).toEqual(["01 One", "02 Two", "10 Ten"]);
     expect(book.metadata.title).toBe("Bk");
+  });
+});
+
+describe("assembleBook — folder tree", () => {
+  const readme = (dir: string, body = "<p>r</p>") => note(`${dir}/README.md`, body);
+  const options = (over: Partial<FolderBookOptions> = {}): FolderBookOptions => ({ ...DEFAULT_FOLDER_OPTIONS, introNames: ["README"], ...over });
+  const folder = (path: string, over?: Partial<FolderBookOptions>) => ({ kind: "folder" as const, path, options: options(over) });
+
+  it("links [x](README.md) to the README next to the page, not to the last README registered", async () => {
+    const notes = {
+      "docs/README.md": readme("docs", "<p>root</p>"),
+      "docs/tutorials/README.md": readme("docs/tutorials", "<p>tut</p>"),
+      "docs/tutorials/lektion-01.md": note(
+        "docs/tutorials/lektion-01.md",
+        '<p><a data-href="README.md" href="README.md" class="internal-link">x</a> <a data-href="../README.md" href="../README.md">up</a></p>'
+      ),
+      "docs/reference/README.md": readme("docs/reference", "<p>ref</p>"),
+    };
+    const { book } = await assembleBook(makeDeps(notes, {}), folder("docs"), opts);
+    const order = book.chapters.map((c) => c.sourcePath);
+    expect(order).toEqual(["docs/README.md", "docs/reference/README.md", "docs/tutorials/README.md", "docs/tutorials/lektion-01.md"]);
+    const lesson = book.chapters[order.indexOf("docs/tutorials/lektion-01.md")].xhtml;
+    const file = (path: string) => `chapter-${String(order.indexOf(path) + 1).padStart(2, "0")}.xhtml`;
+    expect(lesson).toContain(`href="${file("docs/tutorials/README.md")}"`);
+    expect(lesson).toContain(`href="${file("docs/README.md")}"`);
+    expect(lesson).not.toContain(`href="${file("docs/reference/README.md")}"`);
+  });
+
+  it("builds a nested toc: intro is the chapter entry, a chapter without intro points at its first page, the root intro comes first", async () => {
+    const notes = {
+      "docs/README.md": readme("docs"),
+      "docs/STAND.md": note("docs/STAND.md", "<p>s</p>", { chapter_title: "Stand" }),
+      "docs/tutorials/README.md": readme("docs/tutorials"),
+      "docs/tutorials/lektion-01.md": note("docs/tutorials/lektion-01.md", "<p>1</p>"),
+      "docs/explanation/farbsystem.md": note("docs/explanation/farbsystem.md", "<p>f</p>"),
+    };
+    const { book } = await assembleBook(makeDeps(notes, {}), folder("docs"), opts);
+    const idx = (path: string) => book.chapters.findIndex((c) => c.sourcePath === path);
+    expect(book.toc).toEqual([
+      { title: "README", chapterIndex: idx("docs/README.md"), children: [] },
+      { title: "explanation", chapterIndex: idx("docs/explanation/farbsystem.md"), children: [{ title: "farbsystem", chapterIndex: idx("docs/explanation/farbsystem.md"), children: [] }] },
+      { title: "Stand", chapterIndex: idx("docs/STAND.md"), children: [] },
+      { title: "tutorials", chapterIndex: idx("docs/tutorials/README.md"), children: [{ title: "lektion-01", chapterIndex: idx("docs/tutorials/lektion-01.md"), children: [] }] },
+    ]);
+  });
+
+  it("titles the pages by first heading when asked, the book by the folder name", async () => {
+    const notes = { "Bk/a.md": note("Bk/a.md", "# Erklärung\n\ntext") };
+    const heading = await assembleBook(makeDeps(notes, {}), folder("Bk", { titleFromHeading: true }), { ...opts, defaultLanguage: "de" });
+    expect(heading.book.chapters[0].title).toBe("Erklärung");
+    expect(heading.book.metadata.title).toBe("Bk");
+    expect(heading.book.metadata.language).toBe("de");
+    const plain = await assembleBook(makeDeps(notes, {}), folder("Bk", { titleFromHeading: false }), opts);
+    expect(plain.book.chapters[0].title).toBe("a");
+  });
+
+  it("names the book by the number rule: '01 - Handbuch' becomes 'Handbuch'", async () => {
+    const notes = { "x/01 - Handbuch/a.md": note("x/01 - Handbuch/a.md", "<p>a</p>") };
+    const { book } = await assembleBook(makeDeps(notes, {}), folder("x/01 - Handbuch", { numberPrefix: true }), opts);
+    expect(book.metadata.title).toBe("Handbuch");
+  });
+
+  it("returns no chapters and no toc when every page is hidden or excluded", async () => {
+    const notes = {
+      "Bk/0 - Entwurf/a.md": note("Bk/0 - Entwurf/a.md", "<p>a</p>"),
+      "Bk/b.md": note("Bk/b.md", "<p>b</p>", { epub_exclude: true }),
+    };
+    const { book } = await assembleBook(makeDeps(notes, {}), folder("Bk", { numberPrefix: true }), opts);
+    expect(book.chapters).toHaveLength(0);
+    expect(book.toc ?? []).toEqual([]);
+  });
+
+  it("records an unreadable note in missing and builds the rest", async () => {
+    const notes = { "Bk/a.md": note("Bk/a.md", "<p>a</p>") };
+    const deps = makeDeps(notes, {});
+    const { book, missing } = await assembleBook({ ...deps, listFolderNotes: async () => ["Bk/a.md", "Bk/gone.md"] }, folder("Bk"), opts);
+    expect(book.chapters.map((c) => c.sourcePath)).toEqual(["Bk/a.md"]);
+    expect(missing).toEqual(["Bk/gone.md"]);
+  });
+
+  it("leaves a link to a page outside the book as plain text", async () => {
+    const notes = {
+      "Bk/a.md": note("Bk/a.md", '<p><a data-href="b.md" href="b.md">b</a></p>'),
+      "Bk/b.md": note("Bk/b.md", "<p>b</p>", { epub_exclude: true }),
+    };
+    const { book } = await assembleBook(makeDeps(notes, {}), folder("Bk"), opts);
+    expect(book.chapters[0].xhtml).not.toContain("<a ");
+    expect(book.chapters[0].xhtml).toContain("b");
   });
 });
 
@@ -134,7 +223,7 @@ describe("assembleBook — epub_exclude", () => {
       "Bk/01 One.md": note("Bk/01 One.md", "<p>one</p>"),
       "Bk/02 Two.md": note("Bk/02 Two.md", "<p>two</p>", { epub_exclude: true }),
     };
-    const { book } = await assembleBook(makeDeps(notes, {}), { kind: "folder", path: "Bk" }, opts);
+    const { book } = await assembleBook(makeDeps(notes, {}), { kind: "folder", path: "Bk", options: DEFAULT_FOLDER_OPTIONS }, opts);
     expect(book.chapters.map((c) => c.title)).toEqual(["01 One"]);
   });
 });
