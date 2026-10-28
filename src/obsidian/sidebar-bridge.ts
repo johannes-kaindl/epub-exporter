@@ -33,15 +33,22 @@ export async function buildSnapshot(app: App, defaultLanguage: string): Promise<
   return { kind: "note", title: file.basename, chapters: [] };
 }
 
-// The folder preview: the book tree of a right-clicked folder, built from the very reads the export makes
-// (`listFolderNotes`, `readNote`, `buildBookTree`), so the rows are the table of contents the export will write.
-// With the working copy on and made, the copy is what is read, as it will be for the export; `sourcePath` says which.
-export async function buildFolderSnapshot(app: App, folderPath: string, settings: EpubExporterSettings): Promise<SidebarSnapshot> {
+/** Where a folder is read from and what its working copy is doing. The preview and the export both ask here, so what the
+ *  panel shows is what the export reads: the copy while the switch is on and the copy exists, else the original. */
+export function resolveFolderSource(app: App, folderPath: string, settings: EpubExporterSettings): { sourcePath: string; workCopy: WorkCopyState } {
   const copy = workCopyPath(settings.workDir, folderPath);
   const workCopy: WorkCopyState = copy.ok
     ? { available: true, enabled: settings.useWorkCopy, path: copy.path, exists: app.vault.getAbstractFileByPath(copy.path) !== null }
     : { available: false, reason: copy.reason };
   const sourcePath = workCopy.available && workCopy.enabled && workCopy.exists ? workCopy.path : folderPath;
+  return { sourcePath, workCopy };
+}
+
+// The folder preview: the book tree of a right-clicked folder, built from the very reads the export makes
+// (`listFolderNotes`, `readNote`, `buildBookTree`), so the rows are the table of contents the export will write.
+// With the working copy on and made, the copy is what is read, as it will be for the export; `sourcePath` says which.
+export async function buildFolderSnapshot(app: App, folderPath: string, settings: EpubExporterSettings): Promise<SidebarSnapshot> {
+  const { sourcePath, workCopy } = resolveFolderSource(app, folderPath, settings);
 
   const deps = createAssemblerDeps(app);
   const files = [];

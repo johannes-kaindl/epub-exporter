@@ -28,7 +28,8 @@ export interface SidebarHandlers {
 // panel (about 250px wide) never pushes a title out of sight. styles.css has one rule per step.
 const MAX_INDENT_DEPTH = 6;
 
-const NO_COPY_TEXT = {
+/** The sentence for each reason there is no working copy; the sidebar shows it, and so does a click that would have made one. */
+export const NO_COPY_TEXT = {
   "no-workdir": "view.folder.copyNo.noWorkdir",
   "invalid-workdir": "view.folder.copyNo.invalidWorkdir",
   "inside-workdir": "view.folder.copyNo.insideWorkdir",

@@ -11,7 +11,10 @@ import { registerI18n } from "./i18n/strings";
 import { pickLang, setLang, t } from "./vendor/kit/i18n";
 import { vaultDirname } from "./vendor/kit/vault-path";
 import { EpubHubView, VIEW_TYPE_EPUB_HUB, resolveTargetFile, SidebarBridge } from "./obsidian/hub-view";
-import { buildSnapshot } from "./obsidian/sidebar-bridge";
+import { NO_COPY_TEXT } from "./obsidian/sidebar-render";
+import { buildFolderSnapshot, buildSnapshot, resolveFolderSource } from "./obsidian/sidebar-bridge";
+import { planWorkCopy, workCopyPath } from "./core/work-copy";
+import { collectVaultEntries, createWorkCopyPort, executeWorkCopy } from "./obsidian/work-copy";
 import { buildConsolidatePlan } from "./core/consolidate-plan";
 import { createConsolidatePort, gatherConsolidateInput, executeConsolidatePlan, ConsolidatePort } from "./obsidian/consolidate";
 import { createImportPort, folderMdBasenames, executeImport } from "./obsidian/import";
@@ -44,6 +47,9 @@ function readObsidianLocale(): string | null {
 
 export default class EpubExporterPlugin extends Plugin {
   settings: EpubExporterSettings = coerceSettings(null);
+  /** The folder the sidebar previews (set by the folder menu); `null` = the sidebar follows the active note. It ends by an
+   *  explicit act (close button, another folder), never by switching notes. */
+  folderSelection: string | null = null;
 
   async onload(): Promise<void> {
     registerI18n();
@@ -89,19 +95,13 @@ export default class EpubExporterPlugin extends Plugin {
       },
     });
 
-    // Right-click a folder → export it as a book (filename-sorted spine) or import it
-    // as one; right-click a book note → consolidate it into a folder.
+    // Right-click a folder → open the sidebar on it (preview, working copy, export); right-click a book note → consolidate it into a folder.
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu: Menu, file) => {
         if (file instanceof TFolder) {
           menu.addItem((item) =>
-            item.setTitle(t("cmd.exportFolder")).setIcon("book").onClick(() => {
-              void this.exportSource({ kind: "folder", path: file.path, options: toFolderBookOptions(this.settings) });
-            })
-          );
-          menu.addItem((item) =>
-            item.setTitle(t("cmd.importFolder")).setIcon("book-plus").onClick(() => {
-              void this.importFolder(file);
+            item.setTitle(t("cmd.createEpub")).setIcon("book").onClick(() => {
+              void this.selectFolder(file.path);
             })
           );
         }
@@ -135,6 +135,80 @@ export default class EpubExporterPlugin extends Plugin {
   }
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+    // The folder preview reads settings (number rule, intro pages, titles, working copy); an open sidebar must not keep the old reading.
+    await this.refreshHub();
+  }
+
+  /** Redraws every open sidebar from the bridge's current state (a changed selection or setting is not an event the view sees itself). */
+  async refreshHub(): Promise<void> {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_EPUB_HUB)) {
+      if (leaf.view instanceof EpubHubView) await leaf.view.refresh();
+    }
+  }
+
+  private async selectFolder(path: string): Promise<void> {
+    this.folderSelection = path;
+    await this.openHub();
+    await this.refreshHub();
+  }
+
+  private async toggleWorkCopy(): Promise<void> {
+    this.settings.useWorkCopy = !this.settings.useWorkCopy;
+    await this.saveSettings(); // saves, then redraws the sidebar
+  }
+
+  private async createWorkCopy(): Promise<void> {
+    const selection = this.folderSelection;
+    if (selection === null) return;
+    const copy = workCopyPath(this.settings.workDir, selection);
+    if (!copy.ok) { new Notice(t(NO_COPY_TEXT[copy.reason])); return; }
+    try {
+      const plan = planWorkCopy(collectVaultEntries(this.app), selection, copy.path);
+      const res = await executeWorkCopy(createWorkCopyPort(this.app), plan, copy.path);
+      new Notice(t(res.created ? "notice.workCopyCreated" : "notice.workCopyExists", copy.path));
+    } catch (e) {
+      console.error("EPUB Exporter: working copy failed", e);
+      new Notice(t("notice.workCopyFailed"));
+    }
+    await this.refreshHub();
+  }
+
+  private exportSelectedFolder(): void {
+    const selection = this.folderSelection;
+    if (selection === null) return;
+    const { sourcePath } = resolveFolderSource(this.app, selection, this.settings);
+    void this.exportSource({ kind: "folder", path: sourcePath, options: toFolderBookOptions(this.settings) });
+  }
+
+  private importSelectedFolder(): void {
+    const folder = this.folderSelection === null ? null : this.app.vault.getAbstractFileByPath(this.folderSelection);
+    if (folder instanceof TFolder) void this.importFolder(folder);
+  }
+
+  private async closeFolderMode(): Promise<void> {
+    this.folderSelection = null;
+    await this.refreshHub();
+  }
+
+  // Whether a vault path belongs to what the sidebar previews: the selected folder, and its working copy.
+  private affectsSelectedFolder(path: string): boolean {
+    const selection = this.folderSelection;
+    if (selection === null) return false;
+    const within = (root: string): boolean => path === root || path.startsWith(`${root}/`);
+    if (within(selection)) return true;
+    const copy = workCopyPath(this.settings.workDir, selection);
+    return copy.ok && within(copy.path);
+  }
+
+  private async snapshotForSidebar(): ReturnType<SidebarBridge["snapshot"]> {
+    const selection = this.folderSelection;
+    if (selection !== null) {
+      if (this.app.vault.getAbstractFileByPath(selection) instanceof TFolder) {
+        return buildFolderSnapshot(this.app, selection, this.settings);
+      }
+      this.folderSelection = null; // the folder is gone: back to the active note
+    }
+    return buildSnapshot(this.app, this.settings.defaultLanguage);
   }
 
   private async exportActive(): Promise<void> {
@@ -381,9 +455,15 @@ export default class EpubExporterPlugin extends Plugin {
 
   private makeBridge(): SidebarBridge {
     return {
-      snapshot: () => buildSnapshot(this.app, this.settings.defaultLanguage),
+      snapshot: () => this.snapshotForSidebar(),
       canGenerateCover: () => readImageApi(this.app) !== null,
+      affectsFolder: (path) => this.affectsSelectedFolder(path),
       handlers: {
+        onFolderExport: () => this.exportSelectedFolder(),
+        onFolderToggleWorkCopy: () => { void this.toggleWorkCopy(); },
+        onFolderCreateWorkCopy: () => { void this.createWorkCopy(); },
+        onFolderImport: () => this.importSelectedFolder(),
+        onFolderClose: () => { void this.closeFolderMode(); },
         onExport: () => {
           const file = resolveTargetFile(this.app);
           if (file) void this.exportSource({ kind: "note", path: file.path });

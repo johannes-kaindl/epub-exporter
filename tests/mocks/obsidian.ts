@@ -129,7 +129,11 @@ export function setIcon(el: FakeEl, icon: string): void {
 }
 
 export class Notice {
-  constructor(public message?: string) {}
+  // Every notice ever shown, so a test can read what the user would have seen (a test clears it with `length = 0`).
+  static shown: string[] = [];
+  constructor(public message?: string) {
+    Notice.shown.push(message ?? "");
+  }
 }
 
 // Settable stand-in for Obsidian's `Platform`. Real usage only ever reads
@@ -222,4 +226,45 @@ export class ItemView {
   getIcon(): string {
     return "";
   }
+}
+
+// Just enough of Plugin for src/main.ts to run onload() under node: it records what the plugin registers and keeps its data in memory.
+export class Plugin {
+  commands: Array<{ id: string; name: string }> = [];
+  data: unknown = null;
+  saveCalls = 0;
+  constructor(public app: unknown = {}, public manifest: unknown = {}) {}
+  addSettingTab(): void {}
+  addRibbonIcon(): FakeEl {
+    return makeFakeEl();
+  }
+  addCommand(command: { id: string; name: string }): void {
+    this.commands.push(command);
+  }
+  registerView(): void {}
+  registerEvent(): void {}
+  async loadData(): Promise<unknown> {
+    return this.data;
+  }
+  async saveData(data: unknown): Promise<void> {
+    this.data = data;
+    this.saveCalls++;
+  }
+}
+
+// A dialog is only ever constructed, never opened, by the tests that import src/main.ts.
+export class Modal {
+  contentEl = makeFakeEl();
+  titleEl = makeFakeEl();
+  constructor(public app: unknown) {}
+  open(): void {}
+  close(): void {}
+}
+
+export function getLanguage(): string {
+  return "en";
+}
+
+export function normalizePath(path: string): string {
+  return path;
 }
