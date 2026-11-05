@@ -1,5 +1,5 @@
 // src/obsidian/deps.ts
-import { App, Component, MarkdownRenderer, TFile, TFolder, normalizePath } from "obsidian";
+import { App, Component, MarkdownRenderer, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
 import { AssemblerDeps, NoteData } from "./book-assembler";
 import { ImageSource } from "../core/image-registry";
 import { extractCodeBlocks } from "../core/code-blocks";
@@ -39,7 +39,7 @@ export function createAssemblerDeps(app: App): AssemblerDeps {
     async readImage(src, sourcePath): Promise<ImageSource | null> {
       // Normalise every src to a vault TFile so the ImageRegistry dedups on the resolved
       // path (Task 3): the cover arrives as a bare filename, inline images as an app:// URL.
-      let dest: TFile | null = null;
+      let dest: TAbstractFile | null = null;
       if (/^(app:|capacitor:|https?:|blob:|data:)/i.test(src)) {
         // Renderer resource URL → recover the file by its basename.
         const clean = decodeURIComponent(src.split("?")[0]);
@@ -48,7 +48,7 @@ export function createAssemblerDeps(app: App): AssemblerDeps {
       } else {
         const link = decodeURIComponent(src.replace(/^\.\//, ""));
         dest = app.metadataCache.getFirstLinkpathDest(link, sourcePath)
-          ?? (app.vault.getAbstractFileByPath(normalizePath(link)) as TFile | null);
+          ?? app.vault.getAbstractFileByPath(normalizePath(link));
       }
       if (!(dest instanceof TFile)) return null;
       const buf = await app.vault.readBinary(dest);
