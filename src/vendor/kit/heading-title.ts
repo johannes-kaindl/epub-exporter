@@ -1,4 +1,4 @@
-// vendored from code-kit@0.43.0, src/ts/pure/heading-title.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.60.0, src/ts/pure/heading-title.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** The text of the first Markdown heading of a note, as plain text: the title a note gets when its file name is not wanted
  *  (`# 🎓 Lektion 1 — Überleben` → "🎓 Lektion 1 — Überleben"). Works on the raw text, so a preview and an export read the same
  *  title without rendering anything. String logic only, no I/O; linear in the length of the text.
@@ -73,9 +73,9 @@ function toPlainText(raw: string): string {
   s = s.replace(/\[([^\]]+)\]\[[^\]]*\]/g, "$1");
   s = s.replace(/<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?>/g, "");
   s = s.replace(/\*\*(?=\S)([^*]*\S)\*\*/g, "$1");
-  s = s.replace(/(?<!\w)__(?=\S)([^_]*\S)__(?!\w)/g, "$1");
+  s = s.replace(/(^|\W)__(?=\S)([^_]*\S)__(?!\w)/g, "$1$2"); // the lead (`^|\W`) is a lookbehind written out, see rotation.ts STAMP_RE
   s = s.replace(/\*(?=\S)([^*]*\S)\*/g, "$1");
-  s = s.replace(/(?<!\w)_(?=\S)([^_]*\S)_(?!\w)/g, "$1");
+  s = s.replace(/(^|\W)_(?=\S)([^_]*\S)_(?!\w)/g, "$1$2");
   s = s.replace(/~~(?=\S)([^~]*\S)~~/g, "$1");
   s = s.replace(/==(?=\S)([^=]*\S)==/g, "$1");
   s = s.replace(/\uE000(\d+)\uE001/g, (_m, i: string) => stash[Number(i)] ?? "");

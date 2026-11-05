@@ -23,7 +23,10 @@
           "name": "fold-case",
           "ref": "0.44.0"
         },
-        "heading-title",
+        {
+          "name": "heading-title",
+          "ref": "0.60.0"
+        },
         "i18n",
         "link-resolver",
         "name-order",
