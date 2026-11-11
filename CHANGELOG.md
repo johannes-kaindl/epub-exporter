@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-11-11
+
 ### Changed
 
 - **The status line of the cover dialog ("Ready", "Checking …", "Generating …", errors) is now the kit's status indicator** (`obsidian-kit` 0.76.0, `status-indicator` only; the kit pin of the other modules stays). Same four states with icon and colour as before; the whole line now carries its text as the accessible label, and the text is a little larger (the kit's small UI size instead of the smaller one). While the cover is being made the icon turns in the muted text colour instead of the accent colour, and it stands still under "reduce motion".
