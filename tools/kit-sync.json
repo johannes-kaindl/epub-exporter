@@ -54,7 +54,11 @@
         "folder-suggest",
         "help-setting",
         "share-export",
-        "confirm"
+        "confirm",
+        {
+          "name": "status-indicator",
+          "ref": "0.76.0"
+        }
       ],
       "rewrite": [
         [

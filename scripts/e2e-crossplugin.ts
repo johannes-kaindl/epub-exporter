@@ -603,7 +603,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       }
 
       const meldung = await cdp.evaluate<string>(`
-        const el = document.querySelector(".epub-cover-modal .epub-cover-status-text");
+        const el = document.querySelector(".epub-cover-modal .epub-cover-status .okit-status-label");
         return el ? el.textContent : "";
       `);
       const knopfWiederDa = await cdp.evaluate<boolean>(`
@@ -685,7 +685,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
           dialoge: alle.length,
           dropdowns: m ? m.querySelectorAll("select").length : -1,
           knopf: !!m && !!Array.from(m.querySelectorAll("button")).find((b) => b.classList.contains("mod-cta")),
-          status: (m && m.querySelector(".epub-cover-status-text") || {}).textContent || "",
+          status: (m && m.querySelector(".epub-cover-status .okit-status-label") || {}).textContent || "",
         };
       `);
       if (dialog.dialoge !== 1) {
