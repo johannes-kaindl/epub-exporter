@@ -65,6 +65,14 @@ function serializeNode(node: Node, ctx: RenderContext): string {
   const el = node as Element;
   const tag = el.tagName.toLowerCase();
 
+  // Task-list checkbox: the box carries the state (open or done), so it becomes a text box instead of vanishing.
+  if (tag === "input" && el.getAttribute("type") === "checkbox") {
+    const checked = el.hasAttribute("checked") || (el as HTMLInputElement).checked === true;
+    return checked ? "\u2611 " : "\u2610 ";
+  }
+  // The icon in a callout's title is decoration (an SVG); the title text beside it stays.
+  if (el.classList.contains("callout-icon")) return "";
+
   if (tag === "img") {
     const href = ctx.resolveImage(el.getAttribute("src") ?? "");
     if (href === null) {

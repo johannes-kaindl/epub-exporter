@@ -51,6 +51,27 @@ describe("domToXhtml", () => {
     expect(onUnsupported).toHaveBeenCalledWith("obsidian-link");
   });
 
+  it("keeps the state of a task-list checkbox as a text box (before: the <input> vanished, done and open looked alike)", () => {
+    const onUnsupported = vi.fn();
+    const out = domToXhtml(
+      frag('<ul><li><input type="checkbox" class="task-list-item-checkbox"> open</li><li><input type="checkbox" checked> done</li></ul>'),
+      ctx({ onUnsupported })
+    );
+    expect(out).toBe("<ul><li>\u2610  open</li><li>\u2611  done</li></ul>");
+    expect(onUnsupported).not.toHaveBeenCalled();
+  });
+
+  it("drops the decorative callout icon without counting it, but still counts the callout", () => {
+    const onUnsupported = vi.fn();
+    const out = domToXhtml(
+      frag('<div class="callout"><div class="callout-title"><div class="callout-icon"><svg></svg></div><div class="callout-title-inner">Note</div></div><div class="callout-content"><p>text</p></div></div>'),
+      ctx({ onUnsupported })
+    );
+    expect(out).toContain("<p>text</p>");
+    expect(out).toContain("Note");
+    expect(onUnsupported.mock.calls.map((c) => c[0])).toEqual(["callout"]);
+  });
+
   it("keeps external links, resolves internal links, and plain-texts unknown internal links", () => {
     const ext = domToXhtml(frag('<a href="https://x.com">go</a>'), ctx());
     expect(ext).toBe('<a href="https://x.com">go</a>');

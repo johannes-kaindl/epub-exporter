@@ -9,6 +9,7 @@ versioning according to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The notice after an export now says which kinds of elements were simplified (for example "image 3, callout 12"), not only how many.
+- A task-list item keeps its state in the book: an open item starts with ☐, a done one with ☑ (before, the checkbox vanished and both looked alike). The decorative icon in a callout title is dropped silently and no longer counted as a simplified element.
 - A link that points into Obsidian (`obsidian://…`) becomes plain text in the book instead of a dead link in the reader, and counts as a simplified element.
 
 ## [0.9.1] — 2026-11-11
