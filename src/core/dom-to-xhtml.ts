@@ -78,6 +78,11 @@ function serializeNode(node: Node, ctx: RenderContext): string {
   if (tag === "a") {
     const inner = serializeChildren(el, ctx);
     const target = el.getAttribute("data-href") ?? el.getAttribute("href") ?? "";
+    // obsidian:// opens a note in Obsidian; in an e-reader it is a dead link, so keep the text only.
+    if (/^obsidian:\/\//i.test(target)) {
+      ctx.onUnsupported("obsidian-link");
+      return inner;
+    }
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith("mailto:")) {
       return `<a href="${escapeAttr(target)}">${inner}</a>`;
     }

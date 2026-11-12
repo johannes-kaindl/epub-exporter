@@ -43,6 +43,14 @@ describe("domToXhtml", () => {
     expect(onUnsupported).toHaveBeenCalledWith("image");
   });
 
+  it("turns an obsidian:// link into plain text and counts it (a dead link in an e-reader)", () => {
+    const onUnsupported = vi.fn();
+    const out = domToXhtml(frag('<p><a href="obsidian://open?vault=V&amp;file=Note">the note</a> and <a href="OBSIDIAN://open?file=X">shout</a></p>'), ctx({ onUnsupported }));
+    expect(out).toBe("<p>the note and shout</p>");
+    expect(onUnsupported).toHaveBeenCalledTimes(2);
+    expect(onUnsupported).toHaveBeenCalledWith("obsidian-link");
+  });
+
   it("keeps external links, resolves internal links, and plain-texts unknown internal links", () => {
     const ext = domToXhtml(frag('<a href="https://x.com">go</a>'), ctx());
     expect(ext).toBe('<a href="https://x.com">go</a>');
