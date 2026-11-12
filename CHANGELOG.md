@@ -6,6 +6,11 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The notice after an export now says which kinds of elements were simplified (for example "image 3, callout 12"), not only how many.
+- A link that points into Obsidian (`obsidian://…`) becomes plain text in the book instead of a dead link in the reader, and counts as a simplified element.
+
 ## [0.9.1] — 2026-11-11
 
 ### Changed

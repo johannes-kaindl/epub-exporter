@@ -37,6 +37,8 @@ export type BookSource =
 export interface AssembledBook {
   book: Book;
   simplifiedCount: number;
+  /** Die Summe `simplifiedCount` nach Art aufgeschlüsselt: `image`, `math`, `callout` oder der Tag-Name des unbekannten Elements. */
+  simplifiedKinds: Record<string, number>;
   missing: string[];
 }
 
@@ -172,6 +174,7 @@ export async function assembleBook(
 
   const registry = new ImageRegistry((src, sourcePath) => deps.readImage(src, sourcePath));
   let simplifiedCount = 0;
+  const simplifiedKinds: Record<string, number> = {};
   const chapters: Chapter[] = [];
 
   for (const plan of plans) {
@@ -195,8 +198,9 @@ export async function assembleBook(
           }
           return linkMap.get(normalizeLinkTarget(target)) ?? null;
         },
-        onUnsupported: () => {
+        onUnsupported: (kind) => {
           simplifiedCount++;
+          simplifiedKinds[kind] = (simplifiedKinds[kind] ?? 0) + 1;
         },
       };
       const xhtml = restoreCodeBlocks(domToXhtml(rendered.root, ctx), rendered.codes);
@@ -229,5 +233,5 @@ export async function assembleBook(
     css: DEFAULT_BOOK_CSS,
   };
 
-  return { book, simplifiedCount, missing };
+  return { book, simplifiedCount, simplifiedKinds, missing };
 }

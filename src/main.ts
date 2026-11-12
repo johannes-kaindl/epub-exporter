@@ -233,7 +233,7 @@ export default class EpubExporterPlugin extends Plugin {
   private async exportSource(source: BookSource): Promise<void> {
     try {
       const deps = createAssemblerDeps(this.app);
-      const { book, simplifiedCount, missing } = await assembleBook(deps, source, {
+      const { book, simplifiedCount, simplifiedKinds, missing } = await assembleBook(deps, source, {
         defaultLanguage: this.settings.defaultLanguage,
       });
       if (book.chapters.length === 0) { new Notice(t("notice.noChapters")); return; }
@@ -254,7 +254,11 @@ export default class EpubExporterPlugin extends Plugin {
       });
 
       if (missing.length > 0) new Notice(t("notice.brokenEmbed", missing.length));
-      if (simplifiedCount > 0) new Notice(t("notice.simplified", simplifiedCount));
+      if (simplifiedCount > 0) {
+        const top = Object.entries(simplifiedKinds).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([kind, n]) => `${kind} ${n}`).join(", ");
+        console.debug("EPUB Exporter: simplified elements by kind", simplifiedKinds);
+        new Notice(t("notice.simplified", simplifiedCount, top));
+      }
     } catch (e) {
       console.error("EPUB Exporter: export failed", e);
       new Notice(t("notice.exportFailed"));

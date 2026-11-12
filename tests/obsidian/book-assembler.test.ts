@@ -234,9 +234,20 @@ describe("assembleBook — failed image resolution", () => {
       "Book.md": note("Book.md", "![[Intro]]", { epub: true, title: "B" }),
       "Intro.md": note("Intro.md", '<p><img src="missing.png" alt=""></p>'),
     };
-    const { book, simplifiedCount } = await assembleBook(makeDeps(notes, {}), { kind: "note", path: "Book.md" }, opts);
+    const { book, simplifiedCount, simplifiedKinds } = await assembleBook(makeDeps(notes, {}), { kind: "note", path: "Book.md" }, opts);
     expect(simplifiedCount).toBe(1);
+    expect(simplifiedKinds).toEqual({ image: 1 });
     expect(book.images).toEqual([]);
+  });
+
+  it("breaks the simplified count down by kind (sum of the kinds equals the count)", async () => {
+    const notes = {
+      "Book.md": note("Book.md", "![[Intro]]", { epub: true, title: "B" }),
+      "Intro.md": note("Intro.md", '<p><img src="a.png"><img src="b.png"><foo>x</foo></p>'),
+    };
+    const { simplifiedCount, simplifiedKinds } = await assembleBook(makeDeps(notes, {}), { kind: "note", path: "Book.md" }, opts);
+    expect(simplifiedKinds).toEqual({ image: 2, foo: 1 });
+    expect(Object.values(simplifiedKinds).reduce((a, b) => a + b, 0)).toBe(simplifiedCount);
   });
 });
 
