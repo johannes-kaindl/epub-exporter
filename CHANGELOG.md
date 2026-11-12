@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-11-12
+
 ### Changed
 
 - The notice after an export now says which kinds of elements were simplified (for example "image 3, callout 12"), not only how many.
