@@ -289,6 +289,57 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "sidebar-folder.png",
+    klasse: "detail",
+    zeigt: "Panel im Ordner-Kontext: der Ordnerbaum als Buch (Unterordner als Kapitel, Intro-Seiten), die Aktionen darunter",
+    async nimm(cdp) {
+      // Ein Wegwerf-Baum, wie ein Doku-Ordner aussieht: Intro-Seite, nummerierte Seiten, ein Unterordner mit eigener Intro-Seite.
+      const wurzel = "Field Notes";
+      const baum: [string, string][] = [
+        ["README.md", "# Field Notes\n\nA small field guide.\n"],
+        ["01 - Arrival.md", "# Arrival\n\nWe reached the marsh at dawn.\n"],
+        ["02 - Coast/README.md", "# The coast\n\nWhere the tide decides.\n"],
+        ["02 - Coast/Salt marsh.md", "# Salt marsh\n\nGlasswort and sea lavender.\n"],
+        ["02 - Coast/Tides.md", "# Tides\n\nTwice a day.\n"],
+        ["03 - Departure.md", "# Departure\n\nBack before the water.\n"],
+      ];
+      await cdp.evaluate(`
+        const wurzel = ${JSON.stringify(wurzel)};
+        for (const [rel, body] of ${JSON.stringify(baum)}) {
+          const pfad = wurzel + "/" + rel;
+          const dir = pfad.slice(0, pfad.lastIndexOf("/"));
+          if (!app.vault.getAbstractFileByPath(dir)) await app.vault.createFolder(dir).catch(() => undefined);
+          if (!app.vault.getAbstractFileByPath(pfad)) await app.vault.create(pfad, body);
+        }
+        await new Promise((r) => setTimeout(r, 600));
+        return true;
+      `);
+      try {
+        await openPanel(cdp);
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.folderSelection = ${JSON.stringify(wurzel)};
+          await p.refreshHub();
+          return true;
+        `);
+        await requireUntil(cdp, `!!document.querySelector(".epub-sb-tree .epub-sb-row")`, "Panel zeigte den Ordnerbaum nicht");
+        await ruhe();
+        const box = await inhaltsBox(cdp, ".epub-sb-header, .epub-sb-source, .epub-sb-hint, .epub-sb-tree, .epub-sb-btn, .epub-sb-copy-note", 14);
+        if (!box) return null;
+        return { png: await capture(cdp, box, 2) };
+      } finally {
+        await cdp.evaluate(`
+          const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+          p.folderSelection = null;
+          await p.refreshHub();
+          const w = app.vault.getAbstractFileByPath(${JSON.stringify(wurzel)});
+          if (w) await app.vault.delete(w, true);
+          return true;
+        `).catch(() => undefined);
+      }
+    },
+  },
+  {
     name: "reorder.gif",
     klasse: "detail",
     zeigt: "Alt+↓ verschiebt ein Kapitel — die Embed-Zeile in der Notiz wandert mit",
@@ -397,7 +448,7 @@ const SHOTS: Shot[] = [
   {
     name: "settings.png",
     klasse: "detail",
-    zeigt: "Einstellungen-Tab, alle sechs Einstellungen",
+    zeigt: "Einstellungen-Tab, alle zehn Einstellungen",
     async nimm(cdp) {
       // Das Einstellungen-Fenster ueber seine HERKUNFT identifizieren, nicht ueber
       // `attachTo("settings", …)`.
@@ -460,12 +511,16 @@ const SHOTS: Shot[] = [
       const s = await Cdp.connect(url);
       try {
         await requireUntil(s, `!!document.querySelector(".setting-item")`, "Tab kam nicht");
-        await ruhe(400);
+        // Das Fenster ist niedriger als der Tab mit allen zehn Zeilen; ein Ausschnitt darueber hinaus kaeme schwarz (gemessen 2026-11-12).
+        const breite = await s.evaluate<number>(`return window.innerWidth;`);
+        await s.send("Emulation.setDeviceMetricsOverride", { width: breite, height: 2600, deviceScaleFactor: 1, mobile: false });
+        await ruhe(600);
         // Inhaltsbewusster Zuschnitt: der Tab-Container ist ein Volle-Hoehe-Flex-Element.
         const box = await inhaltsBox(s, ".setting-item", 20);
         const png = box ? await capture(s, box, 2) : await capture(s);
         return { png, thumb: true };
       } finally {
+        await s.send("Emulation.clearDeviceMetricsOverride").catch(() => undefined);
         s.close();
         // Versuch, DAS Target zu schliessen, das wir geoeffnet haben — nie pauschal alle
         // `about:blank`-Fenster: eines davon koennte einer anderen Session gehoeren.

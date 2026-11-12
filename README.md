@@ -106,6 +106,8 @@ Per chapter: `chapter_title` overrides the title in the table of contents,
 
 Right-click a folder in the file explorer and choose **Create EPUB**. The sidebar switches to the folder mode: it shows the book as it will be exported (subfolders are chapters, their pages are sub-chapters, to any depth), a hint on the number rule, the working copy switch and the **Export as EPUB** button. The preview follows renaming, adding and deleting in the folder. The folder mode ends when you close it (the × in the panel header) or right-click another folder; switching the active note does not end it, and renaming or moving the folder in the file explorer is followed.
 
+<a href="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/sidebar-folder.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/thumbs/sidebar-folder.png" width="380" alt="The EPUB Exporter panel in folder mode: the folder “Field Notes” as a book with a page, a subfolder chapter with three pages, two more pages, a note that there is no working copy, and the buttons Export as EPUB and Create book note from folder"></a><br><sub>Click the preview for the full-size panel in folder mode</sub>
+
 - **Order and names.** By default pages and subfolders sort by name, numbers compared as numbers (`2` before `10`). With *Use numbers at the start of a name for order* on, a number in front sorts the item (`01 - Intro`, `2. Next`; `1.10 Foo` comes after `1.2 Foo`) and is dropped from the title. A number that is `0` (`0 - Notes`, `000_Draft`) hides the item, a folder with everything in it; `01` does not hide. Digits that run straight into a letter belong to the name (`3D Grafik`). The panel says how many items are hidden.
 - **Intro pages.** *Intro pages* lists page names, for example `README, {{folder_name}}` (`{{folder_name}}` is the name of the folder). A page with such a name opens its chapter and is the chapter's entry in the table of contents; the intro page of the chosen folder comes first in the book. A chapter without an intro page links to its first page.
 - **Titles.** `chapter_title` in a note always wins. Otherwise *Page titles in a folder book* decides: the first heading (the file name if there is none), or the file name.
@@ -134,7 +136,7 @@ Right-click a folder in the file explorer and choose **Create EPUB**. The sideba
 The two consolidate settings are only the **default** in the dialog — it lets you
 deviate per run.
 
-<a href="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/thumbs/settings.png" width="380" alt="The EPUB Exporter settings tab with its first six settings"></a><br><sub>Click the preview for the full-size settings tab</sub>
+<a href="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/epub-exporter/main/docs/images/thumbs/settings.png" width="380" alt="The EPUB Exporter settings tab with all its settings"></a><br><sub>Click the preview for the full-size settings tab</sub>
 
 ## How it works
 
