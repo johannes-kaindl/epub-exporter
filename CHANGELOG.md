@@ -10,6 +10,10 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 - A callout keeps its place in the book: the box is set as a quotation (indented, with a bar), its title stands as a bold paragraph of its own instead of loose text before the content, and the callout type (note, warning, …) is kept as a class. The coloured box is still simplified, so the notice still counts it.
 
+### Fixed
+
+- Writing the cover or the cover prompt into a note whose key held a block list with a blank line or a comment inside it left the rest of the list behind and glued it to the key before it. The kit's frontmatter writer (0.89.0) now finds the end of such a value correctly.
+
 ## [0.9.2] — 2026-11-12
 
 ### Changed

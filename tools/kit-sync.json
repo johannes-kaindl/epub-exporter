@@ -42,11 +42,11 @@
       "modules": [
         {
           "name": "frontmatter",
-          "ref": "0.84.0"
+          "ref": "0.89.0"
         },
         {
           "name": "frontmatter-patch",
-          "ref": "0.84.0"
+          "ref": "0.89.0"
         },
         "vault-path"
       ]

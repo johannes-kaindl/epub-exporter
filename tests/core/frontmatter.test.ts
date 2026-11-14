@@ -175,6 +175,17 @@ describe("setCoverPath", () => {
     expect(setCoverPath(fm, "new.png")).not.toContain("old.png");
   });
 
+  it("replaces a block list that has a blank line inside it, leaving no rest of the list behind (kit 0.89.0)", () => {
+    // Under kit 0.84.0 the value ended at the blank line: the list rest `- [[b.png]]` stayed behind and became part of the key before it.
+    const fm = '---\ntitle: X\ncover:\n  - "[[a.png]]"\n\n  - "[[b.png]]"\nauthor: Y\n---';
+    const out = setCoverPath(fm, "new.png");
+    expect(out).toContain('cover: "[[new.png]]"');
+    expect(out).not.toContain("a.png");
+    expect(out).not.toContain("b.png");
+    expect(out).toContain("author: Y");
+    expect(out).toContain("title: X");
+  });
+
   it("replaces the German alias in place, without adding a second key", () => {
     // Writing an English `cover:` next to an existing `titelbild:` would leave
     // the note with two cover keys, and `pick()` would answer with the first.
