@@ -1,4 +1,4 @@
-import { patchFrontmatter } from "../vendor/kit/frontmatter-patch";
+import { isFrontmatterKeyName, patchFrontmatter } from "../vendor/kit/frontmatter-patch";
 import { BookMetadata } from "./model";
 import { generateUrnUuid } from "./uuid";
 
@@ -165,7 +165,8 @@ export function setCoverPrompt(frontmatter: string, prompt: string): string {
   return setAliased(frontmatter, "coverPrompt", value);
 }
 
-/** The key as the block writes it: a line at column 0, as the kit's block reader finds it. */
+/** The key as the block writes it: a line at column 0, as the kit's block reader finds it (same pattern as the kit's `KEY_RE`).
+ *  Whether the name found is one the kit writes is the kit's call: `isFrontmatterKeyName`, applied to the trimmed name in `setAliased`. */
 const KEY_LINE = /^([A-Za-z0-9_][\w .-]*?):/;
 
 /**
@@ -181,7 +182,9 @@ function setAliased(frontmatter: string, canonical: string, value: string): stri
   const present = new Set<string>();
   for (const line of frontmatter.split(/\r?\n/)) {
     const m = KEY_LINE.exec(line);
-    if (m) present.add((m[1] ?? "").trim());
+    // The reader trims the name (`cover :` is `cover`); a name the kit's writer would refuse is not offered as the key to set.
+    const name = (m?.[1] ?? "").trim();
+    if (isFrontmatterKeyName(name)) present.add(name);
   }
   const names = ALIASES[canonical] ?? [canonical];
   const wanted = names.map((n) => n.toLowerCase());

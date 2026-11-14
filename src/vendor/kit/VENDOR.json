@@ -6,6 +6,6 @@
   "note": "Verbatim snapshot aus festen Git-Refs (CORE-META-22: feste Ref, nicht Arbeitsstand); den Stand nennen `version` und `obsidian_kit_version` samt Einzelpins in `vendored`, die Pins stehen in tools/kit-sync.json. Never hand-edit. Re-vendor via tools/sync-kit.sh. kit-obsidian/ hat eine eigene VENDOR.json.",
   "obsidian_kit_version": "0.70.0",
   "obsidian_kit_sha": "86a2d2d",
-  "obsidian_kit_vendored": "frontmatter.ts, frontmatter-patch.ts, vault-path.ts",
+  "obsidian_kit_vendored": "frontmatter.ts (obsidian-kit@0.84.0, 927e2ce), frontmatter-patch.ts (obsidian-kit@0.84.0, 927e2ce), vault-path.ts",
   "license": "AGPL-3.0-or-later"
 }

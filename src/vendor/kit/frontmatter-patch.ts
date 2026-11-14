@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.0, src/pure/frontmatter-patch.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.84.0, src/pure/frontmatter-patch.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // frontmatter-patch.ts — eigene Frontmatter-Felder setzen, fremde Zeilen byte-gleich lassen. Kein obsidian-Import.
 //
 // Zusammengeführt aus zwei unabhängigen Fassungen desselben Vorgangs (Diachronic wäre die dritte):
@@ -29,14 +29,16 @@
 //     `"DE98ZZZ00000000001"`); `isFmLiteralText` gibt die Prüfung heraus, damit kein Konsument die Regex kopiert. Die Regex ist enger als die in `needsQuoting` (`-.5` und `+.5` liest js-yaml als Text, Obsidian als Zahl: die Menge
 //     hier ist die gemeinsame). Gemessen 2026-10-25 in Obsidian 1.14.5 (`pilot/literal-formen.ts`): `parseYaml`, `metadataCache` und der gerenderte
 //     Eigenschaften-Editor (Zahlenfeld) lesen `5.`, `+5`, `-0` und `007` als Zahl mit demselben Wert wie js-yaml 4.2.0 (5, 5, 7); nur `-0` bleibt bei Obsidian
-//     ein `-0` (js-yaml: `0`), das Feld zeigt `0`, aus dem Cache einer unveränderten Notiz liest man `0`. Ungemessen: Bases.
+//     ein `-0` (js-yaml: `0`), das Feld zeigt `0`, aus dem Cache einer unveränderten Notiz liest man `0`.
+//     Bases gemessen (Obsidian 1.14.5, `pilot/bases-literale.ts`, Tabellenansicht mit der Formel `x + 1` und einer Sortierung nach `x`): `5.`, `+5`, `-0` und `007` sind Zahlen (Zelle `5`, `5`, `0`, `7`;
+//     `x + 1` ergibt `6`, `6`, `1`, `8`, nie eine Verkettung wie `5.1`; `12.50` zeigt `12.5`), die Sortierung ist numerisch (`0`, `5`, `5`, `7`, `12.5`), `"DE98"` bleibt Text. Dieselbe Lesart wie js-yaml und Obsidian: die Regex bleibt.
 // Grenzen, bewusst wie im Kit-Parser: ein Schlüssel muss `[A-Za-z0-9_][\w .-]*` sein (ein Schlüssel mit Umlaut wird nicht gefunden,
 // also angehängt, nicht ersetzt — `invalid-key` fängt ihn deshalb schon beim Setzen ab); Kommentare auf der Zeile eines gesetzten
 // Schlüssels gehen mit der Zeile verloren; ein Block-Skalar (`|`, `>`) wird gemeldet, nicht ersetzt.
 //
 // Diese Datei muss unter `noUncheckedIndexedAccess` fehlerfrei sein — siehe npm-Skript `check:index-strict`.
 
-import { serializeFrontmatter, type FmValue } from "./frontmatter";
+import { quoteScalar, serializeFrontmatter, type FmValue } from "./frontmatter";
 
 /**
  * Ein fertig geschriebener YAML-Skalar, der unverändert in die Zeile geht (`key: <literal>`). Nur `null`, `true`, `false` (klein
@@ -56,6 +58,11 @@ export interface FrontmatterPatchSpec {
   create?: boolean;
   /** Nur Schlüssel in `set` schreiben, die schon da sind. Default `false`. Betrifft `ensure` nicht. */
   onlyExisting?: boolean;
+  /** Wie eine `string[]` geschrieben wird (seit 0.71.0): `"flow"` (Default) als `key: [a, b]`, `"block"` als Blockliste (`key:` und je Eintrag `  - a`, zwei Leerzeichen eingerückt). Gilt für `set`, `ensure`
+   *  und `create`; die Einträge laufen durch dieselbe Quotierung wie in der Flow-Liste, ein leerer Eintrag steht als `""`. Eine **leere** Liste bleibt `key: []` (es gibt keine leere Blockliste; wer `key: null`
+   *  will, übergibt `{ literal: "null" }`). Skalare und Zahlen betrifft die Option nicht. Für Notizen, deren Bestand Blocklisten trägt (finance-ledger: Parität mit dem Python-Importer); Obsidian liest
+   *  beide Formen gleich (Cache, Eigenschaften-Editor und Bases, gemessen 2026-10-25, `pilot/bases-listen.ts`). */
+  listStyle?: "flow" | "block";
 }
 
 export type FrontmatterPatchResult =
@@ -68,7 +75,9 @@ const FM_RE = /^(---\r?\n)([\s\S]*?)(\r?\n---[ \t]*\r?\n?)/;
 const EMPTY_RE = /^(---\r?\n)(---[ \t]*(?:\r?\n|$))/;
 // Schlüsselzeile: Schlüssel am Zeilenanfang (nie eingerückt) — dieselbe Form wie im Kit-Parser.
 const KEY_RE = /^([A-Za-z0-9_][\w .-]*?):[ \t]*(.*)$/;
-const KEY_NAME_RE = /^[A-Za-z0-9_][\w .-]*$/;
+// Kein Leerzeichen am Ende: `patchFrontmatter` schrieb `a : x`, der Leser (`scanEntries`) trimmt den Schlüssel auf `a`, findet `a ` nie wieder, und das zweite `set` hängte eine
+// Dublette an (Befund kitok4-w28, 2026-10-27). Ein Leerzeichen in der Mitte bleibt erlaubt, am Ende stehen Wortzeichen, Punkt oder Bindestrich.
+const KEY_NAME_RE = /^[A-Za-z0-9_](?:[\w .-]*[\w.-])?$/;
 // Fortsetzung einer Schlüssel-Darstellung: eingerückt (Liste, mehrzeiliger Wert) oder Listenpunkt auf Spalte 0.
 const CONT_RE = /^([ \t]|-[ \t])/;
 
@@ -134,13 +143,25 @@ export function isFmLiteralText(text: string): boolean {
   return typeof text === "string" && LITERAL_RE.test(text) && !hasControl(text);
 }
 
+/** Ist `name` ein Schlüsselname, den der Block-Leser des Kits als Schlüssel erkennt? Dieselbe Prüfung wie in `patchFrontmatter` (`invalid-key`); wirft nie, Nicht-Text ist `false`.
+ *  Ungemessen: `yes`, `no`, `on`, `off` und `null` bestehen sie, sind aber in YAML 1.1 keine sicheren Schlüssel (kein Sonderfall gebaut).
+ *  @example
+ *  isFrontmatterKeyName("diachronic-round") // → true
+ *  isFrontmatterKeyName("Größe")            // → false (Umlaut: der Leser findet die Zeile nicht)
+ *  isFrontmatterKeyName("a: b")             // → false
+ *  isFrontmatterKeyName("a ")               // → false (Leerzeichen am Ende: der Leser trimmt, das zweite set legte eine Dublette an) */
+export function isFrontmatterKeyName(name: string): boolean {
+  return typeof name === "string" && KEY_NAME_RE.test(name);
+}
+
 function isLiteral(v: FmValue | FmLiteral): v is FmLiteral {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** Die Zeilen EINES Schlüssels: ein Literal unverändert, alles andere über das Kit serialisiert (ohne die beiden Zäune). */
-function keyLines(key: string, value: FmValue | FmLiteral): string[] {
+/** Die Zeilen EINES Schlüssels: ein Literal unverändert, alles andere über das Kit serialisiert (ohne die beiden Zäune); eine nicht leere Liste mit `listStyle: "block"` als Blockliste. */
+function keyLines(key: string, value: FmValue | FmLiteral, listStyle: "flow" | "block" = "flow"): string[] {
   if (isLiteral(value)) return [`${key}: ${value.literal}`];
+  if (listStyle === "block" && Array.isArray(value) && value.length > 0) return [`${key}:`, ...value.map((item) => `  - ${item === "" ? '""' : quoteScalar(item)}`)];
   const lines = serializeFrontmatter({ [key]: value }, [key]).split("\n");
   return lines.slice(1, lines.length - 2);
 }
@@ -176,7 +197,7 @@ export function patchFrontmatter(text: string, spec: FrontmatterPatchSpec): Fron
   const ensureEntries = Object.entries(spec.ensure ?? {});
 
   for (const [key, value] of [...setEntries, ...ensureEntries]) {
-    if (!KEY_NAME_RE.test(key)) return { ok: false, reason: "invalid-key", key };
+    if (!isFrontmatterKeyName(key)) return { ok: false, reason: "invalid-key", key };
     if (badValue(value)) return { ok: false, reason: "invalid-value", key };
   }
   for (const [key] of setEntries) {
@@ -192,7 +213,7 @@ export function patchFrontmatter(text: string, spec: FrontmatterPatchSpec): Fron
     if (writes.length === 0) return { ok: true, content: text, changed: false };
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
     // Jeder Eintrag über `keyLines`, damit ein Literal hier denselben Weg nimmt wie in einem vorhandenen Block.
-    const block = ["---", ...writes.flatMap(([k, v]) => keyLines(k, v)), "---", ""].join(eol);
+    const block = ["---", ...writes.flatMap(([k, v]) => keyLines(k, v, spec.listStyle)), "---", ""].join(eol);
     return { ok: true, content: `${block}${text}`, changed: true };
   }
 
@@ -203,7 +224,7 @@ export function patchFrontmatter(text: string, spec: FrontmatterPatchSpec): Fron
   const dropped = new Set<number>();
   const appended: string[] = [];
   for (const [key, value] of writes) {
-    const lines = keyLines(key, value);
+    const lines = keyLines(key, value, spec.listStyle);
     const e = doc.entries.get(key);
     if (!e) { appended.push(...lines); continue; }
     if (/^[|>]/.test(e.rest)) return { ok: false, reason: "block-scalar", key };

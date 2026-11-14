@@ -283,6 +283,16 @@ describe("setCoverPrompt", () => {
     expect(out).toBe("---\nCover_Prompt: new\n---");
   });
 
+  // Kit 0.84.0 refuses a key name with trailing blanks (`invalid-key`). The note's `cover_prompt :` is read as `cover_prompt`, so two writes
+  // must change the one line and never append a second key.
+  it("writes twice into a key with a blank before the colon without a duplicate", () => {
+    const once = setCoverPrompt("---\nepub: true\ncover_prompt : old\n---\n", "new");
+    const twice = setCoverPrompt(once, "newer");
+    expect(twice.match(/^cover_prompt\b/gm)).toHaveLength(1);
+    expect(twice).toContain("cover_prompt: newer");
+    expect(twice).not.toContain("old");
+  });
+
   it("returns the block unchanged when the prompt key is a block scalar", () => {
     const fm = "---\ncover_prompt: |\n  old\n  text\n---";
     expect(setCoverPrompt(fm, "new")).toBe(fm);

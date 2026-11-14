@@ -40,8 +40,14 @@
       "source": "obsidian-kit",
       "from": "src/pure",
       "modules": [
-        "frontmatter",
-        "frontmatter-patch",
+        {
+          "name": "frontmatter",
+          "ref": "0.84.0"
+        },
+        {
+          "name": "frontmatter-patch",
+          "ref": "0.84.0"
+        },
         "vault-path"
       ]
     },
