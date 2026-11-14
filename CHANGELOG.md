@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-11-14
+
 ### Changed
 
 - A callout keeps its place in the book: the box is set as a quotation (indented, with a bar), its title stands as a bold paragraph of its own instead of loose text before the content, and the callout type (note, warning, …) is kept as a class. The coloured box is still simplified, so the notice still counts it.
