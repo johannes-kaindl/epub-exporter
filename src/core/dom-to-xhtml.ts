@@ -104,9 +104,22 @@ function serializeNode(node: Node, ctx: RenderContext): string {
     return escapeText(el.textContent ?? "");
   }
 
-  // Generic containers -> unwrap. A callout is a div; flag it, then keep its inner content.
+  // A callout is a div. It stays recognisable as a blockquote (the e-reader sets it apart), its type survives as a class and its
+  // title is a paragraph of its own; the count stays, because the coloured box is still lost.
+  if (tag === "div" && el.classList.contains("callout")) {
+    ctx.onUnsupported("callout");
+    const type = el.getAttribute("data-callout") ?? "";
+    // A plain word only: the value comes from the note and goes into an attribute.
+    const cls = /^[a-z][a-z0-9-]*$/i.test(type) ? `callout callout-${type.toLowerCase()}` : "callout";
+    return `<blockquote class="${cls}">${serializeChildren(el, ctx)}</blockquote>`;
+  }
+  if (tag === "div" && el.classList.contains("callout-title")) {
+    const title = serializeChildren(el, ctx);
+    return title.trim() === "" ? "" : `<p><strong>${title}</strong></p>`;
+  }
+
+  // Generic containers -> unwrap.
   if (UNWRAP.has(tag)) {
-    if (el.classList.contains("callout")) ctx.onUnsupported("callout");
     return serializeChildren(el, ctx);
   }
 

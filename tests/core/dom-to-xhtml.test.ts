@@ -67,8 +67,7 @@ describe("domToXhtml", () => {
       frag('<div class="callout"><div class="callout-title"><div class="callout-icon"><svg></svg></div><div class="callout-title-inner">Note</div></div><div class="callout-content"><p>text</p></div></div>'),
       ctx({ onUnsupported })
     );
-    expect(out).toContain("<p>text</p>");
-    expect(out).toContain("Note");
+    expect(out).toBe('<blockquote class="callout"><p><strong>Note</strong></p><p>text</p></blockquote>');
     expect(onUnsupported.mock.calls.map((c) => c[0])).toEqual(["callout"]);
   });
 
@@ -102,15 +101,33 @@ describe("domToXhtml", () => {
     expect(out).toBe("<p>hi</p><p>yo</p>");
   });
 
-  it("unwraps a callout div and reports it as unsupported", () => {
+  it("sets a callout as a blockquote with its title as its own bold paragraph, and reports it", () => {
     const onUnsupported = vi.fn();
     const out = domToXhtml(
       frag('<div class="callout"><div class="callout-title">Note</div><div class="callout-content"><p>body</p></div></div>'),
       ctx({ onUnsupported })
     );
-    // callout box unwrapped: title text kept as unwrapped text, content <p> kept
-    expect(out).toBe("Note<p>body</p>");
+    // the box is kept as a blockquote (the e-reader shows it set apart), the title is a paragraph of its own and not loose text
+    expect(out).toBe('<blockquote class="callout"><p><strong>Note</strong></p><p>body</p></blockquote>');
     expect(onUnsupported).toHaveBeenCalledWith("callout");
+  });
+
+  it("keeps the callout type as a class, so the kind of callout survives", () => {
+    const out = domToXhtml(
+      frag('<div class="callout" data-callout="warning"><div class="callout-title"><div class="callout-title-inner">Careful</div></div><div class="callout-content"><p>x</p></div></div>'),
+      ctx()
+    );
+    expect(out).toBe('<blockquote class="callout callout-warning"><p><strong>Careful</strong></p><p>x</p></blockquote>');
+  });
+
+  it("drops a type that is not a plain word instead of putting it into an attribute", () => {
+    const out = domToXhtml(frag('<div class="callout" data-callout="a&quot; onclick=&quot;x"><div class="callout-content"><p>x</p></div></div>'), ctx());
+    expect(out).toBe('<blockquote class="callout"><p>x</p></blockquote>');
+  });
+
+  it("does not emit an empty title paragraph", () => {
+    const out = domToXhtml(frag('<div class="callout"><div class="callout-title"><div class="callout-icon"><svg></svg></div></div><div class="callout-content"><p>x</p></div></div>'), ctx());
+    expect(out).toBe('<blockquote class="callout"><p>x</p></blockquote>');
   });
 
   it("degrades a math container to text and reports it", () => {
