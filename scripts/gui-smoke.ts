@@ -80,8 +80,10 @@ import {
   openExisting,
   pollUntil,
   requireUntil,
+  rechtsklickMenue,
   requireVisible,
   schliesseDialog,
+  type MenueEintrag,
 } from "../../tools/obsidian-cdp/cdp.js";
 import { createBilanz, parseArgs, runDriver, Vorbedingung } from "../../tools/obsidian-cdp/bilanz.js";
 import { messeErreichbarkeit } from "../../tools/obsidian-cdp/pflichtpunkte.js";
@@ -449,11 +451,11 @@ async function legeOrdnerBaumAn(cdp: Cdp, mitTief = false): Promise<void> {
   await warteMs(500);
 }
 
-/** Den Ordner im Datei-Explorer zeigen und mit der echten rechten Maustaste anklicken; das Menue bleibt offen. */
-async function rechtsklickOrdner(cdp: Cdp, pfad: string): Promise<void> {
-  // Unmittelbar vor dem Klick und mit Rueckfrage: ein frueher gesetzter Wert hielt in einem frischen Prozess nicht bis hierher (gemessen).
-  const native = await cdp.evaluate<unknown>(`app.vault.setConfig("nativeMenus", false); return app.vault.getConfig("nativeMenus");`);
-  if (native !== false) throw new Error(`nativeMenus liess sich nicht auf false stellen (liest ${JSON.stringify(native)}): das Menue wuerde nativ gezeichnet`);
+const ORDNER_TITEL = (pfad: string): string => `.nav-folder-title[data-path=${JSON.stringify(pfad)}]`;
+
+/** Den Ordner im Datei-Explorer zeigen und mit der echten rechten Maustaste anklicken (Bruecke `rechtsklickMenue`: natives Menue aus, stabile Lage, Rueckfrage);
+ *  das Menue bleibt offen, die Eintraege kommen zurueck. */
+async function rechtsklickOrdner(cdp: Cdp, pfad: string): Promise<MenueEintrag[]> {
   await cdp.evaluate(`
     app.workspace.leftSplit.expand();
     let leaf = app.workspace.getLeavesOfType("file-explorer")[0];
@@ -464,55 +466,7 @@ async function rechtsklickOrdner(cdp: Cdp, pfad: string): Promise<void> {
     leaf.view.revealInFolder(ordner);
     return true;
   `);
-  const titel = `[...document.querySelectorAll(".nav-folder-title")].find((e) => e.getAttribute("data-path") === ${JSON.stringify(pfad)})`;
-  await requireUntil(
-    cdp,
-    `(() => { const e = ${titel}; return !!e && e.getBoundingClientRect().width > 0; })()`,
-    `Der Ordner ${pfad} erschien nicht im Datei-Explorer`,
-  );
-  // Die Seitenleiste faehrt beim ersten Oeffnen aus: erst klicken, wenn die Lage des Ordners zweimal hintereinander gleich gemessen ist,
-  // sonst trifft der Rechtsklick die Stelle, an der der Ordner eben noch stand (gemessen an einem frischen Prozess: kein Menue).
-  const lage = `
-    const e = ${titel};
-    e.scrollIntoView({ block: "center" });
-    const r = e.getBoundingClientRect();
-    return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-  `;
-  let box = await cdp.evaluate<{ x: number; y: number }>(lage);
-  for (let i = 0; i < 20; i++) {
-    await warteMs(150);
-    const jetzt = await cdp.evaluate<{ x: number; y: number }>(lage);
-    const stabil = jetzt.x === box.x && jetzt.y === box.y;
-    box = jetzt;
-    if (stabil) break;
-  }
-  const rechts = { x: box.x, y: box.y, button: "right", clickCount: 1 };
-  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...rechts, buttons: 0 });
-  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", ...rechts, buttons: 2 });
-  await warteMs(60);
-  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", ...rechts, buttons: 0 });
-  const da = await pollUntil<boolean>(cdp, `return !!document.querySelector(".menu .menu-item");`, 8_000, 200);
-  if (!da) {
-    // Was der Klick traf, gehoert in die Meldung: ein Menue, das ausbleibt, hat selten nur eine Ursache.
-    const lage = await cdp.evaluate<string>(`
-      return JSON.stringify({
-        modal: document.querySelectorAll(".modal-container").length, menus: document.querySelectorAll(".menu").length,
-        aktiv: document.querySelectorAll(".has-active-menu").length, native: app.vault.getConfig("nativeMenus"), fokus: document.hasFocus(), sichtbar: document.visibilityState,
-        links: app.workspace.leftSplit.collapsed,
-      });
-    `);
-    throw new Error(`Das Kontextmenue des Ordners ${pfad} oeffnete sich nicht: ${lage}`);
-  }
-}
-
-/** Die Eintraege des offenen Menues: Titel und ob ein Icon (svg) gezeichnet wurde. */
-async function menueEintraege(cdp: Cdp): Promise<Array<{ titel: string; icon: boolean }>> {
-  return cdp.evaluate(`
-    return [...document.querySelectorAll(".menu .menu-item")].map((i) => ({
-      titel: i.querySelector(".menu-item-title")?.textContent ?? "",
-      icon: !!i.querySelector(".menu-item-icon svg"),
-    }));
-  `);
+  return rechtsklickMenue(cdp, ORDNER_TITEL(pfad));
 }
 
 const MENUE_EINTRAG = (titel: string): string =>
@@ -1226,8 +1180,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
     was: "Ordner-Rechtsklick: genau ein Eintrag „Create EPUB“, der Klick oeffnet die Sidebar im Ordnermodus mit der erwarteten Zeilenzahl; Icons und Schliessen-Knopf stehen am echten DOM",
     pruefe: async (cdp) => {
       await legeOrdnerBaumAn(cdp, true);
-      await rechtsklickOrdner(cdp, O_ROOT);
-      const eintraege = await menueEintraege(cdp);
+      const eintraege = await rechtsklickOrdner(cdp, O_ROOT);
       const epub = eintraege.filter((e) => /epub|folder as book/i.test(e.titel));
       if (epub.length !== 1 || epub[0]!.titel !== "Create EPUB") {
         return `Das Ordner-Menue fuehrt ${epub.length} EPUB-Eintraege statt genau eines „Create EPUB“: ${JSON.stringify(eintraege.map((e) => e.titel))}`;
