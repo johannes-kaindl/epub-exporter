@@ -903,7 +903,9 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".epub-sb-chapter")`);
       const vorher = await leseDatei(cdp, SMOKE_BOOK);
       await gesteAltAb(cdp, 0);
-      const nachher = await requireDateiWechsel(cdp, SMOKE_BOOK, vorher ?? "");
+      const wnachher = await erwarteDateiWechsel(cdp, SMOKE_BOOK, vorher ?? "");
+      if ("meldung" in wnachher) return wnachher.meldung;
+      const nachher = wnachher.inhalt;
       const spine = spineZeilen(nachher);
       if (spine.length !== 3) return `Spine hat ${spine.length} Zeilen statt 3: ${JSON.stringify(spine)}`;
       if (spine[0] !== SMOKE_SPINE[1] || spine[1] !== SMOKE_SPINE[0]) {
@@ -921,12 +923,16 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".epub-sb-chapter")`);
       const start = (await leseDatei(cdp, SMOKE_BOOK)) ?? "";
       await gesteAltAb(cdp, 0);
-      const nachEins = await requireDateiWechsel(cdp, SMOKE_BOOK, start);
+      const wnachEins = await erwarteDateiWechsel(cdp, SMOKE_BOOK, start);
+      if ("meldung" in wnachEins) return wnachEins.meldung;
+      const nachEins = wnachEins.inhalt;
       // Die zweite Geste geht bewusst NICHT wieder an Position 0, sondern an die neue
       // Position des bewegten Elements. Genau da sass der historische Defekt: ein stale
       // focusIndex liess sie auf das alte Element zeigen, und das Kapitel pendelte.
       await gesteAltAb(cdp, 1);
-      const nachZwei = await requireDateiWechsel(cdp, SMOKE_BOOK, nachEins);
+      const wnachZwei = await erwarteDateiWechsel(cdp, SMOKE_BOOK, nachEins);
+      if ("meldung" in wnachZwei) return wnachZwei.meldung;
+      const nachZwei = wnachZwei.inhalt;
       const spine = spineZeilen(nachZwei);
       if (spine[2] !== SMOKE_SPINE[0]) {
         return `Kapitel 1 steht nach zwei Gesten nicht an Position 3 — es pendelt: ${JSON.stringify(spine)}`;
@@ -943,7 +949,9 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       await oeffneUndWarte(cdp, SMOKE_BOOK, `document.querySelector(".epub-sb-chapter")`);
       const start = (await leseDatei(cdp, SMOKE_BOOK)) ?? "";
       await gesteAltAb(cdp, 0);
-      const nachher = await requireDateiWechsel(cdp, SMOKE_BOOK, start);
+      const wnachher = await erwarteDateiWechsel(cdp, SMOKE_BOOK, start);
+      if ("meldung" in wnachher) return wnachher.meldung;
+      const nachher = wnachher.inhalt;
       const alias = `![[${SMOKE_ALIAS}]]`;
       if (!nachher.includes(alias)) {
         return `Der Alias-Embed ${JSON.stringify(alias)} steht nicht mehr woertlich in der Datei — der Spine wurde regeneriert statt permutiert. Spine jetzt: ${JSON.stringify(spineZeilen(nachher))}`;
@@ -1141,7 +1149,9 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       // Die Meldung verschwindet nach rund 5 s: gleich nach dem Befehl lesen, nicht erst nach der Cache-Pruefung.
       const ergaenztDa = await pollUntil<boolean>(cdp, `return ${noticeEnthaelt("Book frontmatter added.")};`, 5_000, 200);
       if (!ergaenztDa) return "Die Meldung „Book frontmatter added.“ erschien nach dem ersten Lauf nicht";
-      const nachher = await requireDateiWechsel(cdp, SMOKE_FM_NOTE, SMOKE_FM_VORHER);
+      const wnachher = await erwarteDateiWechsel(cdp, SMOKE_FM_NOTE, SMOKE_FM_VORHER);
+      if ("meldung" in wnachher) return wnachher.meldung;
+      const nachher = wnachher.inhalt;
 
       if (!nachher.startsWith(`---\n${SMOKE_FM_EIGEN}`)) {
         return `Die eigenen Zeilen blieben nicht byte-gleich am Anfang des Blocks. Block: ${JSON.stringify(nachher.split("---")[1] ?? nachher.slice(0, 200))}`;
@@ -1626,17 +1636,21 @@ async function gesteAltAb(cdp: Cdp, index: number): Promise<void> {
  *  Nicht auf eine feste Wartezeit: der Schreibvorgang laeuft ueber `vault.process`, und
  *  eine Pause, die "meistens reicht", macht den Punkt sporadisch rot — teurer als
  *  dauerhaft rot, weil man den Defekt zuerst im Pruefling sucht. */
-async function requireDateiWechsel(cdp: Cdp, pfad: string, vorher: string): Promise<string> {
-  await requireUntil(
+async function erwarteDateiWechsel(cdp: Cdp, pfad: string, vorher: string): Promise<{ inhalt: string } | { meldung: string }> {
+  // Der Dateiwechsel IST das gemessene Verhalten (die Geste soll die Datei veraendern): bleibt er aus, ist das ein Befund (rot), kein
+  // Abbruch des Treibers. `requireUntil` hiesse „nichts gemessen“ (Welle 35: Gegenprobe mit umgedrehter Bedingung ergab „nichts gemessen“).
+  const meldung = await erwarte(
     cdp,
-    `(async () => {
+    `await (async () => {
       const f = app.vault.getAbstractFileByPath(${JSON.stringify(pfad)});
       if (!f) return false;
       return (await app.vault.read(f)) !== ${JSON.stringify(vorher)};
     })()`,
     `Der Dateiinhalt von ${pfad} hat sich nicht geaendert — die Geste erreichte die Datei nicht`,
+    15_000,
   );
-  return (await leseDatei(cdp, pfad)) ?? "";
+  if (meldung !== null) return { meldung };
+  return { inhalt: (await leseDatei(cdp, pfad)) ?? "" };
 }
 
 /** Das Smoke-Buch exportieren und die entstandene Datei einlesen. */
