@@ -6,6 +6,15 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Front matter is only written when Obsidian can read it; notes whose front matter Obsidian shows as “Invalid properties” stay untouched (before, the plugin wrote into them without the property becoming visible). A block list with a blank line or a comment line inside no longer leaves the rest of the list behind as the value of the key before it when the plugin sets a field of a book note (kit `frontmatter-patch` 0.94.0).
+- A cover image whose path contains `[ ] # ^ |` is stored as plain text instead of a link to a different file (`wikilinkOf` of the kit).
+
+### Changed
+
+- Front matter reading follows Obsidian: a closing `---` fence followed by a space or tab no longer closes the block, as in Obsidian itself. Control characters are removed from file names. Shared building blocks updated to obsidian-kit 0.94.0 and code-kit 0.73.0.
+
 ## [0.9.3] — 2026-11-14
 
 ### Changed

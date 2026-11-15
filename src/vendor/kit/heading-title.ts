@@ -1,4 +1,4 @@
-// vendored from code-kit@0.60.0, src/ts/pure/heading-title.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.73.0, src/ts/pure/heading-title.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** The text of the first Markdown heading of a note, as plain text: the title a note gets when its file name is not wanted
  *  (`# 🎓 Lektion 1 — Überleben` → "🎓 Lektion 1 — Überleben"). Works on the raw text, so a preview and an export read the same
  *  title without rendering anything. String logic only, no I/O; linear in the length of the text.
@@ -19,6 +19,11 @@
  *  `body` is the text after the frontmatter; the caller strips that. `\r\n` and a lone `\r` end a line like `\n`. */
 
 const ATX = /^ {0,3}#{1,6}(?:[ \t]+(.*))?$/;
+// Why this module keeps its own fence reading instead of `fences.ts` `listFences` (decided 2026-11-15 with the scanner): on texts with `\n` and
+// `\r\n` the two agree (tests/fences-scanner.test.ts, 20 000 generated texts), but this module reads a lone CR as a line break and `trim()`
+// accepts any Unicode whitespace after the closing fence, where `listFences` reads neither; a switch would need a pre-pass for both to keep
+// the behaviour. And this module imports nothing and is vendored on its own: an import would put a second file into its consumer's vendor tree
+// for twelve lines.
 const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const CLOSING_HASHES = /(?:^|[ \t]+)#+[ \t]*$/;
 
@@ -67,6 +72,7 @@ function toPlainText(raw: string): string {
     // An embed's `|…` is a size (`![[a.png|100]]`), a link's is the text shown.
     if (bar >= 0 && bang === "") return inner.slice(bar + 1);
     const target = bar >= 0 ? inner.slice(0, bar) : inner;
+    // the same expression as `baseName` (rel-path.ts) on purpose, held equal by the differential test in tests/rel-path.test.ts: this module imports nothing and is vendored on its own (one consumers, measured 2026-11-14 from the vendor headers), and an import of `baseName` would pull rel-path.ts into every one of those vendorings.
     return target.slice(target.lastIndexOf("/") + 1);
   });
   s = s.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1");

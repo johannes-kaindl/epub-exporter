@@ -1,3 +1,4 @@
+import { wikilinkOf } from "../vendor/kit/frontmatter";
 import { isFrontmatterKeyName, patchFrontmatter } from "../vendor/kit/frontmatter-patch";
 import { BookMetadata } from "./model";
 import { generateUrnUuid } from "./uuid";
@@ -132,7 +133,8 @@ export const BOOK_FRONTMATTER_TEMPLATE: Record<string, unknown> = {
 };
 
 /**
- * Points a book note's cover key at a vault path, as a quoted wikilink.
+ * Points a book note's cover key at a vault path, as a quoted wikilink. A path with `[ ] # ^ |` cannot be written as a link (`[[…]]` has no escape, the
+ * link would point somewhere else): it is stored as plain text then (`wikilinkOf` of the kit returns `null`).
  *
  * Operates on the raw frontmatter text rather than a parsed object on purpose:
  * rewriting the whole block would reorder keys, drop comments and normalise
@@ -147,7 +149,7 @@ export const BOOK_FRONTMATTER_TEMPLATE: Record<string, unknown> = {
  */
 export function setCoverPath(frontmatter: string, coverPath: string | null): string {
   if (!coverPath) return frontmatter;
-  return setAliased(frontmatter, "cover", `[[${coverPath}]]`);
+  return setAliased(frontmatter, "cover", wikilinkOf(coverPath) ?? coverPath);
 }
 
 /**

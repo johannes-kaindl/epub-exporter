@@ -169,6 +169,11 @@ describe("cover prompt", () => {
 });
 
 describe("setCoverPath", () => {
+  it("writes a path that cannot be a link (#, [, ], ^, |) as plain text, not as a link to another file", () => {
+    expect(setCoverPath("---\ntitle: X\n---", "Books/c#1.png")).toContain('cover: "Books/c#1.png"');
+    expect(setCoverPath("---\ntitle: X\n---", "Books/c#1.png")).not.toContain("[[");
+  });
+
   it("replaces an existing cover value", () => {
     const fm = '---\ntitle: X\ncover: "[[old.png]]"\n---';
     expect(setCoverPath(fm, "new.png")).toContain('cover: "[[new.png]]"');

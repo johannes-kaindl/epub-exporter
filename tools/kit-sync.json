@@ -1,10 +1,10 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.70.0"
+      "ref": "0.94.0"
     },
     "code-kit": {
-      "ref": "0.43.0"
+      "ref": "0.73.0"
     }
   },
   "targets": [
@@ -15,24 +15,16 @@
       "modules": [
         "crc32",
         "filename-template",
-        {
-          "name": "folder-scope",
-          "ref": "0.44.0"
-        },
-        {
-          "name": "fold-case",
-          "ref": "0.44.0"
-        },
-        {
-          "name": "heading-title",
-          "ref": "0.60.0"
-        },
+        "folder-scope",
+        "fold-case",
+        "heading-title",
         "i18n",
         "link-resolver",
         "name-order",
         "rel-path",
         "settings",
-        "split-list"
+        "split-list",
+        "run-exclusive"
       ]
     },
     {
@@ -40,15 +32,19 @@
       "source": "obsidian-kit",
       "from": "src/pure",
       "modules": [
-        {
-          "name": "frontmatter",
-          "ref": "0.89.0"
-        },
-        {
-          "name": "frontmatter-patch",
-          "ref": "0.89.0"
-        },
+        "frontmatter",
+        "frontmatter-patch",
         "vault-path"
+      ],
+      "rewrite": [
+        [
+          "../vendor/code-kit/pure/",
+          "./"
+        ],
+        [
+          "../pure/",
+          "./"
+        ]
       ]
     },
     {
@@ -61,10 +57,8 @@
         "help-setting",
         "share-export",
         "confirm",
-        {
-          "name": "status-indicator",
-          "ref": "0.76.0"
-        }
+        "status-indicator",
+        "setting-body-host"
       ],
       "rewrite": [
         [

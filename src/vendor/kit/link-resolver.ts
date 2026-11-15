@@ -1,10 +1,10 @@
-// vendored from code-kit@0.43.0, src/ts/pure/link-resolver.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.73.0, src/ts/pure/link-resolver.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Links between the pages of one document built from a folder tree (an EPUB, a PDF), resolved by the full path of the page and not
  *  by its file name. A folder tree has many pages called `README.md`; a lookup by file name sends every link `README.md` to the last
  *  one registered. Origin: epub-exporter "folder as book" (design 2026-10-27, § 5.6); paperize needs the same for a PDF with bookmarks.
  *  Pure, no I/O. */
 
-import { resolveRelPath } from "./rel-path";
+import { baseName, resolveRelPath } from "./rel-path";
 
 function dirname(path: string): string {
   const i = path.lastIndexOf("/");
@@ -40,7 +40,7 @@ export function createLinkResolver(pages: ReadonlyArray<{ path: string }>): (tar
   pages.forEach((page, index) => {
     const lower = page.path.toLowerCase();
     if (!byPath.has(lower)) byPath.set(lower, index);
-    const name = lower.slice(lower.lastIndexOf("/") + 1);
+    const name = baseName(lower);
     const same = byFileName.get(name);
     if (same) same.push(index);
     else byFileName.set(name, [index]);
@@ -63,7 +63,7 @@ export function createLinkResolver(pages: ReadonlyArray<{ path: string }>): (tar
     const rootHit = byPath.get(rootPath);
     if (rootHit !== undefined) return rootHit;
 
-    const candidates = (byFileName.get(rootPath.slice(rootPath.lastIndexOf("/") + 1)) ?? []).filter((i) =>
+    const candidates = (byFileName.get(baseName(rootPath)) ?? []).filter((i) =>
       (pages[i]?.path.toLowerCase().endsWith(`/${rootPath}`) ?? false),
     );
     return candidates.length === 1 ? (candidates[0] ?? null) : null;
