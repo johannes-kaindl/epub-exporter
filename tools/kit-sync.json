@@ -66,6 +66,14 @@
           "../kit/"
         ]
       ]
+    },
+    {
+      "dir": "tests/vendor/kit",
+      "source": "obsidian-kit",
+      "from": "src/testing",
+      "modules": [
+        "kit-css"
+      ]
     }
   ]
 }
