@@ -1,4 +1,4 @@
-// vendored from code-kit@0.73.0, src/ts/pure/link-resolver.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.75.0, src/ts/pure/link-resolver.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Links between the pages of one document built from a folder tree (an EPUB, a PDF), resolved by the full path of the page and not
  *  by its file name. A folder tree has many pages called `README.md`; a lookup by file name sends every link `README.md` to the last
  *  one registered. Origin: epub-exporter "folder as book" (design 2026-10-27, § 5.6); paperize needs the same for a PDF with bookmarks.

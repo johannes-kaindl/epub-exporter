@@ -1,11 +1,11 @@
 {
   "source": "code-kit",
-  "version": "0.73.0",
-  "sha": "09b7dcb",
+  "version": "0.75.0",
+  "sha": "e6cd8be",
   "vendored": "crc32.ts, filename-template.ts, folder-scope.ts, fold-case.ts, heading-title.ts, i18n.ts, link-resolver.ts, name-order.ts, rel-path.ts, settings.ts, split-list.ts, run-exclusive.ts",
   "note": "Verbatim snapshot aus festen Git-Refs (CORE-META-22: feste Ref, nicht Arbeitsstand); den Stand nennen `version` und `obsidian_kit_version` samt Einzelpins in `vendored`, die Pins stehen in tools/kit-sync.json. Never hand-edit. Re-vendor via tools/sync-kit.sh. kit-obsidian/ hat eine eigene VENDOR.json.",
-  "obsidian_kit_version": "0.94.0",
-  "obsidian_kit_sha": "bf78d8b",
+  "obsidian_kit_version": "0.95.0",
+  "obsidian_kit_sha": "3853245",
   "obsidian_kit_vendored": "frontmatter.ts, frontmatter-patch.ts, vault-path.ts",
   "license": "AGPL-3.0-or-later"
 }
