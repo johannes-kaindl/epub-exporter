@@ -16,19 +16,15 @@
  * Gelaufen wird in einer **Zweitinstanz** mit eigenem Profil und eigenem Port (Dach-AGENTS
  * § Staging-Vaults) — nie in der regulaeren Instanz, nie per Quit:
  *
- * ```bash
- * npm run build
- * npm run smoke:gui -- --setup --port <port>   # Staging-Vault aus dem Fixture herstellen
- * #   Profil UD=/tmp/obs-test-epub-exporter: aktuelle obsidian-*.asar hineinkopieren, Vault und
- * #   "language":"en" in $UD/obsidian.json eintragen, mit --user-data-dir="$UD" und
- * #   --remote-debugging-port=<port> starten (vorher: lsof -nP -iTCP:<port> -sTCP:LISTEN)
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label epub-exporter \
- *   --intent "GUI-Smoke" --exclusive focus --port <port> --ttl 300
- * npm run smoke:gui -- --port <port>           # Vertrauensdialog und Restricted Mode erledigt der Treiber
- * npm run smoke:gui -- --port <port> --only S4 # einen Punkt nachziehen
- * npm run smoke:gui -- --list                  # Vertrag anzeigen
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
- * ```
+ * Lauf: `tools/obsidian-cdp/messlauf.sh` (Dach, README § Messlauf in einem Aufruf) startet die Zweitinstanz, hält den Lock (`--exclusive focus`, davor, mit `export`)
+ * und räumt auf; das Rezept steht nur dort. Für diesen Treiber: `REPO=epub-exporter SETUP_MIT_PORT=1`.
+ *
+ * Weitere Läufe (als `SMOKE_ARGS`):
+ *   --only S4   # einen Punkt nachziehen
+ *   --list   # Vertrag anzeigen
+ *
+ * Besonderheiten dieses Treibers (aus dem früheren Rezept übernommen):
+ *   Setup (`--setup`): Staging-Vault aus dem Fixture herstellen
  *
  * `--port` ist Pflicht (auch als `CDP_PORT` lesbar): ohne Angabe bricht der Treiber ab, statt
  * auf die reguläre Instanz (9222) zu greifen. Je Messlauf ein frischer Prozess.
