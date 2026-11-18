@@ -26,7 +26,7 @@ Switch to reading view: the three chapters run on as one continuous text. That i
 
 ## 4. Export
 
-Click the ribbon icon **Open EPUB Exporter sidebar** (the book icon). The panel shows the note as a **Book note** with its chapter list. Press **Export as EPUB**.
+Click the ribbon icon **Open export sidebar** (the book icon). The panel shows the note as a **Book note** with its chapter list. Press **Export as EPUB**.
 
 A notice says **EPUB saved to …** and the file `My First Book.epub` — named after the `title` field — lies next to the note. Open it in any e-reader app to check the result.
 
