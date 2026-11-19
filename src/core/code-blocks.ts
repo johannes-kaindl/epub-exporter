@@ -23,6 +23,9 @@ export function extractCodeBlocks(md: string): { markdown: string; codes: Extrac
   const out: string[] = [];
   const codes: ExtractedCode[] = [];
   let i = 0;
+  // Shortest fence length per fence character that found no closing line. A later fence of the same character at least as long has fewer lines to look
+  // at and needs a closer at least as long, so it cannot close either: skipping its scan keeps a run of unclosed fences linear instead of quadratic.
+  const unclosedFrom = new Map<string, number>();
 
   while (i < lines.length) {
     const open = OPEN_RE.exec(lines[i]);
@@ -31,9 +34,11 @@ export function extractCodeBlocks(md: string): { markdown: string; codes: Extrac
     const [, indent, fence, lang] = open;
     // Closing fence: same char, at least as long, nothing else on the line. This is what
     // keeps a ``` inside a ````-block from ending it early.
+    const knownUnclosed = (unclosedFrom.get(fence[0]) ?? Infinity) <= fence.length;
     const close = new RegExp(`^\\s*${fence[0]}{${fence.length},}\\s*$`);
-    let j = i + 1;
+    let j = knownUnclosed ? lines.length : i + 1;
     while (j < lines.length && !close.test(lines[j])) j++;
+    if (j >= lines.length && !knownUnclosed) unclosedFrom.set(fence[0], Math.min(unclosedFrom.get(fence[0]) ?? Infinity, fence.length));
 
     // Unclosed fence: not a code block. Leave the line as-is so the renderer decides.
     if (j >= lines.length) { out.push(lines[i]); i++; continue; }

@@ -93,3 +93,45 @@ describe("restoreCodeBlocks", () => {
     expect(restoreCodeBlocks("<p>hi</p>", [])).toBe("<p>hi</p>");
   });
 });
+
+// Differential check against the version before the "known unclosed" shortcut (it rescanned to the end of the text for every unclosed fence: quadratic).
+describe("extractCodeBlocks equals the version without the unclosed-fence shortcut", () => {
+  const OPEN_RE = /^(\s*)(`{3,}|~{3,})(\S*)\s*$/;
+  function oldExtract(md: string): { markdown: string; codes: Array<{ lang: string | undefined; text: string }> } {
+    const lines = md.split("\n");
+    const out: string[] = [];
+    const codes: Array<{ lang: string | undefined; text: string }> = [];
+    let i = 0;
+    while (i < lines.length) {
+      const open = OPEN_RE.exec(lines[i]);
+      if (!open) { out.push(lines[i]); i++; continue; }
+      const [, indent, fence, lang] = open;
+      const close = new RegExp(`^\\s*${fence[0]}{${fence.length},}\\s*$`);
+      let j = i + 1;
+      while (j < lines.length && !close.test(lines[j])) j++;
+      if (j >= lines.length) { out.push(lines[i]); i++; continue; }
+      const body = lines.slice(i + 1, j).map((l) => (l.startsWith(indent) ? l.slice(indent.length) : l));
+      codes.push({ lang: lang || undefined, text: body.join("\n") });
+      if (out.length > 0 && out[out.length - 1] !== "") out.push("");
+      out.push(indent + codePlaceholder(codes.length - 1));
+      const nextLine = lines[j + 1];
+      if (nextLine !== undefined && nextLine !== "") out.push("");
+      i = j + 1;
+    }
+    return { markdown: out.join("\n"), codes };
+  }
+
+  it("agrees on all texts of up to six lines from a set that mixes both fence characters, lengths, languages and indents", () => {
+    const lines = ["```js", "```", "````", "~~~", "~~~py", "~~~~", "  ```", "x", ""];
+    let n = 0;
+    const walk = (prefix: string[], depth: number): void => {
+      const text = prefix.join("\n");
+      expect(extractCodeBlocks(text), JSON.stringify(text)).toEqual(oldExtract(text));
+      n++;
+      if (depth === 0) return;
+      for (const l of lines) walk([...prefix, l], depth - 1);
+    };
+    walk([], 6);
+    expect(n).toBeGreaterThan(500_000);
+  }, 180_000);
+});

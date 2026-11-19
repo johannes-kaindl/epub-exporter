@@ -10,6 +10,10 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 - **The command that opens the panel drops the plugin name from its name (UI-STANDARD §11).** The palette shows "EPUB Exporter: Open export sidebar" instead of "EPUB Exporter: Open EPUB Exporter sidebar" (German: "Export-Seitenleiste öffnen"); the ribbon tooltip of the book icon reads the same. The command id stays, so bound hotkeys keep working.
 
+### Fixed
+
+- **A chapter with thousands of unclosed code fences or unclosed image links no longer stalls the export.** Looking for the end of a code fence and for the closing bracket of an image embed or link rescanned the rest of the text for every opener that had no end, so the time grew with the square of the length (50,000 characters of `![[` took about three seconds). Both now read the text once; results are unchanged.
+
 ## [0.9.4] — 2026-11-15
 
 ### Fixed
