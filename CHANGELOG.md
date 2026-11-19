@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.5] — 2026-11-19
+
 ### Changed
 
 - **The command that opens the panel drops the plugin name from its name (UI-STANDARD §11).** The palette shows "EPUB Exporter: Open export sidebar" instead of "EPUB Exporter: Open EPUB Exporter sidebar" (German: "Export-Seitenleiste öffnen"); the ribbon tooltip of the book icon reads the same. The command id stays, so bound hotkeys keep working.
