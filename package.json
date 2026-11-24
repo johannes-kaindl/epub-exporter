@@ -1,6 +1,6 @@
 {
   "name": "epub-exporter",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Export Markdown notes as EPUB books from Obsidian.",
   "main": "main.js",
   "scripts": {
