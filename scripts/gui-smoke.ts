@@ -58,7 +58,7 @@
  *    Fixture, und der Fehlschlag des einen beschaedigt still das andere.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import { argv, cwd, env } from "node:process";
@@ -95,7 +95,7 @@ let PORT = 0;
 
 /** Soll-Liste (Nenner der Bilanz). C0 und C1 rahmen die Pruefpunkte (Rest-Stub / Aufraeumprotokoll). */
 const PUNKTE = [
-  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "X1", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "F1", "O1", "O2", "O3", "O4", "O5", "C1",
+  "C0", "S1", "S2", "S3", "S6", "S4", "S5", "X1", "R1", "R2", "R3", "E1", "E2", "E3", "T1", "T2", "T3", "F1", "O1", "O2", "O3", "O4", "O5", "A1", "C1",
 ] as const;
 type PunktId = (typeof PUNKTE)[number];
 
@@ -134,6 +134,14 @@ const SMOKE_FM_FELDER = [
 const STUB_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 const FIXTURE_EPUB = "Notes from the Salt Marsh.epub";
+/** A1: eine Notiz bettet einen Abschnitt einer anderen ein, die unmittelbar vor dem Export geändert wird (Kit `withRenderedNote` wartet auf den Cache, obsidian-kit 0.109.0). */
+const A_ZIEL = `${SMOKE_DIR}/Abschnitt Ziel.md`;
+const A_HOST = `${SMOKE_DIR}/Abschnitt Host.md`;
+const A_EPUB = `${SMOKE_DIR}/Abschnitt Host.epub`;
+const A_ZIEL_ALT = "# Alt\n\nALT-MARKE\n";
+const A_ZIEL_NEU = "# Teil 1\n\nTEIL-EINS-MARKE\n\n# Teil 2\n\nTEIL-ZWEI-MARKE\n";
+/** Optional: Ordner, in den A1, E-Punkte und S4 die erzeugten EPUBs kopieren (Vergleich zweier Builds, alt gegen neu). Leer = keine Ablage. */
+const EPUB_ABLAGE = env.EPUB_ABLAGE ?? "";
 /** Der Code, der den Hijack-Guard belegt. Bewusst mit Sonderzeichen, die eine
  *  HTML-Entitaeten-Wandlung sichtbar machen wuerden. */
 const SMOKE_CODE = 'const x = a < b && c > d ? "ja" : "nein";';
@@ -276,6 +284,25 @@ async function warteAufDatei(cdp: Cdp, pfad: string, frist = 20_000): Promise<st
     frist,
   );
   return join(stagingVaultDir(REPO_NAME), pfad);
+}
+
+/** Eine Datei lesen, sobald ihre Größe zweimal gleich ist (sie erscheint im Vault-Index, bevor der Schreibvorgang fertig ist). */
+async function liesStabil(fsPfad: string): Promise<Buffer> {
+  let letzte = -1;
+  for (let i = 0; i < 25; i++) {
+    const groesse = existsSync(fsPfad) ? readFileSync(fsPfad).length : -1;
+    if (groesse > 0 && groesse === letzte) break;
+    letzte = groesse;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return readFileSync(fsPfad);
+}
+
+/** Mit `EPUB_ABLAGE` ein erzeugtes EPUB dort ablegen (Name = Dateiname im Vault). */
+function legeAb(vaultPfad: string, buf: Buffer): void {
+  if (!EPUB_ABLAGE) return;
+  mkdirSync(EPUB_ABLAGE, { recursive: true });
+  writeFileSync(join(EPUB_ABLAGE, vaultPfad.split("/").pop() ?? "export.epub"), buf);
 }
 
 // ---------------------------------------------------------------------------
@@ -766,7 +793,7 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       const getroffen = await clickReal(cdp, `document.querySelector(".epub-sb-action-export")`, 200);
       if (!getroffen) return "Export-Knopf nicht klickbar (kein Element getroffen)";
       try {
-        await warteAufDatei(cdp, FIXTURE_EPUB);
+        legeAb(FIXTURE_EPUB, await liesStabil(await warteAufDatei(cdp, FIXTURE_EPUB)));
       } catch (e) {
         const toast = await cdp.evaluate<string>(`
           const t = [];
@@ -795,9 +822,15 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
         await new Promise((r) => setTimeout(r, 300));
         return true;
       `);
+      // Das Label ist der Befehlsname ohne Plugin-Präfix (seit 0.9.5 „Open export sidebar“, UI-STANDARD §11): zur Laufzeit aus dem Befehlsregister
+      // gelesen, nicht aus dem Quelltext; vorher suchte der Punkt „EPUB“ oder „book“ im Label und wurde mit der Umbenennung rot.
       const getroffen = await clickReal(
         cdp,
-        `document.querySelector('.side-dock-ribbon-action[aria-label*="EPUB" i], .side-dock-ribbon-action[aria-label*="book" i]')`,
+        `(() => {
+          const name = (app.commands.commands["epub-exporter:open-sidebar"]?.name ?? "").replace(/^[^:]*:\\s*/, "");
+          if (!name) return null;
+          return Array.from(document.querySelectorAll(".side-dock-ribbon-action")).find((e) => e.getAttribute("aria-label") === name) ?? null;
+        })()`,
       );
       if (!getroffen) {
         const vorhanden = await cdp.evaluate<string[]>(`
@@ -1486,6 +1519,36 @@ const PRUEFPUNKTE: Pruefpunkt[] = [
       return null;
     },
   },
+  {
+    id: "A1",
+    was: "Abschnitts-Einbettung direkt nach vault.modify der Zielnotiz: das EPUB zeigt nur den neuen Abschnitt",
+    pruefe: async (cdp) => {
+      await schreibeDatei(cdp, A_ZIEL, A_ZIEL_ALT);
+      await schreibeDatei(cdp, A_HOST, "![[Abschnitt Ziel#Teil 2]]\n");
+      await inDenPapierkorb(cdp, [A_EPUB]);
+      await oeffneUndWarte(cdp, A_HOST, `document.querySelector(".markdown-reading-view")`);
+      // Der Zwischenspeicher kennt jetzt die alte Fassung (Überschrift „Alt“). Ändern und exportieren OHNE Pause dazwischen:
+      // die Neuindizierung läuft dann noch (im Kit gemessen 11 ms), und ein Renderer, der nicht wartet, zeichnet die ganze Notiz.
+      await cdp.evaluate(`await new Promise((r) => setTimeout(r, 500)); return true;`);
+      await leereNotices(cdp);
+      await cdp.evaluate(`
+        const f = app.vault.getAbstractFileByPath(${JSON.stringify(A_ZIEL)});
+        await app.vault.modify(f, ${JSON.stringify(A_ZIEL_NEU)});
+        app.commands.executeCommandById("epub-exporter:export-epub");
+        return true;
+      `);
+      const buf = await liesStabil(await warteAufDatei(cdp, A_EPUB));
+      legeAb(A_EPUB, buf);
+      const kapitel = [...entpacke(buf).entries()].filter(([n]) => /chapter-\d+\.xhtml$/.test(n)).map(([, t]) => t).join("\n");
+      if (!kapitel) return "Das EPUB enthält kein Kapitel (chapter-NN.xhtml)";
+      const fehler: string[] = [];
+      if (!kapitel.includes("TEIL-ZWEI-MARKE")) fehler.push("der Abschnitt „Teil 2“ fehlt");
+      if (kapitel.includes("TEIL-EINS-MARKE")) fehler.push("„Teil 1“ steht mit drin (die ganze Notiz statt des Abschnitts)");
+      if (kapitel.includes("ALT-MARKE")) fehler.push("die alte Fassung steht drin");
+      if (fehler.length > 0) return `${fehler.join("; ")}. Kapiteltext: ${JSON.stringify(kapitel.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240))}`;
+      return null;
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1659,18 +1722,12 @@ async function exportiereSmokeBuch(cdp: Cdp): Promise<Buffer> {
     await app.commands.executeCommandById("epub-exporter:export-epub");
     return true;
   `);
-  const fsPfad = await warteAufDatei(cdp, SMOKE_EPUB);
-  // Kurz nachfassen: die Datei erscheint im Vault-Index, bevor der Schreibvorgang
+  // Kurz nachfassen (`liesStabil`): die Datei erscheint im Vault-Index, bevor der Schreibvorgang
   // abgeschlossen ist. Ein Lesen im selben Moment liefert ein abgeschnittenes Archiv —
   // und der Fehlschlag saehe aus wie ein defekter ZIP-Writer.
-  let letzte = -1;
-  for (let i = 0; i < 25; i++) {
-    const groesse = existsSync(fsPfad) ? readFileSync(fsPfad).length : -1;
-    if (groesse > 0 && groesse === letzte) break;
-    letzte = groesse;
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  return readFileSync(fsPfad);
+  const buf = await liesStabil(await warteAufDatei(cdp, SMOKE_EPUB));
+  legeAb(SMOKE_EPUB, buf);
+  return buf;
 }
 
 // ---------------------------------------------------------------------------
@@ -1728,6 +1785,9 @@ async function lauf(nur?: string): Promise<void> {
         SMOKE_COVER,
         SMOKE_BOOK,
         SMOKE_FM_NOTE,
+        A_EPUB,
+        A_HOST,
+        A_ZIEL,
         ...SMOKE_CHAPTERS.map((k) => k.pfad),
         SMOKE_DIR,
         O_DIR,
