@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.95.0, src/obsidian/share-export.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.106.0, src/obsidian/share-export.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { Notice, type App } from "obsidian";
 import { confirmAction } from "./confirm";
 import { baseName, isPathSegment } from "../kit/rel-path";

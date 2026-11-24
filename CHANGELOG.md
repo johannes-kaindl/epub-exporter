@@ -6,6 +6,9 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Kit pins move to obsidian-kit 0.106.0 and code-kit 0.87.0. No visible change: the cover path and the cover prompt are the only values this plugin writes into a note's properties, and neither can carry a line break (the prompt is joined to one line before the write).
+
 ## [0.9.5] — 2026-11-19
 
 ### Changed

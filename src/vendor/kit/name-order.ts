@@ -1,4 +1,4 @@
-// vendored from code-kit@0.75.0, src/ts/pure/name-order.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.87.0, src/ts/pure/name-order.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** The naming rule that turns a file or folder name into an order, a title and a hidden flag: `01 - Intro` is chapter 1 titled
  *  "Intro", `1.10 Foo` sorts behind `1.2 Foo`, `0 - Notes` is hidden. String logic only; the caller strips the extension and
  *  decides whether the rule is on at all (a setting) — with it off, the full name is the title and the order is the caller's own.
@@ -97,7 +97,11 @@ function compareDigitRuns(a: string, b: string): number {
   return x === y ? 0 : x < y ? -1 : 1;
 }
 
-function compareCodePoints(a: string, b: string): number {
+/** Orders two strings by Unicode code point, not by UTF-16 code unit and never by locale: a negative number if `a` comes first, positive if `b`
+ *  does, `0` for equal strings; a string comes before its own extension. Code unit and code point order differ where a character above U+FFFF
+ *  (stored as a surrogate pair, D800-DFFF) meets one in U+E000-U+FFFF: `"😀" < "\uFFFD"` by code unit, `"\uFFFD" < "😀"` by code point. The same
+ *  answer on every device (no ICU). Case is NOT folded; lower-case first if you want that. A lone surrogate counts as its own code point. */
+export function compareCodePoints(a: string, b: string): number {
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {

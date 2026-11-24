@@ -169,6 +169,14 @@ describe("cover prompt", () => {
 });
 
 describe("setCoverPath", () => {
+  it("writes a path with a line break so that the block reads back equal (kit 0.96.0, before the kit refused it and the head stayed unchanged)", () => {
+    const out = setCoverPath("---\ntitle: X\n---", "Books/a\nb.png");
+    expect(out).not.toBe("---\ntitle: X\n---");
+    const back = parseFrontmatter(out + "\nText\n").data;
+    expect(back.cover).toBe("[[Books/a\nb.png]]");
+    expect(back.title).toBe("X");
+  });
+
   it("writes a path that cannot be a link (#, [, ], ^, |) as plain text, not as a link to another file", () => {
     expect(setCoverPath("---\ntitle: X\n---", "Books/c#1.png")).toContain('cover: "Books/c#1.png"');
     expect(setCoverPath("---\ntitle: X\n---", "Books/c#1.png")).not.toContain("[[");

@@ -155,8 +155,8 @@ export function setCoverPath(frontmatter: string, coverPath: string | null): str
 /**
  * Stores what the cover should depict, so the next run starts from it.
  *
- * The value is free text from a text area. A line break would end the YAML
- * value early, so breaks become blanks before the write; the kit quotes
+ * The value is free text from a text area. It is kept on one line (the prompt is
+ * shown and stored as one line), so breaks become blanks before the write; the kit quotes
  * whatever else needs it (a colon, a `#`, a leading dash), so the block stays
  * one Obsidian can parse — an unparseable block would silently stop the note
  * being a book note at all.
