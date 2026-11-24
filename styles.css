@@ -160,3 +160,6 @@
 @keyframes okit-status-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .okit-status.is-checking .okit-status-icon svg { animation: none; } }
 .epub-cover-status { margin-top: var(--size-4-2); }
+
+/* Render host of the kit renderer (withRenderedNote): in the viewport, invisible, with a fixed width — never off-screen (Bases draws 0 rows there) and never display: none. RENDER_NOTE_CSS is copied verbatim (kit contract). */
+.okit-render-note-host { position: fixed; left: 0; top: 0; width: var(--okit-render-width, 800px); opacity: 0; pointer-events: none; z-index: -1; }

@@ -18,10 +18,10 @@ function deps(
   codes: Record<string, { lang?: string; text: string }[]> = {}
 ): AssemblerDeps {
   return {
-    async renderMarkdown(markdown, sourcePath) {
+    async renderMarkdown(markdown, sourcePath, use) {
       const root = document.createElement("div");
       root.innerHTML = markdown;
-      return { root, dispose: () => {}, codes: codes[sourcePath] ?? [] };
+      return use({ root, codes: codes[sourcePath] ?? [], findings: [] });
     },
     async readNote(path) { return notes[path] ?? null; },
     resolveNotePath(target) {

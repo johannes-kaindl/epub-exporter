@@ -123,6 +123,17 @@ export const EN: Record<string, string> = {
   "notice.cover.modelMissing": "The image generator has no model downloaded.",
   "notice.cover.noGpu": "The image generator found no usable GPU.",
   "notice.cover.failed": "Cover generation failed \u2014 see console for details.",
+  // Findings of the kit renderer (withRenderedNote); keys and wording as in hypertext-exporter (finding.<code>).
+  "finding.render.timeout": "Rendering was not finished after {0} ms; the note may be incomplete.",
+  "finding.render.hidden-window": "The Obsidian window is hidden. Do not minimize the Obsidian window while the export runs.",
+  "finding.render.placeholder": "After {0} ms there was still no final result ({1} placeholders, such as “Loading”); the block may be empty or unfinished.",
+  "finding.render.failed": "The renderer reported an error: {0}",
+  "finding.render.mermaid-missing": "{0} of {1} diagrams were not drawn.",
+  "finding.render.metadata-not-ready": "Obsidian had not indexed the embedded note {0} after {1} ms; an embedded section of it may show the whole note.",
+  "finding.embed.missing": "Embed without a target: {0}",
+  "notice.renderFinding": "{0}: {1}",
+  "notice.renderFindingsMore": "{0} more rendering finding(s), see the developer console.",
+  "notice.renderHidden": "Export stopped: the Obsidian window was hidden, so the chapters were not drawn. Keep the window visible and export again.",
 };
 
 export const DE: Record<string, string> = {
@@ -248,6 +259,16 @@ export const DE: Record<string, string> = {
   "notice.cover.modelMissing": "Der Bildgenerator hat kein Modell heruntergeladen.",
   "notice.cover.noGpu": "Der Bildgenerator hat keine nutzbare GPU gefunden.",
   "notice.cover.failed": "Titelbild konnte nicht erzeugt werden \u2014 Details in der Konsole.",
+  "finding.render.timeout": "Zeichnen nach {0} ms nicht fertig; die Notiz kann unvollständig sein",
+  "finding.render.hidden-window": "Das Obsidian-Fenster ist verdeckt. Obsidian-Fenster nicht minimieren, solange der Export läuft.",
+  "finding.render.placeholder": "Nach {0} ms stand noch kein Endergebnis da ({1} Platzhalter, etwa „Loading“); der Block kann leer oder unfertig sein",
+  "finding.render.failed": "Der Zeichner meldete einen Fehler: {0}",
+  "finding.render.mermaid-missing": "{0} von {1} Diagrammen wurden nicht gezeichnet",
+  "finding.render.metadata-not-ready": "Obsidian hatte die eingebettete Notiz {0} nach {1} ms noch nicht indiziert; ein eingebetteter Abschnitt von ihr zeigt vielleicht die ganze Notiz",
+  "finding.embed.missing": "Einbettung ohne Ziel: {0}",
+  "notice.renderFinding": "{0}: {1}",
+  "notice.renderFindingsMore": "{0} weitere(r) Befund(e) beim Zeichnen, siehe Entwicklerkonsole.",
+  "notice.renderHidden": "Export abgebrochen: Das Obsidian-Fenster war verdeckt, die Kapitel wurden nicht gezeichnet. Fenster sichtbar lassen und erneut exportieren.",
 };
 
 export function registerI18n(): void {

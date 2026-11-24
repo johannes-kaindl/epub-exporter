@@ -7,6 +7,7 @@ import { domToXhtml, RenderContext } from "../core/dom-to-xhtml";
 import { ImageRegistry, ImageSource } from "../core/image-registry";
 import { DEFAULT_BOOK_CSS } from "../core/epub-builder";
 import { restoreCodeBlocks, ExtractedCode } from "../core/code-blocks";
+import type { RenderNoteFinding } from "../vendor/kit-obsidian/render-note";
 
 export interface NoteData {
   path: string;
@@ -16,14 +17,20 @@ export interface NoteData {
 }
 
 export interface RenderedNote {
+  /** Lives only inside the `use` callback of `renderMarkdown` (the kit's `withRenderedNote` removes the host afterwards). */
   root: HTMLElement;
-  dispose: () => void;
   codes: ExtractedCode[]; // fenced code pulled out before render, re-injected after dom-to-xhtml
+  /** Findings of the kit renderer (timeout, mermaid missing, metadata not ready …); empty in fakes. */
+  findings: RenderNoteFinding[];
 }
+
+/** A render finding with the chapter note it came from. */
+export interface ChapterRenderFinding { notePath: string; finding: RenderNoteFinding }
 
 // Injected Obsidian port bundle — real impl (app.*) is built in Plan 3.
 export interface AssemblerDeps {
-  renderMarkdown(markdown: string, sourcePath: string): Promise<RenderedNote>;
+  /** Renders `markdown` and hands the drawn tree to `use`; the tree is gone when `use` returns. */
+  renderMarkdown<T>(markdown: string, sourcePath: string, use: (rendered: RenderedNote) => Promise<T>): Promise<T>;
   readNote(path: string): Promise<NoteData | null>;
   resolveNotePath(target: string, sourcePath: string): string | null;
   readImage(target: string, sourcePath: string): Promise<ImageSource | null>;
@@ -40,6 +47,8 @@ export interface AssembledBook {
   /** Die Summe `simplifiedCount` nach Art aufgeschlüsselt: `image`, `math`, `callout` oder der Tag-Name des unbekannten Elements. */
   simplifiedKinds: Record<string, number>;
   missing: string[];
+  /** Findings of the renderer per chapter, in chapter order. */
+  renderFindings: ChapterRenderFinding[];
 }
 
 interface ChapterPlan {
@@ -176,10 +185,11 @@ export async function assembleBook(
   let simplifiedCount = 0;
   const simplifiedKinds: Record<string, number> = {};
   const chapters: Chapter[] = [];
+  const renderFindings: ChapterRenderFinding[] = [];
 
   for (const plan of plans) {
-    const rendered = await deps.renderMarkdown(plan.body, plan.sourcePath);
-    try {
+    const xhtml = await deps.renderMarkdown(plan.body, plan.sourcePath, async (rendered) => {
+      for (const finding of rendered.findings) renderFindings.push({ notePath: plan.sourcePath, finding });
       // Pre-resolve images so resolveImage can be synchronous.
       const srcToHref = new Map<string, string | null>();
       const imgs = rendered.root.querySelectorAll("img");
@@ -203,11 +213,9 @@ export async function assembleBook(
           simplifiedKinds[kind] = (simplifiedKinds[kind] ?? 0) + 1;
         },
       };
-      const xhtml = restoreCodeBlocks(domToXhtml(rendered.root, ctx), rendered.codes);
-      chapters.push({ title: plan.title, xhtml, sourcePath: plan.sourcePath });
-    } finally {
-      rendered.dispose();
-    }
+      return restoreCodeBlocks(domToXhtml(rendered.root, ctx), rendered.codes);
+    });
+    chapters.push({ title: plan.title, xhtml, sourcePath: plan.sourcePath });
   }
 
   const metadata = parseBookMetadata(frontmatter, {
@@ -233,5 +241,5 @@ export async function assembleBook(
     css: DEFAULT_BOOK_CSS,
   };
 
-  return { book, simplifiedCount, simplifiedKinds, missing };
+  return { book, simplifiedCount, simplifiedKinds, missing, renderFindings };
 }

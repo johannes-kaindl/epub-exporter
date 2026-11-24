@@ -1,10 +1,10 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.108.0"
+      "ref": "0.109.0"
     },
     "code-kit": {
-      "ref": "0.88.0"
+      "ref": "0.89.0"
     }
   },
   "targets": [
@@ -25,7 +25,10 @@
         "settings",
         "split-list",
         "string-list",
-        "run-exclusive"
+        "run-exclusive",
+        "timeout",
+        "error-message",
+        "fences"
       ]
     },
     {
@@ -35,7 +38,8 @@
       "modules": [
         "frontmatter",
         "frontmatter-patch",
-        "vault-path"
+        "vault-path",
+        "mermaid-wait"
       ],
       "rewrite": [
         [
@@ -59,11 +63,17 @@
         "share-export",
         "confirm",
         "status-indicator",
-        "setting-body-host"
+        "setting-body-host",
+        "clock",
+        "render-note"
       ],
       "rewrite": [
         [
           "../vendor/code-kit/pure/",
+          "../kit/"
+        ],
+        [
+          "../pure/",
           "../kit/"
         ]
       ]

@@ -1,8 +1,8 @@
 // src/main.ts
 import { Plugin, Notice, TFile, TFolder, Menu, getLanguage, normalizePath, WorkspaceLeaf } from "obsidian";
-import { assembleBook, BookSource } from "./obsidian/book-assembler";
+import { assembleBook, BookSource, type ChapterRenderFinding } from "./obsidian/book-assembler";
 import { buildEpub } from "./core/epub-builder";
-import { createAssemblerDeps } from "./obsidian/deps";
+import { createAssemblerDeps, renderFindingMessage } from "./obsidian/deps";
 import { writeEpub } from "./obsidian/output";
 import { sanitizeBase } from "./core/output-path";
 import { EpubSettingTab } from "./obsidian/settings-tab";
@@ -233,9 +233,11 @@ export default class EpubExporterPlugin extends Plugin {
   private async exportSource(source: BookSource): Promise<void> {
     try {
       const deps = createAssemblerDeps(this.app);
-      const { book, simplifiedCount, simplifiedKinds, missing } = await assembleBook(deps, source, {
+      const { book, simplifiedCount, simplifiedKinds, missing, renderFindings } = await assembleBook(deps, source, {
         defaultLanguage: this.settings.defaultLanguage,
       });
+      // A hidden window is not drawn (kit renderer): the chapters would be empty, so nothing is written.
+      if (renderFindings.some((r) => r.finding.kind === "window-hidden")) { new Notice(t("notice.renderHidden")); return; }
       if (book.chapters.length === 0) { new Notice(t("notice.noChapters")); return; }
       // Stamp the real modification time (EPUB3 dcterms:modified) — the engine leaves it to the plugin.
       book.metadata.modified = new Date().toISOString().replace(/\.\d+Z$/, "Z");
@@ -254,6 +256,7 @@ export default class EpubExporterPlugin extends Plugin {
       });
 
       if (missing.length > 0) new Notice(t("notice.brokenEmbed", missing.length));
+      this.showRenderFindings(renderFindings);
       if (simplifiedCount > 0) {
         const top = Object.entries(simplifiedKinds).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([kind, n]) => `${kind} ${n}`).join(", ");
         console.debug("EPUB Exporter: simplified elements by kind", simplifiedKinds);
@@ -263,6 +266,14 @@ export default class EpubExporterPlugin extends Plugin {
       console.error("EPUB Exporter: export failed", e);
       new Notice(t("notice.exportFailed"));
     }
+  }
+
+  /** At most three findings as notices, the rest counted; all of them in the console. */
+  private showRenderFindings(renderFindings: ChapterRenderFinding[]): void {
+    if (renderFindings.length === 0) return;
+    console.warn("EPUB Exporter: render findings", renderFindings);
+    for (const r of renderFindings.slice(0, 3)) new Notice(t("notice.renderFinding", r.notePath, renderFindingMessage(r.finding, t)));
+    if (renderFindings.length > 3) new Notice(t("notice.renderFindingsMore", renderFindings.length - 3));
   }
 
   // The note directory + display base name for the output path.

@@ -7,10 +7,11 @@ versioning according to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **An embedded section (`![[Note#Heading]]`) of a note you just created or changed is exported as that section, not as the whole note.** The export now waits up to five seconds until Obsidian has indexed the embedded note in its current version; if it has not by then, a notice names the note. Chapters are drawn by the kit renderer `withRenderedNote` (obsidian-kit 0.109.0): the render host is attached to the document instead of floating loose, a render that does not return within ten seconds or a block that is still loading is reported as a notice instead of passing silently, and an export while the Obsidian window is hidden stops with a notice instead of writing empty chapters.
 - A cover prompt that is only a clock time (`14:55`, `1:30:00`) is written in quotes. Before, the bare text stood in the book note's properties, and Obsidian 1.15.0 reads it as the number 895 (sexagesimal form of YAML 1.1). Text such as `12:30pm` stays unquoted (kit `frontmatter` 0.108.0).
 
 ### Changed
-- Kit pins move to obsidian-kit 0.108.0 and code-kit 0.88.0. The private reader for the author and subject lists is replaced by `coerceStringList` of the kit (same result: a single value is a list of one, numbers and dates become text, empty entries drop out).
+- Kit pins move to obsidian-kit 0.109.0 and code-kit 0.89.0 (`render-note`, `clock`, `mermaid-wait`, `timeout`, `error-message` and `fences` vendored for the renderer; the styles carry `RENDER_NOTE_CSS`). Before that, obsidian-kit 0.108.0 and code-kit 0.88.0. The private reader for the author and subject lists is replaced by `coerceStringList` of the kit (same result: a single value is a list of one, numbers and dates become text, empty entries drop out).
 
 ## [0.9.5] — 2026-11-19
 

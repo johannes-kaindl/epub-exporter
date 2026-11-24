@@ -1,20 +1,24 @@
 // src/obsidian/deps.ts
-import { App, Component, MarkdownRenderer, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
+import { App, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
+import { withRenderedNote, type RenderNoteFinding, type RenderNoteOptions } from "../vendor/kit-obsidian/render-note";
 import { AssemblerDeps, NoteData } from "./book-assembler";
 import { ImageSource } from "../core/image-registry";
 import { extractCodeBlocks } from "../core/code-blocks";
 import { stripFrontmatter } from "../core/frontmatter";
 
-export function createAssemblerDeps(app: App): AssemblerDeps {
+/** Overrides for the kit renderer — tests pass a fake document and ports; the plugin passes nothing. */
+export type RenderOverrides = Partial<Pick<RenderNoteOptions, "doc" | "ports" | "cacheTimeoutMs" | "settle">>;
+
+export function createAssemblerDeps(app: App, renderOverrides: RenderOverrides = {}): AssemblerDeps {
   return {
-    async renderMarkdown(markdown, sourcePath) {
+    async renderMarkdown(markdown, sourcePath, use) {
       // Pull fenced code out BEFORE rendering (other plugins' post-processors would
       // replace the <pre> with unrecoverable widget DOM); re-injected after dom-to-xhtml.
       const { markdown: stripped, codes } = extractCodeBlocks(markdown);
-      const root = createDiv();
-      const comp = new Component();
-      await MarkdownRenderer.render(app, stripped, root, sourcePath, comp);
-      return { root, dispose: () => comp.unload(), codes };
+      // Kit renderer: host attached to the document (Mermaid and callout icons draw), deadline, settle rule,
+      // and a wait for the metadata cache of section embeds (`![[X#Heading]]` right after X was created or changed).
+      return withRenderedNote({ app, markdown: stripped, sourcePath, ...renderOverrides }, ({ root, findings }) =>
+        use({ root, codes, findings }));
     },
 
     async readNote(path) {
@@ -69,4 +73,17 @@ export function createAssemblerDeps(app: App): AssemblerDeps {
       return paths;
     },
   };
+}
+
+/** The sentence for a kit render finding: key `finding.<code>` and arguments in the same order as hypertext-exporter (`translateRenderFinding`). */
+export function renderFindingMessage(f: RenderNoteFinding, t: (key: string, ...args: (string | number)[]) => string): string {
+  switch (f.kind) {
+    case "render-timeout": return t("finding.render.timeout", f.ms);
+    case "render-failed": return t("finding.render.failed", f.message);
+    case "mermaid-missing": return t("finding.render.mermaid-missing", f.expected - f.drawn, f.expected);
+    case "not-settled": return t("finding.render.placeholder", f.ms, f.placeholders);
+    case "window-hidden": return t("finding.render.hidden-window");
+    case "metadata-not-ready": return t("finding.render.metadata-not-ready", f.target, f.ms);
+    case "embed-missing": return t("finding.embed.missing", f.target);
+  }
 }
