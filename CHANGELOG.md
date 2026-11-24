@@ -6,8 +6,11 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- A cover prompt that is only a clock time (`14:55`, `1:30:00`) is written in quotes. Before, the bare text stood in the book note's properties, and Obsidian 1.15.0 reads it as the number 895 (sexagesimal form of YAML 1.1). Text such as `12:30pm` stays unquoted (kit `frontmatter` 0.108.0).
+
 ### Changed
-- Kit pins move to obsidian-kit 0.106.0 and code-kit 0.87.0. No visible change: the cover path and the cover prompt are the only values this plugin writes into a note's properties, and neither can carry a line break (the prompt is joined to one line before the write).
+- Kit pins move to obsidian-kit 0.108.0 and code-kit 0.88.0. The private reader for the author and subject lists is replaced by `coerceStringList` of the kit (same result: a single value is a list of one, numbers and dates become text, empty entries drop out).
 
 ## [0.9.5] — 2026-11-19
 

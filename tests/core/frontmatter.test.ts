@@ -255,6 +255,17 @@ describe("setCoverPath", () => {
 });
 
 describe("setCoverPrompt", () => {
+  it("quotes a prompt that is only a clock time, so Obsidian 1.15.0 does not read it as the number 895 (kit 0.108.0, sexagesimal form of YAML 1.1)", () => {
+    // Bare `14:55` is an Int in YAML 1.1 (base 60). Obsidian 1.15.0 reads it as 895; the cover prompt would come back as a number.
+    expect(setCoverPrompt("---\nepub: true\n---", "14:55")).toBe('---\nepub: true\ncover_prompt: "14:55"\n---');
+    expect(setCoverPrompt("---\nepub: true\n---", "1:30:00")).toBe('---\nepub: true\ncover_prompt: "1:30:00"\n---');
+    // Neighbours that are no clock time stay bare text.
+    expect(setCoverPrompt("---\nepub: true\n---", "12:30pm")).toBe("---\nepub: true\ncover_prompt: 12:30pm\n---");
+    // Round trip: what the block reads back is the text that was set.
+    const out = setCoverPrompt("---\nepub: true\n---", "14:55");
+    expect(parseBookMetadata(parseFrontmatter(out + "\nText\n").data, opts).coverPrompt).toBe("14:55");
+  });
+
   it("stores the prompt so the next run starts from it", () => {
     const out = setCoverPrompt("---\nepub: true\n---", "a marsh at dusk");
     expect(out).toBe("---\nepub: true\ncover_prompt: a marsh at dusk\n---");
