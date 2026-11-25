@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.109.0, src/obsidian/render-note.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.109.1, src/obsidian/render-note.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // render-note.ts — eine Notiz mit Obsidians Renderer in einen DOM-Baum holen, der VOLLSTÄNDIG gezeichnet ist: Host am Dokument, Frist, Mermaid-Wartezeit, Ruhe-Regel mit fester Obergrenze, Befunde statt Würfe.
 //
 // Warum es das gibt (Welle 36, Bestellung hypertext-exporter 1): drei Exporter rendern dieselbe Sache dreimal verschieden. epub-exporter (`deps.ts`) rendert in einen LOSEN Host ohne Frist, Letterhead im Vektor-Weg ebenso;
@@ -151,7 +151,7 @@ function defaultPorts(app: App, clock: ClockPort, doc: Document): RenderNotePort
       return { path: file.path, cache: cache && isCacheEntryCurrent(entry, file.stat) ? { embeds: (cache.embeds ?? []).map((e) => e.link) } : null };
     },
     observe: (host, onChange) => {
-      const Observer = (activeWindow as Window & typeof globalThis).MutationObserver;
+      const Observer = (activeWindow as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver;
       const obs = new Observer(onChange);
       obs.observe(host, { childList: true, subtree: true, attributes: true, characterData: true });
       return () => { obs.disconnect(); };

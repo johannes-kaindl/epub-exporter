@@ -1,7 +1,7 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.109.0"
+      "ref": "0.109.1"
     },
     "code-kit": {
       "ref": "0.89.0"
