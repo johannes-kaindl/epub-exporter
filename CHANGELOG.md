@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.7] — 2026-11-25
+
 ### Fixed
 - The Obsidian Community Store scanner flagged "Avoid using globalThis, use window or activeWindow" (medium) in the vendored kit renderer, which kept the plugin at "Satisfactory" instead of "Passed". The renderer now names the member it uses instead of a `globalThis` type reference (obsidian-kit 0.109.1). No change in behaviour.
 
