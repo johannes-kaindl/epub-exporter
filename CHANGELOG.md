@@ -6,6 +6,8 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.8] — 2026-11-25
+
 ### Fixed
 - **A note embedded in running text (`![[Note]]` or `![[Note#Heading]]` inside a paragraph) gives valid XHTML.** Obsidian draws the embed as an inline wrapper with the note's headings and paragraphs inside, and the chapter carried them as `<p><span><h1>…</h1><p>…</p></span></p>`; EPUBCheck rejected that (RSC-005) and strict readers could drop or misplace the text. A paragraph or inline element that holds blocks is now split around them: the text before and after the embed stays a paragraph of its own, the embedded headings, paragraphs and lists follow as blocks.
 
