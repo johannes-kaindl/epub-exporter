@@ -1,8 +1,5 @@
 import { sanitizeBase } from "./output-path";
-
-function basename(path: string): string {
-  return path.split("/").pop() ?? path;
-}
+import { baseName } from "../vendor/kit/rel-path";
 
 function splitExt(name: string): [string, string] {
   const dot = name.lastIndexOf(".");
@@ -19,7 +16,7 @@ interface AssetPlanState {
 function registerAsset(state: AssetPlanState, sourcePath: string): string {
   const existing = state.bySource.get(sourcePath);
   if (existing) return existing;
-  const [stem, ext] = splitExt(basename(sourcePath));
+  const [stem, ext] = splitExt(baseName(sourcePath));
   let name = `${stem}${ext}`;
   for (let n = 2; state.usedNames.has(name); n++) name = `${stem} (${n})${ext}`;
   state.usedNames.add(name);

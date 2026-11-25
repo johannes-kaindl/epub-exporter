@@ -1,3 +1,4 @@
+import { escapeHtmlAttr, escapeHtmlText } from "../vendor/kit/html-escape";
 export interface ExtractedCode {
   lang?: string;
   text: string;
@@ -61,12 +62,6 @@ export function extractCodeBlocks(md: string): { markdown: string; codes: Extrac
   return { markdown: out.join("\n"), codes };
 }
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-function escapeAttr(s: string): string {
-  return escapeText(s).replace(/"/g, "&quot;");
-}
 
 // dom-to-xhtml strips all attributes from <p> (no whitelist entry), so a lone placeholder
 // paragraph is always serialized as exactly `<p>EPUBEXPORTERCODEi</p>` regardless of any
@@ -78,7 +73,7 @@ export function restoreCodeBlocks(xhtml: string, codes: ExtractedCode[]): string
   return xhtml.replace(PLACEHOLDER_P_RE, (whole, n) => {
     const code = codes[Number(n)];
     if (!code) return whole;
-    const langAttr = code.lang ? ` class="language-${escapeAttr(code.lang)}"` : "";
-    return `<pre><code${langAttr}>${escapeText(code.text)}</code></pre>`;
+    const langAttr = code.lang ? ` class="language-${escapeHtmlAttr(code.lang)}"` : "";
+    return `<pre><code${langAttr}>${escapeHtmlText(code.text)}</code></pre>`;
   });
 }

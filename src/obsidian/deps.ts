@@ -22,8 +22,8 @@ export function createAssemblerDeps(app: App, renderOverrides: RenderOverrides =
     },
 
     async readNote(path) {
-      const file = app.vault.getAbstractFileByPath(path);
-      if (!(file instanceof TFile) || file.extension !== "md") return null;
+      const file = app.vault.getFileByPath(path);
+      if (!file || file.extension !== "md") return null;
       const content = await app.vault.cachedRead(file);
       const frontmatter = (app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<string, unknown>;
       const note: NoteData = {
@@ -52,7 +52,7 @@ export function createAssemblerDeps(app: App, renderOverrides: RenderOverrides =
       } else {
         const link = decodeURIComponent(src.replace(/^\.\//, ""));
         dest = app.metadataCache.getFirstLinkpathDest(link, sourcePath)
-          ?? app.vault.getAbstractFileByPath(normalizePath(link));
+          ?? app.vault.getFileByPath(normalizePath(link));
       }
       if (!(dest instanceof TFile)) return null;
       const buf = await app.vault.readBinary(dest);
@@ -60,8 +60,8 @@ export function createAssemblerDeps(app: App, renderOverrides: RenderOverrides =
     },
 
     async listFolderNotes(folderPath) {
-      const folder = app.vault.getAbstractFileByPath(folderPath);
-      if (!(folder instanceof TFolder)) return [];
+      const folder = app.vault.getFolderByPath(folderPath);
+      if (!folder) return [];
       const paths: string[] = [];
       const walk = (dir: TFolder): void => {
         for (const child of dir.children) {

@@ -1,10 +1,10 @@
 {
   "sources": {
     "obsidian-kit": {
-      "ref": "0.109.1"
+      "ref": "0.111.0"
     },
     "code-kit": {
-      "ref": "0.89.0"
+      "ref": "0.91.1"
     }
   },
   "targets": [
@@ -28,7 +28,9 @@
         "run-exclusive",
         "timeout",
         "error-message",
-        "fences"
+        "fences",
+        "html-escape",
+        "ensure-dir"
       ]
     },
     {

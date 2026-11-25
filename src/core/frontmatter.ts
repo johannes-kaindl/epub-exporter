@@ -1,4 +1,4 @@
-import { wikilinkOf } from "../vendor/kit/frontmatter";
+import { splitFrontmatter, wikilinkOf } from "../vendor/kit/frontmatter";
 import { isFrontmatterKeyName, patchFrontmatter } from "../vendor/kit/frontmatter-patch";
 import { coerceStringList, scalarToString } from "../vendor/kit/string-list";
 import { BookMetadata } from "./model";
@@ -70,18 +70,7 @@ export function parseBookMetadata(
   };
 }
 
-// Split a note into its leading YAML frontmatter block and the remaining body.
-// head + body always recomposes to the input, so a writer can put the note back
-// together after rewriting only the body.
-export function splitFrontmatter(content: string): { head: string; body: string } {
-  if (content.startsWith("---")) {
-    const m = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-    if (m) return { head: m[0], body: content.slice(m[0].length) };
-  }
-  return { head: "", body: content };
-}
-
-// Strip a leading YAML frontmatter block so the body handed to a renderer/parser
+// Strip a leading YAML frontmatter block (fence rules of obsidian-kit splitFrontmatter, after Obsidian) so the body handed to a renderer/parser
 // has no raw YAML. Shared by deps.ts (render) and sidebar-bridge.ts (spine read).
 export function stripFrontmatter(content: string): string {
   return splitFrontmatter(content).body;

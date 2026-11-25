@@ -39,6 +39,9 @@ function makeVault(initial: { folders: string[]; files: string[] }) {
     remove: (path: string) => entries.delete(path),
     vault: {
       getAbstractFileByPath: (p: string) => entries.get(p) ?? null,
+      getFileByPath: (p: string) => { const e = entries.get(p); return e instanceof TFile ? e : null; },
+      getFolderByPath: (p: string) => { const e = entries.get(p); return e instanceof TFolder ? e : null; },
+      adapter: { exists: async (p: string) => entries.has(p) },
       getAllLoadedFiles: () => [...entries.values()],
       cachedRead: async () => "# Titel\n",
       createFolder: async (p: string) => { calls.push(`folder ${p}`); folderAt(p); },

@@ -1,5 +1,6 @@
 // src/obsidian/output.ts
 import { App, Notice } from "obsidian";
+import { ensureDir } from "../vendor/kit/ensure-dir";
 import { OutputDestination, resolveOutputPath, sanitizeBase } from "../core/output-path";
 import { getLang, t } from "../vendor/kit/i18n";
 import { SHARE_EXPORT_STRINGS_DE, SHARE_EXPORT_STRINGS_EN, shareExport } from "../vendor/kit-obsidian/share-export";
@@ -33,7 +34,8 @@ export async function writeEpub(
   // Only "share" yields null; the guard keeps TypeScript happy and is defensive.
   if (path === null) return { savedPath: null };
   const dir = vaultDirname(path);
-  if (dir && !(await adapter.exists(dir))) await adapter.mkdir(dir);
+  // The EPUB is written through the adapter as well, so the adapter store is enough (no vault object follows).
+  if (dir) await ensureDir(adapter, dir);
   await adapter.writeBinary(path, bytes.buffer as ArrayBuffer);
   new Notice(t("notice.saved", path));
   return { savedPath: path };

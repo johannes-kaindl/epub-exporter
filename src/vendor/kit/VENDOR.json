@@ -1,11 +1,11 @@
 {
   "source": "code-kit",
-  "version": "0.89.0",
-  "sha": "4576daa",
-  "vendored": "crc32.ts, filename-template.ts, folder-scope.ts, fold-case.ts, heading-title.ts, i18n.ts, link-resolver.ts, name-order.ts, rel-path.ts, settings.ts, split-list.ts, string-list.ts, run-exclusive.ts, timeout.ts, error-message.ts, fences.ts",
+  "version": "0.91.1",
+  "sha": "512aa5c",
+  "vendored": "crc32.ts, filename-template.ts, folder-scope.ts, fold-case.ts, heading-title.ts, i18n.ts, link-resolver.ts, name-order.ts, rel-path.ts, settings.ts, split-list.ts, string-list.ts, run-exclusive.ts, timeout.ts, error-message.ts, fences.ts, html-escape.ts, ensure-dir.ts",
   "note": "Verbatim snapshot aus festen Git-Refs (CORE-META-22: feste Ref, nicht Arbeitsstand); den Stand nennen `version` und `obsidian_kit_version` samt Einzelpins in `vendored`, die Pins stehen in tools/kit-sync.json. Never hand-edit. Re-vendor via tools/sync-kit.sh. kit-obsidian/ hat eine eigene VENDOR.json.",
-  "obsidian_kit_version": "0.109.1",
-  "obsidian_kit_sha": "dbbbf11",
+  "obsidian_kit_version": "0.111.0",
+  "obsidian_kit_sha": "3ba6442",
   "obsidian_kit_vendored": "frontmatter.ts, frontmatter-patch.ts, vault-path.ts, mermaid-wait.ts",
   "license": "AGPL-3.0-or-later"
 }

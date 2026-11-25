@@ -1,5 +1,7 @@
 // src/obsidian/work-copy.ts
-import { App, TFile, TFolder } from "obsidian";
+import { App, TFolder } from "obsidian";
+import { ensureDir } from "../vendor/kit/ensure-dir";
+import { vaultDirStore } from "./vault-dir-store";
 import { CopyPlan } from "../core/work-copy";
 
 export interface WorkCopyPort {
@@ -21,16 +23,16 @@ export function createWorkCopyPort(app: App): WorkCopyPort {
       return app.vault.getAbstractFileByPath(path) !== null;
     },
     async createFolder(path) {
-      await app.vault.createFolder(path);
+      await ensureDir(vaultDirStore(app), path);
     },
     async copyFile(from, to) {
-      const file = app.vault.getAbstractFileByPath(from);
-      if (!(file instanceof TFile)) throw new Error(`Cannot copy, not a file: ${from}`);
+      const file = app.vault.getFileByPath(from);
+      if (!file) throw new Error(`Cannot copy, not a file: ${from}`);
       await app.vault.copy(file, to);
     },
     async renameFolder(from, to) {
-      const folder = app.vault.getAbstractFileByPath(from);
-      if (!(folder instanceof TFolder)) throw new Error(`Cannot rename, not a folder: ${from}`);
+      const folder = app.vault.getFolderByPath(from);
+      if (!folder) throw new Error(`Cannot rename, not a folder: ${from}`);
       await app.vault.rename(folder, to);
     },
     async trash(path) {

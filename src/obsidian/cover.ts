@@ -1,5 +1,6 @@
-import { App, TFile, base64ToArrayBuffer, normalizePath } from "obsidian";
-import { setCoverPath, splitFrontmatter } from "../core/frontmatter";
+import { App, base64ToArrayBuffer, normalizePath } from "obsidian";
+import { setCoverPath } from "../core/frontmatter";
+import { splitFrontmatter } from "../vendor/kit/frontmatter";
 import { ensureImageApiReady, type ImageApi, type ImageApiFailure } from "../core/image-api";
 
 /**
@@ -92,8 +93,8 @@ export function createCoverPort(app: App): CoverPort {
       await app.vault.createBinary(normalizePath(path), base64ToArrayBuffer(base64));
     },
     async updateFrontmatter(notePath, fn) {
-      const file = app.vault.getAbstractFileByPath(normalizePath(notePath));
-      if (!(file instanceof TFile)) return;
+      const file = app.vault.getFileByPath(normalizePath(notePath));
+      if (!file) return;
       await app.vault.process(file, (content) => {
         const { head, body } = splitFrontmatter(content);
         // A note without frontmatter is not a book note and cannot reach this

@@ -13,7 +13,8 @@ import { describe, expect, it } from "vitest";
 import { pruefeLinear, pruefeLinearFuzz } from "./vendor/kit/linear-probe";
 import { extractCodeBlocks, restoreCodeBlocks } from "../src/core/code-blocks";
 import { extractImageRefs, rewriteImageRefs } from "../src/core/image-refs";
-import { setCoverPrompt, splitFrontmatter } from "../src/core/frontmatter";
+import { setCoverPrompt } from "../src/core/frontmatter";
+import { splitFrontmatter } from "../src/vendor/kit/frontmatter";
 import { parseEmbedSpine } from "../src/core/spine-parser";
 
 const FUZZ_MS = 180_000;

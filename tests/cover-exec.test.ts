@@ -122,7 +122,7 @@ describe("createCoverPort().updateFrontmatter — line ending of the seam", () =
     const file = Object.assign(new TFile(), { path: PATH });
     let text = content;
     const vault = {
-      getAbstractFileByPath: (p: string) => (p === PATH ? file : null),
+      getFileByPath: (p: string) => (p === PATH ? file : null),
       process: async (_f: TFile, fn: (data: string) => string) => {
         text = fn(text);
         return text;

@@ -34,6 +34,8 @@ function fakeApp(notes: Record<string, Note>, extraFolders: string[] = []): App 
   return {
     vault: {
       getAbstractFileByPath: (p: string) => entries.get(p) ?? null,
+      getFileByPath: (p: string) => { const e = entries.get(p); return e instanceof TFile ? e : null; },
+      getFolderByPath: (p: string) => { const e = entries.get(p); return e instanceof TFolder ? e : null; },
       cachedRead: async (f: TFile) => {
         const n = notes[f.path];
         const fm = n.fm ? `---\n${Object.entries(n.fm).map(([k, v]) => `${k}: ${String(v)}`).join("\n")}\n---\n` : "";

@@ -1,4 +1,5 @@
 import { firstHeadingText } from "../vendor/kit/heading-title";
+import { baseName } from "../vendor/kit/rel-path";
 import { compareOrderedNames, parseOrderedName, type OrderedName } from "../vendor/kit/name-order";
 
 export interface FolderBookOptions {
@@ -74,12 +75,8 @@ function stripMd(name: string): string | null {
   return /\.md$/i.test(name) ? name.slice(0, -3) : null;
 }
 
-function lastSegment(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
-}
-
 function collectDirs(rootPath: string, files: readonly FolderFileInput[]): Dir {
-  const root: Dir = { name: lastSegment(rootPath), path: rootPath, files: [], dirs: new Map() };
+  const root: Dir = { name: baseName(rootPath), path: rootPath, files: [], dirs: new Map() };
   const prefix = rootPath === "" ? "" : `${rootPath}/`;
   for (const file of files) {
     if (!file.path.startsWith(prefix) || stripMd(file.path) === null) continue;
@@ -118,7 +115,7 @@ function buildLevel(dir: Dir, folderTitle: string, options: FolderBookOptions): 
 
   for (const file of dir.files) {
     if (file.excluded) continue;
-    const name = stripMd(lastSegment(file.path)) ?? "";
+    const name = stripMd(baseName(file.path)) ?? "";
     const parsed = parseOrderedName(name);
     if (options.numberPrefix && parsed.hidden) {
       hidden++;

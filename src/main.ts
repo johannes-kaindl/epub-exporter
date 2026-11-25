@@ -1,5 +1,6 @@
 // src/main.ts
 import { Plugin, Notice, TFile, TFolder, Menu, getLanguage, normalizePath, WorkspaceLeaf } from "obsidian";
+import { isInFolder } from "./vendor/kit/folder-scope";
 import { assembleBook, BookSource, type ChapterRenderFinding } from "./obsidian/book-assembler";
 import { buildEpub } from "./core/epub-builder";
 import { createAssemblerDeps, renderFindingMessage } from "./obsidian/deps";
@@ -31,8 +32,8 @@ import {
   isBookNote,
   parseBookMetadata,
   setCoverPrompt,
-  splitFrontmatter,
 } from "./core/frontmatter";
+import { splitFrontmatter } from "./vendor/kit/frontmatter";
 
 // Defensive feature-detect: getAvailablePathForAttachment is in the installed obsidian
 // typings, but this narrow interface guards hosts older than minAppVersion (1.8.7),
@@ -185,8 +186,8 @@ export default class EpubExporterPlugin extends Plugin {
   }
 
   private importSelectedFolder(): void {
-    const folder = this.folderSelection === null ? null : this.app.vault.getAbstractFileByPath(this.folderSelection);
-    if (folder instanceof TFolder) void this.importFolder(folder);
+    const folder = this.folderSelection === null ? null : this.app.vault.getFolderByPath(this.folderSelection);
+    if (folder) void this.importFolder(folder);
   }
 
   private async closeFolderMode(): Promise<void> {
@@ -198,7 +199,7 @@ export default class EpubExporterPlugin extends Plugin {
   private affectsSelectedFolder(path: string): boolean {
     const selection = this.folderSelection;
     if (selection === null) return false;
-    const within = (root: string): boolean => path === root || path.startsWith(`${root}/`);
+    const within = (root: string): boolean => isInFolder(path, root, { self: true });
     if (within(selection)) return true;
     const copy = workCopyPath(this.settings.workDir, selection);
     return copy.ok && within(copy.path);
@@ -216,7 +217,7 @@ export default class EpubExporterPlugin extends Plugin {
   private async snapshotForSidebar(): ReturnType<SidebarBridge["snapshot"]> {
     const selection = this.folderSelection;
     if (selection !== null) {
-      if (this.app.vault.getAbstractFileByPath(selection) instanceof TFolder) {
+      if (this.app.vault.getFolderByPath(selection)) {
         return buildFolderSnapshot(this.app, selection, this.settings);
       }
       this.folderSelection = null; // the folder is gone: back to the active note
@@ -282,8 +283,8 @@ export default class EpubExporterPlugin extends Plugin {
       const parent = vaultDirname(source.path);
       return { noteDir: parent, baseName: title };
     }
-    const file = this.app.vault.getAbstractFileByPath(source.path);
-    const dir = file instanceof TFile && file.parent ? file.parent.path : "";
+    const file = this.app.vault.getFileByPath(source.path);
+    const dir = file?.parent ? file.parent.path : "";
     return { noteDir: dir === "/" ? "" : dir, baseName: title };
   }
 
@@ -477,8 +478,8 @@ export default class EpubExporterPlugin extends Plugin {
     const res = await executeImport(createImportPort(this.app), folder.path, plan);
     if (!res.created) { new Notice(t("notice.importExists")); return; }
     new Notice(t("notice.imported", res.notePath));
-    const created = this.app.vault.getAbstractFileByPath(res.notePath);
-    if (created instanceof TFile) void this.app.workspace.getLeaf(false).openFile(created);
+    const created = this.app.vault.getFileByPath(res.notePath);
+    if (created) void this.app.workspace.getLeaf(false).openFile(created);
   }
 
   private makeBridge(): SidebarBridge {

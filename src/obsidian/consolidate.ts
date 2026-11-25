@@ -1,4 +1,6 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
+import { ensureDir } from "../vendor/kit/ensure-dir";
+import { vaultDirStore } from "./vault-dir-store";
 import { ConsolidatePlan, ChapterMode, ConsolidateInput, AssetMode, ResolvedImageRef } from "../core/consolidate-plan";
 import { extractImageRefs, rewriteImageRefs } from "../core/image-refs";
 import { parseEmbedSpine } from "../core/spine-parser";
@@ -80,28 +82,28 @@ export function createConsolidatePort(app: App): ConsolidatePort {
   const a = app.vault.adapter;
   return {
     async createFolder(path) {
-      if (!(await a.exists(normalizePath(path)))) await app.vault.createFolder(normalizePath(path));
+      await ensureDir(vaultDirStore(app), normalizePath(path));
     },
     async readBody(path) {
-      const f = app.vault.getAbstractFileByPath(path);
-      return f instanceof TFile ? app.vault.read(f) : "";
+      const f = app.vault.getFileByPath(path);
+      return f ? app.vault.read(f) : "";
     },
     async copyFile(sourcePath, targetPath) {
-      const f = app.vault.getAbstractFileByPath(sourcePath);
-      if (f instanceof TFile) await app.vault.copy(f, targetPath);
+      const f = app.vault.getFileByPath(sourcePath);
+      if (f) await app.vault.copy(f, targetPath);
     },
     async moveFile(sourcePath, targetPath) {
-      const f = app.vault.getAbstractFileByPath(sourcePath);
-      if (f instanceof TFile) await app.fileManager.renameFile(f, targetPath);
+      const f = app.vault.getFileByPath(sourcePath);
+      if (f) await app.fileManager.renameFile(f, targetPath);
     },
     async writeFile(path, content) {
-      const f = app.vault.getAbstractFileByPath(path);
-      if (f instanceof TFile) await app.vault.modify(f, content);
+      const f = app.vault.getFileByPath(path);
+      if (f) await app.vault.modify(f, content);
       else await app.vault.create(path, content);
     },
     async copyBinary(sourcePath, targetPath) {
-      const f = app.vault.getAbstractFileByPath(sourcePath);
-      if (f instanceof TFile) {
+      const f = app.vault.getFileByPath(sourcePath);
+      if (f) {
         const bytes = await app.vault.readBinary(f);
         await a.writeBinary(normalizePath(targetPath), bytes);
       }

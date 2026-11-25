@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.109.1, src/pure/mermaid-wait.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.111.0, src/pure/mermaid-wait.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // mermaid-wait.ts — wartet, bis Obsidian die Mermaid-Diagramme eines Hosts gezeichnet hat. Kein `obsidian`-Import.
 //
 // Warum hier und nicht in code-kit (erste Frage aus AGENTS.md / CONTRIBUTING § 2): der Vertrag trägt eine Annahme über die gerenderte Form von Obsidian: ein gezeichnetes Diagramm ist ein `svg` in einem

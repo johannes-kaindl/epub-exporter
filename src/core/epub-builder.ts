@@ -1,17 +1,13 @@
 import { Book, TocEntry } from "./model";
 import { createZip, ZipEntry } from "./zip-writer";
+import { escapeHtmlAttr } from "../vendor/kit/html-escape";
 
 const MIMETYPE = "application/epub+zip";
 const DEFAULT_MODIFIED = "2026-01-01T00:00:00Z";
 const enc = (s: string) => new TextEncoder().encode(s);
 
-function xmlEscape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+// Text and attribute values alike: escapeHtmlAttr masks & < > " and ' (as &#39;, a character reference XML accepts).
+const xmlEscape = escapeHtmlAttr;
 
 function chapterFileName(index: number): string {
   return `chapter-${String(index + 1).padStart(2, "0")}.xhtml`;

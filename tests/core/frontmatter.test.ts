@@ -3,12 +3,11 @@ import {
   parseBookMetadata,
   isBookNote,
   BOOK_FRONTMATTER_TEMPLATE,
-  splitFrontmatter,
   setCoverPath,
   setCoverPrompt,
 } from "../../src/core/frontmatter";
 import { stripFrontmatter } from "../../src/core/frontmatter";
-import { parseFrontmatter } from "../../src/vendor/kit/frontmatter";
+import { parseFrontmatter, splitFrontmatter } from "../../src/vendor/kit/frontmatter";
 
 const opts = { fallbackTitle: "Untitled", defaultLanguage: "en", rng: () => 0.5 };
 
@@ -133,6 +132,7 @@ describe("BOOK_FRONTMATTER_TEMPLATE", () => {
   });
 });
 
+// splitFrontmatter comes from obsidian-kit since 0.111.0; these cases pin what the cover and prompt writers rely on.
 describe("splitFrontmatter", () => {
   it("splits a note into frontmatter head and body", () => {
     const content = "---\ntitle: X\n---\n# Heading\nText";

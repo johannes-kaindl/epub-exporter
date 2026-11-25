@@ -1,5 +1,5 @@
 // src/obsidian/import.ts
-import { App, TFile, TFolder, stringifyYaml } from "obsidian";
+import { App, TFile, stringifyYaml } from "obsidian";
 import { ImportPlan } from "../core/import-plan";
 
 export interface ImportPort {
@@ -20,8 +20,8 @@ export function createImportPort(app: App): ImportPort {
 
 // List the .md basenames directly inside a folder (for buildImportPlan).
 export function folderMdBasenames(app: App, folderPath: string): string[] {
-  const folder = app.vault.getAbstractFileByPath(folderPath);
-  if (!(folder instanceof TFolder)) return [];
+  const folder = app.vault.getFolderByPath(folderPath);
+  if (!folder) return [];
   return folder.children
     .filter((c): c is TFile => c instanceof TFile && c.extension === "md")
     .map((f) => f.basename);
