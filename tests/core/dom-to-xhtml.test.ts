@@ -154,3 +154,61 @@ describe("domToXhtml", () => {
     expect(out).toContain("cap"); // figcaption text preserved as loose inline text
   });
 });
+
+// Content-model probe: the output parses as XML, and no block element sits inside p or inside an inline element (EPUBCheck RSC-005).
+const PHRASING_ONLY = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "em", "strong", "del", "s", "b", "i", "code", "sup", "sub", "span"]);
+const BLOCKS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "pre", "table", "hr"]);
+function blockInPhrasing(xhtml: string): string[] {
+  const doc = new DOMParser().parseFromString(`<body xmlns="http://www.w3.org/1999/xhtml">${xhtml}</body>`, "application/xhtml+xml");
+  if (doc.getElementsByTagName("parsererror").length > 0) return ["parsererror"];
+  const bad: string[] = [];
+  for (const el of Array.from(doc.getElementsByTagName("*"))) {
+    if (!BLOCKS.has(el.localName)) continue;
+    for (let a = el.parentElement; a && a.localName !== "body"; a = a.parentElement) {
+      if (PHRASING_ONLY.has(a.localName)) bad.push(`${a.localName}>${el.localName}`);
+    }
+  }
+  return bad;
+}
+
+// Obsidian builds the DOM with createEl, so a div may sit inside a p; the HTML parser behind innerHTML would close the p first and
+// hide the case. The fixtures go through the XML parser, which keeps the nesting as written.
+function domOf(xhtml: string): Element {
+  return new DOMParser().parseFromString(`<div xmlns="http://www.w3.org/1999/xhtml">${xhtml}</div>`, "application/xhtml+xml").documentElement;
+}
+
+// Obsidian renders ![[Note]] in running text as a span.internal-embed inside the paragraph, with the note's blocks inside it.
+const EMBED_IN_P =
+  '<p>vor <span class="internal-embed markdown-embed inline-embed is-loaded" src="Teil 2"><div class="embed-title markdown-embed-title"></div>' +
+  '<div class="markdown-embed-content"><div class="markdown-preview-view markdown-rendered"><div class="markdown-preview-sizer markdown-preview-section">' +
+  '<div><h1 data-heading="Teil 2">Teil 2</h1></div><div><p>Text <em>kursiv</em></p></div></div></div></div>' +
+  '<div class="markdown-embed-link"></div></span> nach</p>';
+
+describe("domToXhtml — embedded note inside a paragraph", () => {
+  it("splits p > span > h1 into sibling blocks instead of nesting them", () => {
+    const out = domToXhtml(domOf(EMBED_IN_P), ctx());
+    expect(out).toBe("<p>vor </p><h1>Teil 2</h1><p>Text <em>kursiv</em></p><p> nach</p>");
+    expect(blockInPhrasing(out)).toEqual([]);
+  });
+
+  it("keeps a paragraph with only an embed free of empty wrappers", () => {
+    const out = domToXhtml(domOf('<p><span class="internal-embed"><div class="markdown-embed-content"><h2>A</h2><p>b</p></div></span></p>'), ctx());
+    expect(out).toBe("<h2>A</h2><p>b</p>");
+  });
+
+  it("splits an inline wrapper with a block inside even outside a paragraph", () => {
+    const out = domToXhtml(domOf("<em>a<div><ul><li>x</li></ul></div>b</em>"), ctx());
+    expect(out).toBe("<em>a</em><ul><li>x</li></ul><em>b</em>");
+    expect(blockInPhrasing(out)).toEqual([]);
+  });
+
+  it("leaves an ordinary paragraph and an embed without blocks untouched", () => {
+    const out = domToXhtml(domOf('<p>a <span class="internal-embed">Bild</span> b</p>'), ctx());
+    expect(out).toBe("<p>a <span>Bild</span> b</p>");
+  });
+
+  it("counts a callout inside an embed as a block", () => {
+    const out = domToXhtml(domOf('<p><span class="internal-embed"><div class="callout" data-callout="note"><div class="callout-title">T</div></div></span></p>'), ctx());
+    expect(blockInPhrasing(out)).toEqual([]);
+  });
+});

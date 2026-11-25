@@ -6,6 +6,12 @@ versioning according to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **A note embedded in running text (`![[Note]]` or `![[Note#Heading]]` inside a paragraph) gives valid XHTML.** Obsidian draws the embed as an inline wrapper with the note's headings and paragraphs inside, and the chapter carried them as `<p><span><h1>…</h1><p>…</p></span></p>`; EPUBCheck rejected that (RSC-005) and strict readers could drop or misplace the text. A paragraph or inline element that holds blocks is now split around them: the text before and after the embed stays a paragraph of its own, the embedded headings, paragraphs and lists follow as blocks.
+
+### Changed
+- Kit pins move to obsidian-kit 0.111.0 and code-kit 0.91.1 (before: 0.109.1 and 0.89.0). Splitting a note's front matter uses `splitFrontmatter` of the kit (fence rules after Obsidian: an empty `---`/`---` block is a block, a line `---x` does not close it, a byte order mark before the fence means no block). Escaping in chapters, package and table of contents uses `escapeHtmlText`/`escapeHtmlAttr` of the kit (an apostrophe in a title or attribute is now written as `&#39;`, which every reader decodes); folders are created with `ensureDir` of the kit (missing parents included). No other change in behaviour.
+
 ## [0.9.7] — 2026-11-25
 
 ### Fixed

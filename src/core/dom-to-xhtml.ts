@@ -1,3 +1,5 @@
+import { escapeHtmlAttr, escapeHtmlText } from "../vendor/kit/html-escape";
+
 export interface RenderContext {
   // EPUB href for an image src, or null to drop it (counts as unsupported).
   resolveImage(src: string): string | null;
@@ -29,12 +31,6 @@ const ATTR_WHITELIST: Record<string, string[]> = {
   ol: ["start"],
 };
 
-function escapeText(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-function escapeAttr(s: string): string {
-  return escapeText(s).replace(/"/g, "&quot;");
-}
 
 function serializeAttrs(el: Element, tag: string): string {
   const allow = ATTR_WHITELIST[tag];
@@ -42,7 +38,7 @@ function serializeAttrs(el: Element, tag: string): string {
   let out = "";
   for (const name of allow) {
     const v = el.getAttribute(name);
-    if (v !== null) out += ` ${name}="${escapeAttr(v)}"`;
+    if (v !== null) out += ` ${name}="${escapeHtmlAttr(v)}"`;
   }
   return out;
 }
@@ -60,7 +56,7 @@ function serializeChildren(node: Node, ctx: RenderContext): string {
 }
 
 function serializeNode(node: Node, ctx: RenderContext): string {
-  if (node.nodeType === 3) return escapeText(node.textContent ?? ""); // text
+  if (node.nodeType === 3) return escapeHtmlText(node.textContent ?? ""); // text
   if (node.nodeType !== 1) return ""; // comment/other
   const el = node as Element;
   const tag = el.tagName.toLowerCase();
@@ -80,7 +76,7 @@ function serializeNode(node: Node, ctx: RenderContext): string {
       return "";
     }
     const alt = el.getAttribute("alt") ?? "";
-    return `<img src="${escapeAttr(href)}" alt="${escapeAttr(alt)}"/>`;
+    return `<img src="${escapeHtmlAttr(href)}" alt="${escapeHtmlAttr(alt)}"/>`;
   }
 
   if (tag === "a") {
@@ -92,16 +88,16 @@ function serializeNode(node: Node, ctx: RenderContext): string {
       return inner;
     }
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target) || target.startsWith("mailto:")) {
-      return `<a href="${escapeAttr(target)}">${inner}</a>`;
+      return `<a href="${escapeHtmlAttr(target)}">${inner}</a>`;
     }
     const internal = ctx.resolveInternalLink(target);
-    return internal ? `<a href="${escapeAttr(internal)}">${inner}</a>` : inner;
+    return internal ? `<a href="${escapeHtmlAttr(internal)}">${inner}</a>` : inner;
   }
 
   // Math (MathJax container or an element flagged with the math class) -> text.
   if (tag === "mjx-container" || el.classList.contains("math")) {
     ctx.onUnsupported("math");
-    return escapeText(el.textContent ?? "");
+    return escapeHtmlText(el.textContent ?? "");
   }
 
   // A callout is a div. It stays recognisable as a blockquote (the e-reader sets it apart), its type survives as a class and its
@@ -125,10 +121,48 @@ function serializeNode(node: Node, ctx: RenderContext): string {
 
   if (BLOCK.has(tag) || INLINE.has(tag)) {
     if (VOID.has(tag)) return `<${tag}/>`;
+    // A note embed sits in a paragraph as a span with headings and paragraphs inside (p > span > h1): the reader rejects a block
+    // inside p or inside an inline element, so such a wrapper is split around its block children instead of nesting them.
+    if ((tag === "p" || INLINE.has(tag)) && emitsBlock(el)) return splitAroundBlocks(el, tag, ctx);
     return `<${tag}${serializeAttrs(el, tag)}>${serializeChildren(el, ctx)}</${tag}>`;
   }
 
   // Unknown element -> inline-safe escaped text (NO <p> wrapper -> no invalid nesting).
   ctx.onUnsupported(tag);
-  return escapeText(el.textContent ?? "");
+  return escapeHtmlText(el.textContent ?? "");
+}
+
+// Does this node come out of serializeNode as (or containing) a block element? Mirrors the branches above: unknown elements, math,
+// images and checkboxes come out as text or inline markup; containers and inline wrappers pass their children's answer through.
+function emitsBlock(node: Node): boolean {
+  if (node.nodeType !== 1) return false;
+  const el = node as Element;
+  const tag = el.tagName.toLowerCase();
+  if (el.classList.contains("callout-icon") || tag === "mjx-container" || el.classList.contains("math")) return false;
+  if (tag === "div" && (el.classList.contains("callout") || el.classList.contains("callout-title"))) return true;
+  if (BLOCK.has(tag)) return true;
+  if (UNWRAP.has(tag) || INLINE.has(tag) || tag === "a") return Array.from(el.childNodes).some(emitsBlock);
+  return false;
+}
+
+// Emits the block children as they are and wraps each run of inline content between them in its own copy of the wrapper
+// (`tag`), so <p>a<span><h1>T</h1></span>b</p> becomes <p>a</p><h1>T</h1><p>b</p>. A run of only whitespace is dropped.
+function splitAroundBlocks(el: Element, tag: string, ctx: RenderContext): string {
+  const open = `<${tag}${serializeAttrs(el, tag)}>`;
+  let out = "";
+  let run = "";
+  const flush = (): void => {
+    if (run.trim() !== "") out += `${open}${run}</${tag}>`;
+    run = "";
+  };
+  el.childNodes.forEach((child) => {
+    if (emitsBlock(child)) {
+      flush();
+      out += serializeNode(child, ctx);
+    } else {
+      run += serializeNode(child, ctx);
+    }
+  });
+  flush();
+  return out;
 }
